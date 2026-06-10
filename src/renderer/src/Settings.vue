@@ -22,6 +22,7 @@ function makeProvider(): ProviderState {
 
 const kimi = reactive<ProviderState>(makeProvider());
 const minimax = reactive<ProviderState>(makeProvider());
+const copilot = reactive<ProviderState>(makeProvider());
 const intervalMinutes = ref<number>(10);
 const saving = ref<boolean>(false);
 
@@ -42,6 +43,10 @@ onMounted(async () => {
   minimax.token = cfg.hasMiniMaxToken ? (cfg.minimax.token || '') : '';
   minimax.hasToken = !!cfg.hasMiniMaxToken;
 
+  copilot.enabled = !!cfg.copilot.enabled;
+  copilot.token = cfg.hasCopilotToken ? (cfg.copilot.token || '') : '';
+  copilot.hasToken = !!cfg.hasCopilotToken;
+
   intervalMinutes.value = cfg.intervalMinutes || 10;
 });
 
@@ -60,6 +65,11 @@ async function onSave() {
         token: minimax.token.trim(),
         tokenChanged: minimax.tokenChanged,
         enabled: minimax.enabled,
+      },
+      copilot: {
+        token: copilot.token.trim(),
+        tokenChanged: copilot.tokenChanged,
+        enabled: copilot.enabled,
       },
       intervalMinutes: intervalMinutes.value,
     };
@@ -143,6 +153,35 @@ function onCancel() {
             >
             <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="minimax.showToken = !minimax.showToken">
               {{ minimax.showToken ? '🔒' : '👁' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Copilot -->
+      <div class="settings-section" data-provider="copilot">
+        <div class="settings-section-header">
+          <span class="settings-section-title">Copilot</span>
+          <label class="settings-toggle">
+            <input type="checkbox" v-model="copilot.enabled">
+            <span class="settings-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="copilotToken">Cookie</label>
+          <div class="settings-input-wrap">
+            <input
+              :type="copilot.showToken ? 'text' : 'password'"
+              id="copilotToken"
+              class="settings-input"
+              v-model="copilot.token"
+              :placeholder="copilot.hasToken ? '留空保持原值' : '粘贴整段浏览器 Cookie'"
+              autocomplete="off"
+              spellcheck="false"
+              @input="copilot.tokenChanged = true"
+            >
+            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="copilot.showToken = !copilot.showToken">
+              {{ copilot.showToken ? '🔒' : '👁' }}
             </button>
           </div>
         </div>

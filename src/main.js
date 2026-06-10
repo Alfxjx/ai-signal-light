@@ -22,7 +22,7 @@ const RENDERER_BASE = isDev ? 'http://localhost:5173' : 'http://localhost:3456';
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 240,
-    height: 450,
+    height: 550,
     minWidth: 220,
     minHeight: 352,
     resizable: true,
@@ -132,6 +132,15 @@ function buildTrayMenu() {
           checked: cfg.minimax.enabled,
           click: (item) => {
             configStore.update({ minimax: { enabled: item.checked } });
+            rebuildTray();
+          }
+        },
+        {
+          label: '启用 Copilot',
+          type: 'checkbox',
+          checked: cfg.copilot.enabled,
+          click: (item) => {
+            configStore.update({ copilot: { enabled: item.checked } });
             rebuildTray();
           }
         },
@@ -266,9 +275,11 @@ ipcMain.handle('settings:get', async () => {
   return {
     kimi:    { token: cfg.kimi.token    ? maskToken(cfg.kimi.token)    : '', enabled: cfg.kimi.enabled },
     minimax: { token: cfg.minimax.token ? maskToken(cfg.minimax.token) : '', enabled: cfg.minimax.enabled },
+    copilot: { token: cfg.copilot.token ? maskToken(cfg.copilot.token) : '', enabled: cfg.copilot.enabled },
     intervalMinutes: cfg.intervalMinutes,
     hasKimiToken:    !!cfg.kimi.token,
-    hasMiniMaxToken: !!cfg.minimax.token
+    hasMiniMaxToken: !!cfg.minimax.token,
+    hasCopilotToken: !!cfg.copilot.token
   };
 });
 
@@ -294,6 +305,14 @@ ipcMain.handle('settings:save', async (event, partial) => {
       next.minimax = { ...next.minimax, token: current.minimax.token };
     }
     delete next.minimax.tokenChanged;
+  }
+  if (next.copilot && typeof next.copilot === 'object') {
+    if (next.copilot.tokenChanged) {
+      next.copilot = { ...next.copilot, token: next.copilot.token || '' };
+    } else {
+      next.copilot = { ...next.copilot, token: current.copilot.token };
+    }
+    delete next.copilot.tokenChanged;
   }
 
   configStore.update(next);

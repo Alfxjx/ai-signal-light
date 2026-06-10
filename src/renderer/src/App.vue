@@ -19,6 +19,7 @@ const projects = ref<ClaudeProject[]>([]);
 const usage = reactive<UsageState>({
   kimi: null,
   minimax: null,
+  copilot: null,
   enabled: {},
 });
 
@@ -66,6 +67,7 @@ function handleUsageInit(payload: UsageInitPayload) {
   if (!payload) return;
   usage.kimi = payload.kimi ?? null;
   usage.minimax = payload.minimax ?? null;
+  usage.copilot = payload.copilot ?? null;
   usage.enabled = payload.enabled ?? {};
 }
 

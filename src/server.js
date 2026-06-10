@@ -44,10 +44,12 @@ class StatusServer {
           data: {
             kimi:    this.usageMonitor.state.kimi,
             minimax: this.usageMonitor.state.minimax,
+            copilot: this.usageMonitor.state.copilot,
             enabled: this.configStore ? {
               kimi:    this.configStore.get().kimi.enabled,
-              minimax: this.configStore.get().minimax.enabled
-            } : { kimi: true, minimax: true },
+              minimax: this.configStore.get().minimax.enabled,
+              copilot: this.configStore.get().copilot.enabled
+            } : { kimi: true, minimax: true, copilot: true },
             intervalMinutes: this.configStore ? this.configStore.get().intervalMinutes : 10
           }
         }));

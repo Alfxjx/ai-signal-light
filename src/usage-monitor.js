@@ -8,6 +8,7 @@ const axios = require('axios');
 
 const KIMI_API = 'https://www.kimi.com/apiv2/kimi.gateway.billing.v1.BillingService/GetUsages';
 const MINIMAX_API = 'https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains';
+const COPILOT_API = 'https://github.com/github-copilot/chat/entitlement';
 const REQUEST_TIMEOUT_MS = 8000;
 
 // 浏览器风格的 UA,避免被部分 API 当作 node 客户端拒绝
@@ -32,8 +33,9 @@ class UsageMonitor {
     this.interval = null;
     this.intervalMs = configStore.get().intervalMinutes * 60 * 1000;
     this.state = {
-      kimi: { data: null, lastUpdated: null, error: null },
-      minimax: { data: null, lastUpdated: null, error: null }
+      kimi:    { data: null, lastUpdated: null, error: null },
+      minimax: { data: null, lastUpdated: null, error: null },
+      copilot: { data: null, lastUpdated: null, error: null }
     };
 
     // 订阅配置变化：interval 变化时重启轮询
@@ -76,11 +78,12 @@ class UsageMonitor {
     this.start();
   }
 
-  // 主入口：依次检查两个 provider
+  // 主入口：依次检查所有 provider
   async checkAll() {
     await Promise.all([
-      this._safeRun('kimi', (token) => this.fetchKimi(token)),
-      this._safeRun('minimax', (token) => this.fetchMiniMax(token))
+      this._safeRun('kimi',    (token) => this.fetchKimi(token)),
+      this._safeRun('minimax', (token) => this.fetchMiniMax(token)),
+      this._safeRun('copilot', (token) => this.fetchCopilot(token))
     ]);
   }
 
@@ -246,6 +249,54 @@ class UsageMonitor {
       weeklyPercent: Number(general.current_weekly_remaining_percent) || 0,
       fiveHourResetTime: general.remains_time || null,
     };
+  }
+
+  // ==================== Copilot ====================
+
+  // token 字段实际存的是从浏览器复制的整段 Cookie 串
+  async fetchCopilot(cookie) {
+    let res;
+    try {
+      res = await http.get(COPILOT_API, {
+        headers: {
+          'Cookie': cookie.trim(),
+          'Referer': 'https://github.com/copilot',
+          'Accept': 'application/json, text/plain, */*'
+        }
+      });
+    } catch (e) {
+      throw e;
+    }
+
+    if (res.status >= 400) {
+      const body = typeof res.data === 'string' ? res.data : JSON.stringify(res.data || {});
+      console.error(`[usage:copilot] HTTP ${res.status}\n  body: ${body.slice(0, 500)}`);
+      throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`);
+    }
+
+    const json = res.data;
+    if (!json || typeof json !== 'object' || !json.quotas) {
+      throw new Error('invalid response');
+    }
+
+    const limits    = json.quotas.limits    || {};
+    const remaining = json.quotas.remaining || {};
+
+    const result = {
+      premium: {
+        limit:        Number(limits.premiumInteractions)    || 0,
+        remaining:    Number(remaining.premiumInteractions) || 0,
+        percent:      Number(remaining.premiumInteractionsPercentage) || 0,
+        resetDate:    json.quotas.resetDate    || null,
+        resetDateUtc: json.quotas.resetDateUtc || null
+      },
+      chat: { percent: Number(remaining.chatPercentage) || 0 },
+      plan: json.plan || null,
+      licenseType: json.licenseType || null
+    };
+
+    console.log('[usage:copilot] fetched data:', result);
+    return result;
   }
 
   // ==================== Utilities ====================

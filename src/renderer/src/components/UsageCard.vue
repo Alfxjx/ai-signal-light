@@ -5,6 +5,7 @@ import type {
   ProviderId,
   KimiUsageData,
   MinimaxUsageData,
+  CopilotUsageData,
   UsageMetric,
 } from '../types/messages';
 import { formatAge, formatResetTime, barClass } from '../utils/time';
@@ -95,18 +96,46 @@ const minimaxWeeklyText = computed<string>(() => {
   return `${minimaxData.value?.weeklyPercent ?? 0}%`;
 });
 
+// ---- Copilot 专用 ----
+const copilotData = computed<CopilotUsageData | null>(() => {
+  return (props.usage.copilot?.data as CopilotUsageData | undefined) ?? null;
+});
+
+const copilotPremiumPercent = computed<number>(() => {
+  // 服务端给的是「剩余 %」，bar 填充宽度直接用它（剩得少 = bar 窄）
+  if (!copilotData.value?.premium?.limit) return 0;
+  return Math.max(0, Math.min(100, copilotData.value.premium.percent ?? 0));
+});
+
+const copilotPremiumText = computed<string>(() => {
+  const p = copilotData.value?.premium;
+  if (!p || !p.limit) return '—';
+  return `${p.remaining}/${p.limit}`;
+});
+
+const copilotResetDateText = computed<string>(() => {
+  const d = copilotData.value?.premium?.resetDate;
+  if (!d) return '';
+  // "2026-07-01" → "07-01"
+  return d.length >= 10 ? d.slice(5, 10) : d;
+});
+
 // ---- 卡片头 / 底部 ----
 const usageLastTs = computed<number | null>(() => {
-  const k = props.usage.kimi?.lastUpdated;
-  const m = props.usage.minimax?.lastUpdated;
-  if (k && m) return k > m ? k : m;
-  return k ?? m ?? null;
+  const ks = [
+    props.usage.kimi?.lastUpdated,
+    props.usage.minimax?.lastUpdated,
+    props.usage.copilot?.lastUpdated,
+  ].filter((v): v is number => typeof v === 'number');
+  if (ks.length === 0) return null;
+  return Math.max(...ks);
 });
 
 const allNoToken = computed<boolean>(() => {
   const kimiNoToken = props.usage.kimi?.error === 'no_token';
   const miniNoToken = props.usage.minimax?.error === 'no_token';
-  return kimiNoToken && miniNoToken;
+  const copilotNoToken = props.usage.copilot?.error === 'no_token';
+  return kimiNoToken && miniNoToken && copilotNoToken;
 });
 </script>
 
@@ -167,6 +196,8 @@ const allNoToken = computed<boolean>(() => {
         </template>
       </div>
 
+      
+
       <!-- MiniMax -->
       <div class="usage-row" :data-disabled="String(isProviderDisabled('minimax'))" data-provider="minimax">
         <div class="usage-row-header">
@@ -200,6 +231,31 @@ const allNoToken = computed<boolean>(() => {
         </template>
       </div>
     </div>
+
+
+    <!-- Copilot -->
+      <div class="usage-row" :data-disabled="String(isProviderDisabled('copilot'))" data-provider="copilot">
+        <div class="usage-row-header">
+          <span class="usage-name">Copilot</span>
+          <span class="usage-status" :class="usageStatusClass('copilot')" :title="usage.copilot?.error || ''">
+            {{ usageStatusText('copilot') }}
+          </span>
+        </div>
+        <div class="usage-bar-block" v-if="showUsageBars('copilot')">
+          <div class="usage-bar-label">
+            <div class="usage-time">
+              <span>premium</span>
+              <div class="usage-bar-meta" v-if="copilotResetDateText">Reset {{ copilotResetDateText }}</div>
+            </div>
+            <span class="usage-bar-value">{{ copilotPremiumText }}</span>
+          </div>
+          <div class="usage-bar">
+            <div class="usage-bar-fill"
+                 :style="{ width: copilotPremiumPercent + '%' }"
+                 :class="barClass(100 - copilotPremiumPercent)"></div>
+          </div>
+        </div>
+      </div>
 
     <div class="usage-empty" v-show="allNoToken">No token configured, set in tray menu</div>
   </div>

@@ -26,7 +26,7 @@ export interface DetectorAllStatus {
 
 // 用量监控
 export type UsageError = 'no_token' | 'disabled' | string;
-export type ProviderId = 'kimi' | 'minimax';
+export type ProviderId = 'kimi' | 'minimax' | 'copilot';
 
 export interface UsageMetric {
   limit?: number;
@@ -48,21 +48,39 @@ export interface MinimaxUsageData {
   fiveHourResetTime?: number | string;
 }
 
+// Copilot 标准化形状 —— fetchCopilot 的返回
+export interface CopilotPremiumData {
+  limit: number;
+  remaining: number;
+  percent: number;          // 服务端给的剩余 %（如 8.8）
+  resetDate: string | null; // "2026-07-01"
+  resetDateUtc: string | null;
+}
+
+export interface CopilotUsageData {
+  premium: CopilotPremiumData;
+  chat: { percent: number };
+  plan: string | null;
+  licenseType: string | null;
+}
+
 export interface UsageProviderState {
   lastUpdated?: number;
   error?: UsageError;
-  data?: KimiUsageData | MinimaxUsageData | null;
+  data?: KimiUsageData | MinimaxUsageData | CopilotUsageData | null;
   [key: string]: unknown;
 }
 
 export interface UsageEnabledMap {
   kimi?: boolean;
   minimax?: boolean;
+  copilot?: boolean;
 }
 
 export interface UsageInitPayload {
   kimi: UsageProviderState | null;
   minimax: UsageProviderState | null;
+  copilot: UsageProviderState | null;
   enabled?: UsageEnabledMap;
   intervalMinutes?: number;
 }
@@ -71,6 +89,7 @@ export interface UsageInitPayload {
 export interface UsageState {
   kimi: UsageProviderState | null;
   minimax: UsageProviderState | null;
+  copilot: UsageProviderState | null;
   enabled: UsageEnabledMap;
 }
 

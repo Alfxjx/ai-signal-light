@@ -4,14 +4,17 @@
 export interface SettingsPayload {
   kimi: { token: string; enabled: boolean };
   minimax: { token: string; enabled: boolean };
+  copilot: { token: string; enabled: boolean };
   intervalMinutes: number;
   hasKimiToken: boolean;
   hasMiniMaxToken: boolean;
+  hasCopilotToken: boolean;
 }
 
 export interface SettingsSavePayload {
   kimi: { token: string; tokenChanged: boolean; enabled: boolean };
   minimax: { token: string; tokenChanged: boolean; enabled: boolean };
+  copilot: { token: string; tokenChanged: boolean; enabled: boolean };
   intervalMinutes: number;
 }
 

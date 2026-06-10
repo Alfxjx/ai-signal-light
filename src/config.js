@@ -11,6 +11,7 @@ const { app } = require('electron');
 const DEFAULTS = {
   kimi:    { token: '', enabled: true },
   minimax: { token: '', enabled: true },
+  copilot: { token: '', enabled: true },
   intervalMinutes: 10
 };
 
@@ -37,6 +38,7 @@ class ConfigStore {
       return {
         kimi:    { ...DEFAULTS.kimi,    ...(parsed.kimi    || {}) },
         minimax: { ...DEFAULTS.minimax, ...(parsed.minimax || {}) },
+        copilot: { ...DEFAULTS.copilot, ...(parsed.copilot || {}) },
         intervalMinutes: VALID_INTERVALS.includes(parsed.intervalMinutes)
           ? parsed.intervalMinutes
           : DEFAULTS.intervalMinutes
@@ -61,6 +63,9 @@ class ConfigStore {
     }
     if (partial.minimax && typeof partial.minimax === 'object') {
       this.data.minimax = { ...this.data.minimax, ...partial.minimax };
+    }
+    if (partial.copilot && typeof partial.copilot === 'object') {
+      this.data.copilot = { ...this.data.copilot, ...partial.copilot };
     }
     if (typeof partial.intervalMinutes === 'number'
         && VALID_INTERVALS.includes(partial.intervalMinutes)) {
