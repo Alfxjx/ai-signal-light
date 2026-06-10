@@ -16,6 +16,9 @@ let isQuitting = false;
 // 判断是否为开发模式
 const isDev = process.argv.includes('--dev');
 
+// dev 模式下渲染层走 Vite (5173)；生产环境走内嵌 server (3456)
+const RENDERER_BASE = isDev ? 'http://localhost:5173' : 'http://localhost:3456';
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 240,
@@ -39,11 +42,9 @@ function createWindow() {
   });
 
   // 加载页面
+  mainWindow.loadURL(RENDERER_BASE);
   if (isDev) {
-    mainWindow.loadURL('http://localhost:3456');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
-  } else {
-    mainWindow.loadURL('http://localhost:3456');
   }
 
   // 加载完成后显示
@@ -183,7 +184,7 @@ function openSettingsWindow() {
     show: false
   });
 
-  settingsWindow.loadURL('http://localhost:3456/settings.html');
+  settingsWindow.loadURL(`${RENDERER_BASE}/settings.html`);
   settingsWindow.once('ready-to-show', () => {
     settingsWindow.center();
     settingsWindow.show();

@@ -174,11 +174,12 @@ class StatusServer {
       return;
     }
 
-    // 静态文件服务
-    let filePath = path.join(__dirname, 'renderer', url === '/' ? 'index.html' : url);
-    
+    // 静态文件服务（来自 Vite 构建产物 src/renderer/dist）
+    const STATIC_ROOT = path.join(__dirname, 'renderer', 'dist');
+    let filePath = path.join(STATIC_ROOT, url === '/' ? 'index.html' : url);
+
     // 安全检查
-    if (!filePath.startsWith(path.join(__dirname, 'renderer'))) {
+    if (!filePath.startsWith(STATIC_ROOT)) {
       res.writeHead(403);
       res.end('Forbidden');
       return;
@@ -195,9 +196,13 @@ class StatusServer {
       '.html': 'text/html',
       '.css': 'text/css',
       '.js': 'application/javascript',
+      '.mjs': 'application/javascript',
       '.json': 'application/json',
       '.png': 'image/png',
-      '.svg': 'image/svg+xml'
+      '.svg': 'image/svg+xml',
+      '.ico': 'image/x-icon',
+      '.woff': 'font/woff',
+      '.woff2': 'font/woff2'
     }[ext] || 'application/octet-stream';
 
     res.writeHead(200, { 'Content-Type': contentType });

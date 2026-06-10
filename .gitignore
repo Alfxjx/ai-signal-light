@@ -1,5 +1,6 @@
 /dist
 /node_modules
+/src/renderer/dist
 /.env
 /.env.local
 /.env.development
