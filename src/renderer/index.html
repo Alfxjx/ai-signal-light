@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Status Monitor</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="vendor/vue.global.js"></script>
+</head>
+
+<body>
+  <div class="app" id="app">
+    <!-- 标题栏 -->
+    <div class="title-bar">
+      <div class="title">Coding Status</div>
+      <div class="window-controls">
+        <button class="btn-pin" id="btnPin" title="Pin" :style="{ opacity: isPinned ? '1' : '0.4' }"
+          @click="togglePin">📌</button>
+        <button class="btn-minimize" id="btnMinimize" title="Minimize" @click="minimize">−</button>
+      </div>
+    </div>
+
+    <!-- 状态卡片容器 -->
+    <div class="cards-container" id="cardsContainer">
+      <!-- Claude Code 项目列表 -->
+      <div class="status-card" data-assistant="claude">
+        <div class="claude-header">
+          <span class="claude-title">Claude Code</span>
+          <div class="header-controls">
+            <select id="claudeRange" class="claude-range" v-model.number="rangeMs">
+              <option value="18000000" selected>5h</option>
+              <option value="28800000">8h</option>
+              <option value="43200000">12h</option>
+              <option value="86400000">24h</option>
+              <option value="259200000">3d</option>
+              <option value="604800000">7d</option>
+              <option value="2592000000">30d</option>
+              <option value="0">All</option>
+            </select>
+            <button id="btnRefresh" class="btn-refresh" :class="{ spinning: isRefreshing }" title="Refresh Now"
+              @click="sendRefresh">↻</button>
+          </div>
+        </div>
+        <ul id="claudeProjectList" class="project-list">
+          <li v-if="filteredProjects.length === 0" class="project-empty">No projects</li>
+          <li v-for="p in filteredProjects" :key="p.id" class="project-row">
+            <span class="project-name" :title="p.id">{{ p.name }}</span>
+            <span class="project-time" :class="ageClass(p.lastResponse)" :data-ts="p.lastResponse">{{
+              formatAge(p.lastResponse) }}</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- AI 用量监控 -->
+      <div class="usage-card" data-assistant="usage">
+        <div class="usage-header">
+          <div class="header-left">
+            <span class="usage-title">Usage</span>
+            <span class="usage-updated" id="usageUpdated" :data-ts="usageLastTs">{{ formatAge(usageLastTs) }}</span>
+          </div>
+          <div class="header-controls">
+            <button id="btnUsageCompact" class="btn-compact" :class="{ active: isCompact }"
+              :title="isCompact ? '完整模式' : '简略模式'" @click="toggleCompact">≡</button>
+            <button id="btnUsageRefresh" class="btn-refresh" :class="{ spinning: isUsageRefreshing }"
+              title="Refresh Now" @click="sendUsageRefresh">↻</button>
+          </div>
+        </div>
+        <div class="usage-list" id="usageList" :class="{ compact: isCompact }">
+          <!-- Kimi -->
+          <div class="usage-row" :data-disabled="String(isProviderDisabled('kimi'))" data-provider="kimi">
+            <div class="usage-row-header">
+              <span class="usage-name">Kimi</span>
+              <span class="usage-status" :class="usageStatusClass('kimi')" :title="usage.kimi?.error || ''">{{
+                usageStatusText('kimi') }}</span>
+            </div>
+            <div class="usage-bar-block" data-hide-compact v-if="showUsageBars('kimi')">
+              <div class="usage-bar-label">
+                <span>all plan</span>
+                <span class="usage-bar-value">{{ kimiText('total') }}</span>
+              </div>
+              <div class="usage-bar">
+                <div class="usage-bar-fill" :style="{ width: kimiPercent('total') + '%' }"
+                  :class="barClass(kimiPercent('total'))"></div>
+              </div>
+            </div>
+            <div class="usage-bar-block" data-hide-compact v-if="showUsageBars('kimi')">
+              <div class="usage-bar-label">
+                <span>week</span>
+                <span class="usage-bar-value">{{ kimiText('codingWeekly') }}</span>
+              </div>
+              <div class="usage-bar">
+                <div class="usage-bar-fill" :style="{ width: kimiPercent('codingWeekly') + '%' }"
+                  :class="barClass(kimiPercent('codingWeekly'))"></div>
+              </div>
+            </div>
+            <div class="usage-bar-block" v-if="showUsageBars('kimi')">
+              <div class="usage-bar-label">
+                <div class="usage-time">
+                  <span>5h</span>
+                  <div class="usage-bar-meta">{{ formatResetTime(kimiData('codingFiveHour')?.resetTime) }}</div>
+                </div>
+                <span class="usage-bar-value">{{ kimiText('codingFiveHour') }}</span>
+              </div>
+              <div class="usage-bar">
+                <div class="usage-bar-fill" :style="{ width: kimiPercent('codingFiveHour') + '%' }"
+                  :class="barClass(kimiPercent('codingFiveHour'))"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- MiniMax -->
+          <div class="usage-row" :data-disabled="String(isProviderDisabled('minimax'))" data-provider="minimax">
+            <div class="usage-row-header">
+              <span class="usage-name">MiniMax</span>
+              <span class="usage-status" :class="usageStatusClass('minimax')" :title="usage.minimax?.error || ''">{{
+                usageStatusText('minimax') }}</span>
+            </div>
+            <div class="usage-bar-block" v-if="showUsageBars('minimax')">
+              <div class="usage-bar-label">
+                <div class="usage-time">
+                  <span>5h</span>
+                  <div class="usage-bar-meta">{{ formatResetTime(minimaxData?.fiveHourResetTime) }}</div>
+                </div>
+
+                <span class="usage-bar-value">{{ minimaxFiveHourText }}</span>
+              </div>
+              <div class="usage-bar">
+                <div class="usage-bar-fill" :style="{ width: minimaxFiveHourPercent + '%' }"
+                  :class="barClass(minimaxFiveHourPercent)"></div>
+              </div>
+            </div>
+            <div class="usage-bar-block" data-hide-compact v-if="showUsageBars('minimax')">
+              <div class="usage-bar-label">
+                <span>week</span>
+                <span class="usage-bar-value">{{ minimaxWeeklyText }}</span>
+              </div>
+              <div class="usage-bar">
+                <div class="usage-bar-fill" :style="{ width: minimaxWeeklyPercent + '%' }"
+                  :class="barClass(minimaxWeeklyPercent)"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="usage-empty" id="usageEmpty" v-show="allNoToken">No token configured, set in tray menu</div>
+      </div>
+    </div>
+
+    <!-- 底部信息 -->
+    <div class="footer">
+      <div class="connection-status" id="connectionStatus" :class="{ disconnected: !isConnected }">
+        <span class="dot"></span> {{ isConnected ? 'Connected' : 'Disconnected' }}
+      </div>
+      <div class="last-update" id="lastUpdate">{{ lastUpdateText }}</div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
