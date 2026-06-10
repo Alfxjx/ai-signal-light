@@ -2,19 +2,22 @@
 // 在所有渲染进程里可用：window.electronAPI?.xxx
 
 export interface SettingsPayload {
-  kimi: { token: string; enabled: boolean };
-  minimax: { token: string; enabled: boolean };
-  copilot: { token: string; enabled: boolean };
+  kimi: { token: string; enabled: boolean; useProxy: boolean };
+  minimax: { token: string; enabled: boolean; useProxy: boolean };
+  copilot: { token: string; enabled: boolean; useProxy: boolean };
+  proxy: { url: string };
   intervalMinutes: number;
   hasKimiToken: boolean;
   hasMiniMaxToken: boolean;
   hasCopilotToken: boolean;
+  hasProxy: boolean;
 }
 
 export interface SettingsSavePayload {
-  kimi: { token: string; tokenChanged: boolean; enabled: boolean };
-  minimax: { token: string; tokenChanged: boolean; enabled: boolean };
-  copilot: { token: string; tokenChanged: boolean; enabled: boolean };
+  kimi: { token: string; tokenChanged: boolean; enabled: boolean; useProxy: boolean };
+  minimax: { token: string; tokenChanged: boolean; enabled: boolean; useProxy: boolean };
+  copilot: { token: string; tokenChanged: boolean; enabled: boolean; useProxy: boolean };
+  proxy: { url: string; urlChanged: boolean };
   intervalMinutes: number;
 }
 
@@ -25,6 +28,7 @@ export interface ElectronAPI {
   getSettings: () => Promise<SettingsPayload | null>;
   saveSettings: (partial: SettingsSavePayload) => Promise<{ success: boolean }>;
   closeSettings: () => Promise<void>;
+  resizeWindow: (opts: { height: number }) => Promise<void>;
 }
 
 declare global {

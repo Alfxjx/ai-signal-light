@@ -176,7 +176,7 @@ function openSettingsWindow() {
 
   settingsWindow = new BrowserWindow({
     width: 380,
-    height: 380,
+    height: 460,
     parent: null,
     modal: false,
     resizable: false,
@@ -273,13 +273,15 @@ ipcMain.handle('settings:get', async () => {
   const cfg = configStore.get();
   // 把 token 字段脱敏后再返回（保留真实值给保存按钮用，但不在 UI 上 echo）
   return {
-    kimi:    { token: cfg.kimi.token    ? maskToken(cfg.kimi.token)    : '', enabled: cfg.kimi.enabled },
-    minimax: { token: cfg.minimax.token ? maskToken(cfg.minimax.token) : '', enabled: cfg.minimax.enabled },
-    copilot: { token: cfg.copilot.token ? maskToken(cfg.copilot.token) : '', enabled: cfg.copilot.enabled },
+    kimi:    { token: cfg.kimi.token    ? maskToken(cfg.kimi.token)    : '', enabled: cfg.kimi.enabled,    useProxy: cfg.kimi.useProxy },
+    minimax: { token: cfg.minimax.token ? maskToken(cfg.minimax.token) : '', enabled: cfg.minimax.enabled, useProxy: cfg.minimax.useProxy },
+    copilot: { token: cfg.copilot.token ? maskToken(cfg.copilot.token) : '', enabled: cfg.copilot.enabled, useProxy: cfg.copilot.useProxy },
+    proxy: { url: cfg.proxy?.url || '' },
     intervalMinutes: cfg.intervalMinutes,
     hasKimiToken:    !!cfg.kimi.token,
     hasMiniMaxToken: !!cfg.minimax.token,
-    hasCopilotToken: !!cfg.copilot.token
+    hasCopilotToken: !!cfg.copilot.token,
+    hasProxy:        !!(cfg.proxy?.url)
   };
 });
 
@@ -314,6 +316,15 @@ ipcMain.handle('settings:save', async (event, partial) => {
     }
     delete next.copilot.tokenChanged;
   }
+  // proxy 使用同样的变更协议
+  if (next.proxy && typeof next.proxy === 'object') {
+    if (next.proxy.urlChanged) {
+      next.proxy = { ...next.proxy, url: next.proxy.url || '' };
+    } else {
+      next.proxy = { ...next.proxy, url: current.proxy?.url || '' };
+    }
+    delete next.proxy.urlChanged;
+  }
 
   configStore.update(next);
   rebuildTray();
@@ -324,6 +335,15 @@ ipcMain.handle('settings:save', async (event, partial) => {
 ipcMain.handle('settings:close', async () => {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.close();
+  }
+});
+
+// 主窗口调整大小（保持宽度，只调高度，重新贴右上角）
+ipcMain.handle('window:resize', async (event, { height }) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const [width] = mainWindow.getSize();
+    mainWindow.setSize(width, height);
+    positionWindow();
   }
 });
 

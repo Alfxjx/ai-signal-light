@@ -135,6 +135,24 @@ body {
   transform: translateX(14px);
 }
 
+/* 行内 checkbox label（如"使用代理"） */
+.settings-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.settings-toggle-label input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: #4ade80;
+  cursor: pointer;
+}
+
 /* ===== Field ===== */
 .settings-field {
   margin-top: 8px;

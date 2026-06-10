@@ -107,6 +107,10 @@ function onUsageRefresh() {
 
 function toggleCompact() {
   isCompact.value = !isCompact.value;
+  if (isElectron.value) {
+    const newHeight = isCompact.value ? 380 : 550;
+    window.electronAPI?.resizeWindow({ height: newHeight });
+  }
 }
 
 // ====== Age timer ======

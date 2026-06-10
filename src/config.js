@@ -9,9 +9,10 @@ const path = require('path');
 const { app } = require('electron');
 
 const DEFAULTS = {
-  kimi:    { token: '', enabled: true },
-  minimax: { token: '', enabled: true },
-  copilot: { token: '', enabled: true },
+  kimi:    { token: '', enabled: true, useProxy: false },
+  minimax: { token: '', enabled: true, useProxy: false },
+  copilot: { token: '', enabled: true, useProxy: false },
+  proxy: { url: '' },
   intervalMinutes: 10
 };
 
@@ -39,6 +40,7 @@ class ConfigStore {
         kimi:    { ...DEFAULTS.kimi,    ...(parsed.kimi    || {}) },
         minimax: { ...DEFAULTS.minimax, ...(parsed.minimax || {}) },
         copilot: { ...DEFAULTS.copilot, ...(parsed.copilot || {}) },
+        proxy:   { ...DEFAULTS.proxy,   ...(parsed.proxy   || {}) },
         intervalMinutes: VALID_INTERVALS.includes(parsed.intervalMinutes)
           ? parsed.intervalMinutes
           : DEFAULTS.intervalMinutes
@@ -66,6 +68,9 @@ class ConfigStore {
     }
     if (partial.copilot && typeof partial.copilot === 'object') {
       this.data.copilot = { ...this.data.copilot, ...partial.copilot };
+    }
+    if (partial.proxy && typeof partial.proxy === 'object') {
+      this.data.proxy = { ...this.data.proxy, ...partial.proxy };
     }
     if (typeof partial.intervalMinutes === 'number'
         && VALID_INTERVALS.includes(partial.intervalMinutes)) {

@@ -8,6 +8,7 @@ interface ProviderState {
   tokenChanged: boolean;
   hasToken: boolean;
   showToken: boolean;
+  useProxy: boolean;
 }
 
 function makeProvider(): ProviderState {
@@ -17,12 +18,16 @@ function makeProvider(): ProviderState {
     tokenChanged: false,
     hasToken: false,
     showToken: false,
+    useProxy: false,
   };
 }
 
 const kimi = reactive<ProviderState>(makeProvider());
 const minimax = reactive<ProviderState>(makeProvider());
 const copilot = reactive<ProviderState>(makeProvider());
+const proxyUrl = ref<string>('');
+const proxyUrlChanged = ref<boolean>(false);
+const hasProxy = ref<boolean>(false);
 const intervalMinutes = ref<number>(10);
 const saving = ref<boolean>(false);
 
@@ -36,16 +41,22 @@ onMounted(async () => {
   if (!cfg) return;
 
   kimi.enabled = !!cfg.kimi.enabled;
+  kimi.useProxy = !!cfg.kimi.useProxy;
   kimi.token = cfg.hasKimiToken ? (cfg.kimi.token || '') : '';
   kimi.hasToken = !!cfg.hasKimiToken;
 
   minimax.enabled = !!cfg.minimax.enabled;
+  minimax.useProxy = !!cfg.minimax.useProxy;
   minimax.token = cfg.hasMiniMaxToken ? (cfg.minimax.token || '') : '';
   minimax.hasToken = !!cfg.hasMiniMaxToken;
 
   copilot.enabled = !!cfg.copilot.enabled;
+  copilot.useProxy = !!cfg.copilot.useProxy;
   copilot.token = cfg.hasCopilotToken ? (cfg.copilot.token || '') : '';
   copilot.hasToken = !!cfg.hasCopilotToken;
+
+  proxyUrl.value = cfg.hasProxy ? (cfg.proxy?.url || '') : '';
+  hasProxy.value = !!cfg.hasProxy;
 
   intervalMinutes.value = cfg.intervalMinutes || 10;
 });
@@ -60,16 +71,23 @@ async function onSave() {
         token: kimi.token.trim(),
         tokenChanged: kimi.tokenChanged,
         enabled: kimi.enabled,
+        useProxy: kimi.useProxy,
       },
       minimax: {
         token: minimax.token.trim(),
         tokenChanged: minimax.tokenChanged,
         enabled: minimax.enabled,
+        useProxy: minimax.useProxy,
       },
       copilot: {
         token: copilot.token.trim(),
         tokenChanged: copilot.tokenChanged,
         enabled: copilot.enabled,
+        useProxy: copilot.useProxy,
+      },
+      proxy: {
+        url: proxyUrl.value.trim(),
+        urlChanged: proxyUrlChanged.value,
       },
       intervalMinutes: intervalMinutes.value,
     };
@@ -100,6 +118,25 @@ function onCancel() {
     </div>
 
     <div class="settings-body">
+      <!-- 全局代理 -->
+      <div class="settings-section" data-section="proxy">
+        <div class="settings-section-header">
+          <span class="settings-section-title">代理设置</span>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="proxyUrl">代理地址</label>
+          <input
+            id="proxyUrl"
+            class="settings-input"
+            v-model="proxyUrl"
+            :placeholder="hasProxy ? '留空保持原值' : '如 http://127.0.0.1:7890'"
+            autocomplete="off"
+            spellcheck="false"
+            @input="proxyUrlChanged = true"
+          >
+        </div>
+      </div>
+
       <!-- Kimi -->
       <div class="settings-section" data-provider="kimi">
         <div class="settings-section-header">
@@ -107,6 +144,12 @@ function onCancel() {
           <label class="settings-toggle">
             <input type="checkbox" v-model="kimi.enabled">
             <span class="settings-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <label class="settings-toggle-label">
+            <input type="checkbox" v-model="kimi.useProxy">
+            <span>使用代理</span>
           </label>
         </div>
         <div class="settings-field">
@@ -139,6 +182,12 @@ function onCancel() {
           </label>
         </div>
         <div class="settings-field">
+          <label class="settings-toggle-label">
+            <input type="checkbox" v-model="minimax.useProxy">
+            <span>使用代理</span>
+          </label>
+        </div>
+        <div class="settings-field">
           <label class="settings-label" for="minimaxToken">Bearer Token</label>
           <div class="settings-input-wrap">
             <input
@@ -165,6 +214,12 @@ function onCancel() {
           <label class="settings-toggle">
             <input type="checkbox" v-model="copilot.enabled">
             <span class="settings-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <label class="settings-toggle-label">
+            <input type="checkbox" v-model="copilot.useProxy">
+            <span>使用代理</span>
           </label>
         </div>
         <div class="settings-field">

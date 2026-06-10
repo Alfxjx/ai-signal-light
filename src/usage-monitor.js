@@ -81,9 +81,9 @@ class UsageMonitor {
   // 主入口：依次检查所有 provider
   async checkAll() {
     await Promise.all([
-      this._safeRun('kimi',    (token) => this.fetchKimi(token)),
-      this._safeRun('minimax', (token) => this.fetchMiniMax(token)),
-      this._safeRun('copilot', (token) => this.fetchCopilot(token))
+      this._safeRun('kimi',    this.fetchKimi.bind(this)),
+      this._safeRun('minimax', this.fetchMiniMax.bind(this)),
+      this._safeRun('copilot', this.fetchCopilot.bind(this))
     ]);
   }
 
@@ -107,7 +107,9 @@ class UsageMonitor {
     }
 
     try {
-      const data = await fetcher(cfg.token);
+      const globalProxy = this.configStore.get().proxy?.url;
+      const proxyConfig = cfg.useProxy && globalProxy ? parseProxyUrl(globalProxy) : null;
+      const data = await fetcher(cfg.token, proxyConfig);
       this.state[provider] = {
         data,
         lastUpdated: new Date().toISOString(),
@@ -141,18 +143,17 @@ class UsageMonitor {
 
   // ==================== Kimi ====================
 
-  async fetchKimi(token) {
+  async fetchKimi(token, proxyConfig) {
     let res;
     try {
-      res = await http.post(KIMI_API,
-        { scope: ['FEATURE_CODING'] },
-        {
-          headers: {
-            'Authorization': `Bearer ${token.trim()}`,
-            'Content-Type': 'application/json',
-          }
+      const reqConfig = {
+        headers: {
+          'Authorization': `Bearer ${token.trim()}`,
+          'Content-Type': 'application/json',
         }
-      );
+      };
+      if (proxyConfig) reqConfig.proxy = proxyConfig;
+      res = await http.post(KIMI_API, { scope: ['FEATURE_CODING'] }, reqConfig);
     } catch (e) {
       throw e; // 网络层/超时
     }
@@ -202,21 +203,23 @@ class UsageMonitor {
       resetTime: d5h.resetTime || null
     };
 
-    console.log('[usage:kimi] fetched data:', { total: totalData, codingFiveHour, codingWeekly });
+    console.log('[usage:kimi] fetched data:', JSON.stringify({ total: totalData, codingFiveHour, codingWeekly }));
 
     return { total: totalData, codingFiveHour, codingWeekly };
   }
 
   // ==================== MiniMax ====================
 
-  async fetchMiniMax(token) {
+  async fetchMiniMax(token, proxyConfig) {
     let res;
     try {
-      res = await http.get(MINIMAX_API, {
+      const reqConfig = {
         headers: {
           'Authorization': `Bearer ${token.trim()}`
         }
-      });
+      };
+      if (proxyConfig) reqConfig.proxy = proxyConfig;
+      res = await http.get(MINIMAX_API, reqConfig);
     } catch (e) {
       throw e;
     }
@@ -254,16 +257,18 @@ class UsageMonitor {
   // ==================== Copilot ====================
 
   // token 字段实际存的是从浏览器复制的整段 Cookie 串
-  async fetchCopilot(cookie) {
+  async fetchCopilot(cookie, proxyConfig) {
     let res;
     try {
-      res = await http.get(COPILOT_API, {
+      const reqConfig = {
         headers: {
           'Cookie': cookie.trim(),
           'Referer': 'https://github.com/copilot',
           'Accept': 'application/json, text/plain, */*'
         }
-      });
+      };
+      if (proxyConfig) reqConfig.proxy = proxyConfig;
+      res = await http.get(COPILOT_API, reqConfig);
     } catch (e) {
       throw e;
     }
@@ -276,7 +281,7 @@ class UsageMonitor {
 
     const json = res.data;
     if (!json || typeof json !== 'object' || !json.quotas) {
-      throw new Error('invalid response');
+      throw new Error('invalid response, cookie may be incorrect or expired');
     }
 
     const limits    = json.quotas.limits    || {};
@@ -311,6 +316,25 @@ class UsageMonitor {
   // 对外提供快照(用于 init 推送)
   snapshot() {
     return JSON.parse(JSON.stringify(this.state));
+  }
+}
+
+// 解析代理 URL 为 axios 的 proxy 配置格式
+function parseProxyUrl(urlStr) {
+  if (!urlStr || typeof urlStr !== 'string') return null;
+  try {
+    const url = new URL(urlStr.trim());
+    const result = {
+      protocol: url.protocol.replace(':', ''),
+      host: url.hostname,
+      port: parseInt(url.port, 10) || (url.protocol === 'https:' ? 443 : 80),
+    };
+    if (url.username) {
+      result.auth = { username: url.username, password: url.password };
+    }
+    return result;
+  } catch {
+    return null;
   }
 }
 

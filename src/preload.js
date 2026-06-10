@@ -14,5 +14,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 设置（用量监控）
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (partial) => ipcRenderer.invoke('settings:save', partial),
-  closeSettings: () => ipcRenderer.invoke('settings:close')
+  closeSettings: () => ipcRenderer.invoke('settings:close'),
+
+  // 窗口控制
+  resizeWindow: (opts) => ipcRenderer.invoke('window:resize', opts)
 });
