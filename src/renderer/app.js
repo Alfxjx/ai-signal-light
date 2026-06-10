@@ -88,11 +88,11 @@ createApp({
     },
 
     minimaxFiveHourText() {
-      return `${this.minimaxFiveHourPercent}%`;
+      return `${this.minimaxData.fiveHourPercent}%`;
     },
 
     minimaxWeeklyText() {
-      return `${this.minimaxWeeklyPercent}%`;
+      return `${this.minimaxData.weeklyPercent}%`;
     }
   },
 
