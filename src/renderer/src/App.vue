@@ -48,7 +48,7 @@ function handleMessage(msg: WsMessage) {
     if (msg.data.claude) handleClaudeData(msg.data.claude);
     if (msg.data.usage) handleUsageInit(msg.data.usage);
   } else if (msg.type === 'statusChange' && msg.assistantId === 'claude') {
-    handleClaudeData(msg.data);
+    handleClaudeData(msg.data as AssistantStatus);
   } else if (msg.type === 'usageInit') {
     handleUsageInit(msg.data);
   } else if (msg.type === 'usageUpdate') {

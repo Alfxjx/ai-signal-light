@@ -1,14 +1,14 @@
 /**
  * 配置存储
  * 持久化用户设置到 userData/config.json
- * 无外部依赖，使用 fs 原生 API
  */
 
-const fs = require('fs');
-const path = require('path');
-const { app } = require('electron');
+import fs from 'fs';
+import path from 'path';
+import { app } from 'electron';
+import type { AppConfig, ConfigPartial, HooksEnabledConfig } from '../shared/types/config';
 
-const DEFAULTS = {
+const DEFAULTS: AppConfig = {
   kimi:    { token: '', enabled: true, useProxy: false },
   minimax: { token: '', enabled: true, useProxy: false },
   copilot: { token: '', enabled: true, useProxy: false },
@@ -21,27 +21,34 @@ const DEFAULTS = {
   }
 };
 
-const VALID_INTERVALS = [5, 10, 15, 30, 60];
-const HOOK_EVENTS = ['Notification', 'Stop', 'PreToolUse'];
+export const VALID_INTERVALS = [5, 10, 15, 30, 60] as const;
+export type ValidInterval = typeof VALID_INTERVALS[number];
 
-class ConfigStore {
+export const HOOK_EVENTS = ['Notification', 'Stop', 'PreToolUse'] as const;
+export type HookEvent = typeof HOOK_EVENTS[number];
+
+export class ConfigStore {
+  private userDataDir: string;
+  private configPath: string;
+  private tmpPath: string;
+  private callbacks: ((cfg: AppConfig) => void)[] = [];
+  private data: AppConfig;
+
   constructor() {
     this.userDataDir = app.getPath('userData');
     this.configPath = path.join(this.userDataDir, 'config.json');
     this.tmpPath = this.configPath + '.tmp';
-    this.callbacks = [];
     this.data = this._load();
   }
 
   // 同步加载配置（启动时调用）
-  _load() {
+  private _load(): AppConfig {
     try {
       if (!fs.existsSync(this.configPath)) {
-        return JSON.parse(JSON.stringify(DEFAULTS));
+        return JSON.parse(JSON.stringify(DEFAULTS)) as AppConfig;
       }
       const raw = fs.readFileSync(this.configPath, 'utf8');
-      const parsed = JSON.parse(raw);
-      // 合并默认值，防止用户配置文件缺字段
+      const parsed = JSON.parse(raw) as Partial<AppConfig>;
       return {
         kimi:    { ...DEFAULTS.kimi,    ...(parsed.kimi    || {}) },
         minimax: { ...DEFAULTS.minimax, ...(parsed.minimax || {}) },
@@ -52,23 +59,23 @@ class ConfigStore {
           enabled:  { ...DEFAULTS.hooks.enabled,  ...((parsed.hooks && parsed.hooks.enabled)  || {}) },
           endpoint: { ...DEFAULTS.hooks.endpoint, ...((parsed.hooks && parsed.hooks.endpoint) || {}) }
         },
-        intervalMinutes: VALID_INTERVALS.includes(parsed.intervalMinutes)
-          ? parsed.intervalMinutes
+        intervalMinutes: VALID_INTERVALS.includes(parsed.intervalMinutes as ValidInterval)
+          ? (parsed.intervalMinutes as ValidInterval)
           : DEFAULTS.intervalMinutes
       };
     } catch (e) {
-      console.warn('[Config] load failed, using defaults:', e.message);
-      return JSON.parse(JSON.stringify(DEFAULTS));
+      console.warn('[Config] load failed, using defaults:', (e as Error).message);
+      return JSON.parse(JSON.stringify(DEFAULTS)) as AppConfig;
     }
   }
 
   // 获取完整配置（深拷贝，防止外部修改内部状态）
-  get() {
-    return JSON.parse(JSON.stringify(this.data));
+  get(): AppConfig {
+    return JSON.parse(JSON.stringify(this.data)) as AppConfig;
   }
 
   // 更新配置（浅合并），同步写文件 + 触发 onChange
-  update(partial) {
+  update(partial: ConfigPartial): void {
     if (!partial || typeof partial !== 'object') return;
 
     if (partial.kimi && typeof partial.kimi === 'object') {
@@ -91,7 +98,7 @@ class ConfigStore {
         const next = { ...this.data.hooks.enabled };
         for (const ev of HOOK_EVENTS) {
           if (typeof partial.hooks.enabled[ev] === 'boolean') {
-            next[ev] = partial.hooks.enabled[ev];
+            next[ev as keyof HooksEnabledConfig] = partial.hooks.enabled[ev] as boolean;
           }
         }
         this.data.hooks.enabled = next;
@@ -103,8 +110,8 @@ class ConfigStore {
       }
     }
     if (typeof partial.intervalMinutes === 'number'
-        && VALID_INTERVALS.includes(partial.intervalMinutes)) {
-      this.data.intervalMinutes = partial.intervalMinutes;
+        && VALID_INTERVALS.includes(partial.intervalMinutes as ValidInterval)) {
+      this.data.intervalMinutes = partial.intervalMinutes as ValidInterval;
     }
 
     this._save();
@@ -112,7 +119,7 @@ class ConfigStore {
   }
 
   // 订阅配置变更
-  onChange(cb) {
+  onChange(cb: (cfg: AppConfig) => void): () => void {
     this.callbacks.push(cb);
     return () => {
       this.callbacks = this.callbacks.filter(c => c !== cb);
@@ -120,7 +127,7 @@ class ConfigStore {
   }
 
   // 原子写入：先写 .tmp 再 rename
-  _save() {
+  private _save(): void {
     try {
       if (!fs.existsSync(this.userDataDir)) {
         fs.mkdirSync(this.userDataDir, { recursive: true });
@@ -128,11 +135,11 @@ class ConfigStore {
       fs.writeFileSync(this.tmpPath, JSON.stringify(this.data, null, 2), 'utf8');
       fs.renameSync(this.tmpPath, this.configPath);
     } catch (e) {
-      console.error('[Config] save failed:', e.message);
+      console.error('[Config] save failed:', (e as Error).message);
     }
   }
 
-  _emit() {
+  private _emit(): void {
     const snapshot = this.get();
     this.callbacks.forEach(cb => {
       try { cb(snapshot); } catch (e) {
@@ -141,5 +148,3 @@ class ConfigStore {
     });
   }
 }
-
-module.exports = { ConfigStore, VALID_INTERVALS, HOOK_EVENTS };

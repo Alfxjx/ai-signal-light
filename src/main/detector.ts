@@ -1,29 +1,44 @@
 /**
  * AI助手状态检测器
- * 支持: Claude Code (通过 statusLine JSON) 和 Kimi Code CLI (通过进程监控)
+ * 支持: Claude Code (通过 jsonl 文件扫描)
+ * Kimi Code CLI 已停用
  */
 
-const os = require('os');
-const path = require('path');
-const fs = require('fs');
+import os from 'os';
+import path from 'path';
+import fs from 'fs';
+import type { ClaudeProject, DetectorDetails, AssistantStatus, DetectorAllStatus } from '../shared/types/detector';
 
-// 状态枚举
-const Status = {
-  IDLE: 'idle',           // 空闲 - 等待用户输入
-  EXECUTING: 'executing', // 执行中 - AI正在思考/生成/执行工具
-  WAITING: 'waiting'      // 等待判断 - AI提出了建议，等待用户确认(y/n)
-};
+/**
+ * @deprecated 保留仅作历史兼容，不再使用 IDLE/EXECUTING/WAITING 状态模型
+ */
+export enum Status {
+  IDLE = 'idle',
+  EXECUTING = 'executing',
+  WAITING = 'waiting',
+}
 
 // Claude Code 项目 jsonl 扫描常量
 const JSONL_TAIL_SIZE = 8 * 1024;           // 每次只读尾部 8KB
 const MAX_JSONL_SIZE = 50 * 1024 * 1024;    // 超过 50MB 跳过（防御性）
 
-class AIDetector {
+interface AssistantEntry {
+  name: string;
+  type: string;
+  status: Status | 'projects';
+  lastUpdate: string | null;
+  details: Record<string, unknown>;
+  pid: number | null;
+}
+
+type StatusChangeCallback = (assistantId: string, status: string, assistant: AssistantEntry) => void;
+
+export class AIDetector {
+  private assistants = new Map<string, AssistantEntry>();
+  private callbacks: StatusChangeCallback[] = [];
+  private checkInterval: NodeJS.Timeout | null = null;
+
   constructor() {
-    this.assistants = new Map();
-    this.callbacks = [];
-    this.checkInterval = null;
-    
     // 初始化支持的AI助手
     this.assistants.set('claude', {
       name: 'Claude Code',
@@ -33,33 +48,32 @@ class AIDetector {
       details: {},
       pid: null
     });
-
   }
 
   // 注册状态变更回调
-  onStatusChange(callback) {
+  onStatusChange(callback: StatusChangeCallback): void {
     this.callbacks.push(callback);
   }
 
   // 通知所有回调
-  notify(assistantId, status, details = {}) {
+  private notify(assistantId: string, status: string, details: Record<string, unknown> = {}): void {
     const assistant = this.assistants.get(assistantId);
     if (assistant) {
-      assistant.status = status;
+      assistant.status = status as Status | 'projects';
       assistant.lastUpdate = new Date().toISOString();
       assistant.details = { ...assistant.details, ...details };
     }
-    this.callbacks.forEach(cb => cb(assistantId, status, assistant));
+    this.callbacks.forEach(cb => cb(assistantId, status, assistant!));
   }
 
   // 启动监控
-  start() {
+  start(): void {
     this.checkInterval = setInterval(() => this.checkAll(), 30000);
     this.checkAll(); // 立即检查一次
   }
 
   // 停止监控
-  stop() {
+  stop(): void {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
@@ -67,13 +81,13 @@ class AIDetector {
   }
 
   // 检查所有AI助手
-  async checkAll() {
+  async checkAll(): Promise<void> {
     await this.checkClaude();
   }
 
   // ==================== Claude Code 项目扫描 ====================
 
-  async checkClaude() {
+  private async checkClaude(): Promise<void> {
     try {
       const projects = await this.scanClaudeProjects();
       this.notify('claude', 'projects', {
@@ -81,22 +95,18 @@ class AIDetector {
         projects,
       });
     } catch (e) {
-      console.warn('[claude] scan failed:', e.message);
+      console.warn('[claude] scan failed:', (e as Error).message);
     }
   }
 
-  // ==================== Claude Code 项目扫描 ====================
-
   /**
    * 读 jsonl 尾部 8KB，反向扫描找最近一条 type=assistant && isSidechain!==true 的 timestamp
-   * @param {string} jsonlPath
-   * @returns {Promise<string|null>} ISO 字符串或 null
    */
-  async readJsonlTailTimestamp(jsonlPath) {
-    let stat;
+  private async readJsonlTailTimestamp(jsonlPath: string): Promise<string | null> {
+    let stat: fs.Stats;
     try {
       stat = await fs.promises.stat(jsonlPath);
-    } catch (e) {
+    } catch {
       return null;
     }
     if (stat.size === 0 || stat.size > MAX_JSONL_SIZE) return null;
@@ -104,7 +114,7 @@ class AIDetector {
     const start = Math.max(0, stat.size - JSONL_TAIL_SIZE);
     const length = stat.size - start;
 
-    let fd = null;
+    let fd: fs.promises.FileHandle | null = null;
     try {
       fd = await fs.promises.open(jsonlPath, 'r');
       const buffer = Buffer.alloc(length);
@@ -117,32 +127,30 @@ class AIDetector {
         const line = lines[i].trim();
         if (!line) continue;
         try {
-          const obj = JSON.parse(line);
+          const obj = JSON.parse(line) as Record<string, unknown>;
           if (obj.type === 'assistant' && obj.isSidechain !== true && obj.timestamp) {
-            return obj.timestamp;
+            return String(obj.timestamp);
           }
-        } catch (e) {
+        } catch {
           // 跳过坏行
         }
       }
       return null;
-    } catch (e) {
+    } catch {
       return null;
     } finally {
       if (fd) {
-        try { await fd.close(); } catch (e) {}
+        try { await fd.close(); } catch { /* ignore */ }
       }
     }
   }
 
   /**
    * 从 jsonl 头部读前 8KB，找第一条含 cwd / slug 的记录，返回显示名来源
-   * @param {string} jsonlPath
-   * @returns {Promise<{name: string, source: 'cwd'|'slug', cwd: string|null}|null>}
    */
-  async extractProjectDisplayName(jsonlPath) {
+  private async extractProjectDisplayName(jsonlPath: string): Promise<{ name: string; source: 'cwd' | 'slug'; cwd: string | null } | null> {
     const HEAD_SIZE = 8 * 1024;
-    let fd = null;
+    let fd: fs.promises.FileHandle | null = null;
     try {
       const stat = await fs.promises.stat(jsonlPath);
       const length = Math.min(stat.size, HEAD_SIZE);
@@ -154,38 +162,36 @@ class AIDetector {
       for (const line of lines) {
         if (!line.trim()) continue;
         try {
-          const obj = JSON.parse(line);
-          if (obj.cwd) {
+          const obj = JSON.parse(line) as Record<string, unknown>;
+          if (obj.cwd && typeof obj.cwd === 'string') {
             return { name: path.basename(obj.cwd), source: 'cwd', cwd: obj.cwd };
           }
-          if (obj.slug) {
+          if (obj.slug && typeof obj.slug === 'string') {
             return { name: obj.slug, source: 'slug', cwd: null };
           }
-        } catch (e) {
+        } catch {
           // 跳过坏行
         }
       }
       return null;
-    } catch (e) {
+    } catch {
       return null;
     } finally {
       if (fd) {
-        try { await fd.close(); } catch (e) {}
+        try { await fd.close(); } catch { /* ignore */ }
       }
     }
   }
 
   /**
    * 递归收集目录下所有 .jsonl 文件
-   * @param {string} dir
-   * @returns {Promise<string[]>}
    */
-  async findJsonlFiles(dir) {
-    const results = [];
-    let entries;
+  private async findJsonlFiles(dir: string): Promise<string[]> {
+    const results: string[] = [];
+    let entries: fs.Dirent[];
     try {
       entries = await fs.promises.readdir(dir, { withFileTypes: true });
-    } catch (e) {
+    } catch {
       return results;
     }
     for (const entry of entries) {
@@ -202,20 +208,19 @@ class AIDetector {
 
   /**
    * 扫描 ~/.claude/projects/ 下所有项目，返回聚合结果
-   * @returns {Promise<Array<{id: string, name: string, source: 'cwd'|'slug'|'id', lastResponse: string|null}>>}
    */
-  async scanClaudeProjects() {
+  async scanClaudeProjects(): Promise<ClaudeProject[]> {
     const projectsRoot = path.join(os.homedir(), '.claude', 'projects');
 
-    let entries;
+    let entries: fs.Dirent[];
     try {
       entries = await fs.promises.readdir(projectsRoot, { withFileTypes: true });
     } catch (e) {
-      console.warn('[claude] projects dir not accessible:', e.message);
+      console.warn('[claude] projects dir not accessible:', (e as Error).message);
       return [];
     }
 
-    const results = [];
+    const results: ClaudeProject[] = [];
 
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
@@ -226,8 +231,8 @@ class AIDetector {
 
       // 提取显示名：只从项目根 jsonl（不在 subagents/ 里）取
       let name = entry.name;
-      let source = 'id';
-      let cwd = null;
+      let source: 'cwd' | 'slug' | 'id' = 'id';
+      let cwd: string | null = null;
       for (const f of jsonlFiles) {
         if (f.includes(`${path.sep}subagents${path.sep}`)) continue;
         const display = await this.extractProjectDisplayName(f);
@@ -240,7 +245,7 @@ class AIDetector {
       }
 
       // 找最近 assistant timestamp
-      let lastResponse = null;
+      let lastResponse: string | null = null;
       for (const f of jsonlFiles) {
         const ts = await this.readJsonlTailTimestamp(f);
         if (ts && (!lastResponse || ts > lastResponse)) {
@@ -255,26 +260,26 @@ class AIDetector {
   }
 
   // 获取所有助手状态
-  getAllStatus() {
-    const result = {};
+  getAllStatus(): DetectorAllStatus {
+    const result: DetectorAllStatus = {};
     for (const [id, assistant] of this.assistants) {
-      result[id] = { ...assistant };
+      result[id] = { ...assistant } as unknown as AssistantStatus;
     }
     return result;
   }
 
   // 获取单个助手状态
-  getStatus(assistantId) {
+  getStatus(assistantId: string): AssistantStatus | null {
     const assistant = this.assistants.get(assistantId);
-    return assistant ? { ...assistant } : null;
+    return assistant ? { ...assistant } as unknown as AssistantStatus : null;
   }
 
   // 手动设置状态（用于 VS Code 插件等无法自动检测的场景）
-  setManualStatus(assistantId, status, details = {}) {
+  setManualStatus(assistantId: string, status: string, details: Record<string, unknown> = {}): boolean {
     const assistant = this.assistants.get(assistantId);
     if (!assistant) return false;
 
-    assistant.status = status;
+    assistant.status = status as Status | 'projects';
     assistant.lastUpdate = new Date().toISOString();
     assistant.details = { ...assistant.details, ...details, manual: true };
 
@@ -282,8 +287,3 @@ class AIDetector {
     return true;
   }
 }
-
-module.exports = {
-  AIDetector,
-  Status
-};

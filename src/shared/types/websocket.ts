@@ -1,0 +1,18 @@
+import type { DetectorAllStatus } from './detector';
+import type { UsageSnapshot, UsageUpdatePayload } from './usage';
+
+export interface ClaudeHookPayload {
+  event: 'Notification' | 'Stop' | 'PreToolUse';
+  cwd: string | null;
+  sessionId: string | null;
+  ts: number;
+  message?: string;
+  toolName?: string;
+}
+
+export type WsMessage =
+  | { type: 'init'; data: DetectorAllStatus & { usage?: UsageSnapshot & { enabled?: Record<string, boolean>; intervalMinutes?: number } } }
+  | { type: 'statusChange'; assistantId: string; data: { status?: string; details: { projects: unknown[] } } }
+  | { type: 'usageInit'; data: UsageSnapshot & { enabled?: Record<string, boolean>; intervalMinutes?: number } }
+  | (UsageUpdatePayload & { type: 'usageUpdate' })
+  | (ClaudeHookPayload & { type: 'claudeHook' });

@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "lib": ["ES2020"],
+    "strict": true,
+    "noImplicitAny": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationDir": "./dist/types",
+    "types": ["node", "electron"]
+  },
+  "include": ["src/main/**/*.ts", "src/shared/**/*.ts"],
+  "exclude": ["src/renderer/**/*", "**/*.test.ts"]
+}

@@ -1,24 +1,37 @@
-const WebSocket = require('ws');
-const http = require('http');
-const path = require('path');
-const fs = require('fs');
-const { AIDetector } = require('./detector');
+import WebSocket from 'ws';
+import http from 'http';
+import path from 'path';
+import fs from 'fs';
+import { AIDetector } from './detector';
+import type { ConfigStore } from './config';
+import type { UsageMonitor } from './usage-monitor';
+import type { WsMessage } from '../shared/types/websocket';
+
+interface ServerOptions {
+  configStore?: ConfigStore | null;
+  usageMonitor?: UsageMonitor | null;
+}
 
 /**
  * 状态服务器 - 提供 WebSocket 实时推送和 HTTP API
  */
-class StatusServer {
-  constructor(port = 3456, options = {}) {
+export class StatusServer {
+  private port: number;
+  private detector: AIDetector;
+  private configStore: ConfigStore | null;
+  private usageMonitor: UsageMonitor | null;
+  private wss: WebSocket.Server | null = null;
+  private httpServer: http.Server | null = null;
+  private clients = new Set<WebSocket>();
+
+  constructor(port = 3456, options: ServerOptions = {}) {
     this.port = port;
     this.detector = new AIDetector();
     this.configStore = options.configStore || null;
     this.usageMonitor = options.usageMonitor || null;
-    this.wss = null;
-    this.httpServer = null;
-    this.clients = new Set();
   }
 
-  start() {
+  start(): this {
     // 创建 HTTP 服务器（同时服务静态文件和 API）
     this.httpServer = http.createServer((req, res) => {
       this.handleHttp(req, res);
@@ -35,7 +48,7 @@ class StatusServer {
       ws.send(JSON.stringify({
         type: 'init',
         data: this.detector.getAllStatus()
-      }));
+      } as WsMessage));
 
       // 发送当前用量快照
       if (this.usageMonitor) {
@@ -52,18 +65,18 @@ class StatusServer {
             } : { kimi: true, minimax: true, copilot: true },
             intervalMinutes: this.configStore ? this.configStore.get().intervalMinutes : 10
           }
-        }));
+        } as WsMessage));
       }
 
-      ws.on('message', (raw) => {
+      ws.on('message', (raw: WebSocket.RawData) => {
         try {
-          const msg = JSON.parse(raw);
+          const msg = JSON.parse(raw.toString()) as { type?: string };
           if (msg.type === 'refresh') {
             console.log('[Server] user requested refresh');
             this.detector.checkAll();
             if (this.usageMonitor) this.usageMonitor.checkAll();
           }
-        } catch (e) {
+        } catch {
           // 忽略非 JSON 消息
         }
       });
@@ -73,7 +86,7 @@ class StatusServer {
         console.log('[Server] Client disconnected');
       });
 
-      ws.on('error', (err) => {
+      ws.on('error', (err: Error) => {
         console.error('[Server] WebSocket error:', err);
       });
     });
@@ -84,14 +97,14 @@ class StatusServer {
         type: 'statusChange',
         assistantId,
         status,
-        data: assistant
-      });
+        data: assistant as unknown as { status?: string; details: { projects: unknown[] } }
+      } as WsMessage);
     });
 
     // 注册用量更新回调，推送给所有客户端
     if (this.usageMonitor) {
       this.usageMonitor.onUpdate((payload) => {
-        this.broadcast({ type: 'usageUpdate', ...payload });
+        this.broadcast({ type: 'usageUpdate', ...payload } as WsMessage);
       });
     }
 
@@ -107,7 +120,7 @@ class StatusServer {
   }
 
   // 向所有打开的 WS 客户端广播一条消息
-  broadcast(msg) {
+  broadcast(msg: WsMessage): void {
     const payload = JSON.stringify(msg);
     this.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
@@ -116,8 +129,8 @@ class StatusServer {
     });
   }
 
-  handleHttp(req, res) {
-    const url = req.url;
+  private handleHttp(req: http.IncomingMessage, res: http.ServerResponse): void {
+    const url = req.url || '/';
 
     // CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -139,7 +152,7 @@ class StatusServer {
 
     // API: 获取单个助手状态
     if (url.startsWith('/api/status/')) {
-      const assistantId = url.split('/').pop();
+      const assistantId = url.split('/').pop() || '';
       const status = this.detector.getStatus(assistantId);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(status || { error: 'not found' }));
@@ -155,16 +168,16 @@ class StatusServer {
 
     // API: 手动设置状态 (POST /api/status/:id)
     if (req.method === 'POST' && url.startsWith('/api/status/')) {
-      const assistantId = url.split('/').pop();
+      const assistantId = url.split('/').pop() || '';
       let body = '';
       req.on('data', chunk => body += chunk);
       req.on('end', () => {
         try {
-          const { status, details } = JSON.parse(body);
+          const { status, details } = JSON.parse(body) as { status: string; details?: Record<string, unknown> };
           const success = this.detector.setManualStatus(assistantId, status, details || {});
           res.writeHead(success ? 200 : 404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success, assistantId, status }));
-        } catch (e) {
+        } catch {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'invalid body' }));
         }
@@ -179,7 +192,7 @@ class StatusServer {
     }
 
     // 静态文件服务（来自 Vite 构建产物 src/renderer/dist）
-    const STATIC_ROOT = path.join(__dirname, 'renderer', 'dist');
+    const STATIC_ROOT = path.join(__dirname, '..', 'renderer', 'dist');
     let filePath = path.join(STATIC_ROOT, url === '/' ? 'index.html' : url);
 
     // 安全检查
@@ -196,7 +209,7 @@ class StatusServer {
     }
 
     const ext = path.extname(filePath);
-    const contentType = {
+    const contentType: Record<string, string> = {
       '.html': 'text/html',
       '.css': 'text/css',
       '.js': 'application/javascript',
@@ -207,71 +220,69 @@ class StatusServer {
       '.ico': 'image/x-icon',
       '.woff': 'font/woff',
       '.woff2': 'font/woff2'
-    }[ext] || 'application/octet-stream';
-
-    res.writeHead(200, { 'Content-Type': contentType });
+    };
+    res.writeHead(200, { 'Content-Type': contentType[ext] || 'application/octet-stream' });
     res.end(fs.readFileSync(filePath));
   }
 
-  stop() {
+  stop(): void {
     this.detector.stop();
     if (this.wss) this.wss.close();
     if (this.httpServer) this.httpServer.close();
   }
 
   // 处理 Claude Code hook POST: 校验、按 config gating，再 broadcast
-  handleHookEvent(req, res) {
+  private handleHookEvent(req: http.IncomingMessage, res: http.ServerResponse): void {
     const MAX_BODY = 64 * 1024;
     const WHITELIST = new Set(['Notification', 'Stop', 'PreToolUse']);
 
     let body = '';
     let aborted = false;
-    req.on('data', (chunk) => {
+    req.on('data', (chunk: string) => {
       if (aborted) return;
       body += chunk;
       if (body.length > MAX_BODY) {
         aborted = true;
         res.writeHead(413, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'body too large' }));
-        try { req.destroy(); } catch (e) {}
+        try { req.destroy(); } catch { /* ignore */ }
       }
     });
     req.on('end', () => {
       if (aborted) return;
-      let parsed;
+      let parsed: Record<string, unknown>;
       try {
-        parsed = JSON.parse(body || '{}');
-      } catch (e) {
+        parsed = JSON.parse(body || '{}') as Record<string, unknown>;
+      } catch {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'invalid body' }));
         return;
       }
 
-      const event = parsed.hook_event_name || parsed.event;
+      const event = (parsed.hook_event_name || parsed.event) as string;
       if (!event || !WHITELIST.has(event)) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'unsupported event' }));
         return;
       }
+      const eventTyped = event as 'Notification' | 'Stop' | 'PreToolUse';
 
       // 配置 gating：用户关掉的事件直接静默丢弃
-      const enabled = this.configStore && this.configStore.get().hooks
-        ? this.configStore.get().hooks.enabled
-        : null;
-      if (enabled && enabled[event] === false) {
+      const enabled = this.configStore?.get().hooks?.enabled ?? null;
+      if (enabled && enabled[eventTyped] === false) {
         res.writeHead(204);
         res.end();
         return;
       }
 
-      const sessionId = parsed.session_id || parsed.sessionId || null;
+      const sessionId = (parsed.session_id || parsed.sessionId || null) as string | null;
       const cwd = typeof parsed.cwd === 'string' ? parsed.cwd : null;
       const message = typeof parsed.message === 'string' ? parsed.message : undefined;
       const toolName = typeof parsed.tool_name === 'string' ? parsed.tool_name : undefined;
 
       this.broadcast({
         type: 'claudeHook',
-        event,
+        event: eventTyped,
         cwd,
         sessionId,
         ts: Date.now(),
@@ -285,5 +296,3 @@ class StatusServer {
     req.on('error', () => { aborted = true; });
   }
 }
-
-module.exports = { StatusServer };

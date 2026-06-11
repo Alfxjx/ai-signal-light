@@ -1,10 +1,20 @@
 /**
  * AI 用量监控器
- * 轮询 Kimi 和 MiniMax 用量 API，通过 onUpdate 回调推送数据
+ * 轮询 Kimi、MiniMax 和 Copilot 用量 API，通过 onUpdate 回调推送数据
  * 失败时不抛出，错误信息保存到 state 中由前端展示
  */
 
-const axios = require('axios');
+import axios, { AxiosError, AxiosProxyConfig } from 'axios';
+import type { ConfigStore } from './config';
+import type {
+  ProviderId,
+  KimiUsageData,
+  MinimaxUsageData,
+  CopilotUsageData,
+  UsageUpdatePayload,
+  UsageSnapshot,
+  ProviderUsageData,
+} from '../shared/types/usage';
 
 const KIMI_API = 'https://www.kimi.com/apiv2/kimi.gateway.billing.v1.BillingService/GetUsages';
 const MINIMAX_API = 'https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains';
@@ -26,17 +36,23 @@ const http = axios.create({
   validateStatus: (status) => status >= 200 && status < 500
 });
 
-class UsageMonitor {
-  constructor(configStore) {
+type UpdateCallback = (payload: UsageUpdatePayload) => void;
+
+export class UsageMonitor {
+  private configStore: ConfigStore;
+  private callbacks: UpdateCallback[] = [];
+  private interval: NodeJS.Timeout | null = null;
+  private intervalMs: number;
+  private _unsubscribe: (() => void) | null = null;
+  state: UsageSnapshot = {
+    kimi:    { data: null, lastUpdated: null, error: null },
+    minimax: { data: null, lastUpdated: null, error: null },
+    copilot: { data: null, lastUpdated: null, error: null }
+  };
+
+  constructor(configStore: ConfigStore) {
     this.configStore = configStore;
-    this.callbacks = [];
-    this.interval = null;
     this.intervalMs = configStore.get().intervalMinutes * 60 * 1000;
-    this.state = {
-      kimi:    { data: null, lastUpdated: null, error: null },
-      minimax: { data: null, lastUpdated: null, error: null },
-      copilot: { data: null, lastUpdated: null, error: null }
-    };
 
     // 订阅配置变化：interval 变化时重启轮询
     this._unsubscribe = configStore.onChange((cfg) => {
@@ -49,19 +65,19 @@ class UsageMonitor {
   }
 
   // 注册更新回调
-  onUpdate(cb) {
+  onUpdate(cb: UpdateCallback): void {
     this.callbacks.push(cb);
   }
 
   // 启动轮询
-  start() {
+  start(): void {
     if (this.interval) return;
     this.interval = setInterval(() => this.checkAll(), this.intervalMs);
     this.checkAll(); // 立即执行一次
   }
 
   // 停止轮询
-  stop() {
+  stop(): void {
     if (this.interval) {
       clearInterval(this.interval);
       this.interval = null;
@@ -70,7 +86,7 @@ class UsageMonitor {
   }
 
   // 重启（interval 变更时用）
-  restart() {
+  restart(): void {
     if (this.interval) {
       clearInterval(this.interval);
       this.interval = null;
@@ -79,7 +95,7 @@ class UsageMonitor {
   }
 
   // 主入口：依次检查所有 provider
-  async checkAll() {
+  async checkAll(): Promise<void> {
     await Promise.all([
       this._safeRun('kimi',    this.fetchKimi.bind(this)),
       this._safeRun('minimax', this.fetchMiniMax.bind(this)),
@@ -87,7 +103,7 @@ class UsageMonitor {
     ]);
   }
 
-  async _safeRun(provider, fetcher) {
+  private async _safeRun(provider: ProviderId, fetcher: (token: string, proxy: AxiosProxyConfig | null) => Promise<ProviderUsageData>): Promise<void> {
     const cfg = this.configStore.get()[provider];
     if (!cfg.enabled) {
       this.state[provider] = {
@@ -127,8 +143,8 @@ class UsageMonitor {
     this._emit(provider);
   }
 
-  _emit(provider) {
-    const payload = {
+  private _emit(provider: ProviderId): void {
+    const payload: UsageUpdatePayload = {
       provider,
       data: this.state[provider].data,
       lastUpdated: this.state[provider].lastUpdated,
@@ -143,17 +159,17 @@ class UsageMonitor {
 
   // ==================== Kimi ====================
 
-  async fetchKimi(token, proxyConfig) {
+  private async fetchKimi(token: string, proxyConfig: AxiosProxyConfig | null): Promise<KimiUsageData> {
     let res;
     try {
-      const reqConfig = {
+      const reqConfig: { headers: Record<string, string>; proxy?: AxiosProxyConfig } = {
         headers: {
           'Authorization': `Bearer ${token.trim()}`,
           'Content-Type': 'application/json',
         }
       };
       if (proxyConfig) reqConfig.proxy = proxyConfig;
-      res = await http.post(KIMI_API, { scope: ['FEATURE_CODING'] }, reqConfig);
+      res = await http.post<unknown>(KIMI_API, { scope: ['FEATURE_CODING'] }, reqConfig);
     } catch (e) {
       throw e; // 网络层/超时
     }
@@ -164,43 +180,43 @@ class UsageMonitor {
       throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`);
     }
 
-    const json = res.data;
+    const json = res.data as Record<string, unknown>;
     if (!json || typeof json !== 'object') {
       throw new Error('invalid response');
     }
 
     // 解析 totalQuota
-    const total = json.totalQuota || {};
+    const total = (json.totalQuota as Record<string, unknown>) || {};
     const totalData = {
       limit: Number(total.limit) || 0,
       used: Number(total.used) || 0,
       remaining: Number(total.remaining) || 0,
-      percent: this._calcPercent(total.remaining, total.limit)
+      percent: calcPercent(Number(total.remaining), Number(total.limit))
     };
 
     // 解析 FEATURE_CODING usages 数组
-    const usages = json.usages || [];
-    const usage = usages[0] || {};
+    const usages = (json.usages as unknown[]) || [];
+    const usage = (usages[0] as Record<string, unknown>) || {};
 
     // usages[0].detail        → 总/日配额 (resetTime 跨天)
     // usages[0].limits[0]     → 5h 窗口 (duration=300min)
-    const dTotal = usage.detail || {};
-    const d5h = (usage.limits || [])[0]?.detail || {};
+    const dTotal = (usage.detail as Record<string, unknown>) || {};
+    const d5h = ((usage.limits as unknown[])?.[0] as Record<string, unknown>)?.detail as Record<string, unknown> || {};
 
     const codingWeekly = {
       limit:     Number(dTotal.limit)     || 0,
       used:      Number(dTotal.used)      || 0,
       remaining: Number(dTotal.remaining) || 0,
-      percent:   this._calcPercent(dTotal.remaining, dTotal.limit),
-      resetTime: dTotal.resetTime || null
+      percent:   calcPercent(Number(dTotal.remaining), Number(dTotal.limit)),
+      resetTime: dTotal.resetTime ? String(dTotal.resetTime) : null
     };
 
     const codingFiveHour = {
       limit:     Number(d5h.limit)     || 0,
       used:      Number(d5h.used)      || 0,
       remaining: Number(d5h.remaining) || 0,
-      percent:   this._calcPercent(d5h.remaining, d5h.limit),
-      resetTime: d5h.resetTime || null
+      percent:   calcPercent(Number(d5h.remaining), Number(d5h.limit)),
+      resetTime: d5h.resetTime ? String(d5h.resetTime) : null
     };
 
     console.log('[usage:kimi] fetched data:', JSON.stringify({ total: totalData, codingFiveHour, codingWeekly }));
@@ -210,16 +226,16 @@ class UsageMonitor {
 
   // ==================== MiniMax ====================
 
-  async fetchMiniMax(token, proxyConfig) {
+  private async fetchMiniMax(token: string, proxyConfig: AxiosProxyConfig | null): Promise<MinimaxUsageData> {
     let res;
     try {
-      const reqConfig = {
+      const reqConfig: { headers: Record<string, string>; proxy?: AxiosProxyConfig } = {
         headers: {
           'Authorization': `Bearer ${token.trim()}`
         }
       };
       if (proxyConfig) reqConfig.proxy = proxyConfig;
-      res = await http.get(MINIMAX_API, reqConfig);
+      res = await http.get<unknown>(MINIMAX_API, reqConfig);
     } catch (e) {
       throw e;
     }
@@ -230,15 +246,15 @@ class UsageMonitor {
       throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`);
     }
 
-    const json = res.data;
-    if (!json || json.base_resp?.status_code !== 0) {
+    const json = res.data as Record<string, unknown>;
+    if (!json || (json.base_resp as Record<string, unknown>)?.status_code !== 0) {
       console.error('[usage:minimax] api error response:', JSON.stringify(json).slice(0, 500));
-      throw new Error(json?.base_resp?.status_msg || 'api error');
+      throw new Error((json?.base_resp as Record<string, unknown>)?.status_msg as string || 'api error');
     }
 
     // 只取 model_name === 'general' 那条
-    const arr = json.model_remains || [];
-    const general = arr.find(m => m.model_name === 'general');
+    const arr = (json.model_remains as unknown[]) || [];
+    const general = (arr as Array<Record<string, unknown>>).find(m => m.model_name === 'general');
     if (!general) {
       throw new Error('general model not found');
     }
@@ -250,17 +266,17 @@ class UsageMonitor {
     return {
       fiveHourPercent: Number(general.current_interval_remaining_percent) || 0,
       weeklyPercent: Number(general.current_weekly_remaining_percent) || 0,
-      fiveHourResetTime: general.remains_time || null,
+      fiveHourResetTime: general.remains_time ? String(general.remains_time) : null,
     };
   }
 
   // ==================== Copilot ====================
 
   // token 字段实际存的是从浏览器复制的整段 Cookie 串
-  async fetchCopilot(cookie, proxyConfig) {
+  private async fetchCopilot(cookie: string, proxyConfig: AxiosProxyConfig | null): Promise<CopilotUsageData> {
     let res;
     try {
-      const reqConfig = {
+      const reqConfig: { headers: Record<string, string>; proxy?: AxiosProxyConfig } = {
         headers: {
           'Cookie': cookie.trim(),
           'Referer': 'https://github.com/copilot',
@@ -268,7 +284,7 @@ class UsageMonitor {
         }
       };
       if (proxyConfig) reqConfig.proxy = proxyConfig;
-      res = await http.get(COPILOT_API, reqConfig);
+      res = await http.get<unknown>(COPILOT_API, reqConfig);
     } catch (e) {
       throw e;
     }
@@ -279,52 +295,53 @@ class UsageMonitor {
       throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`);
     }
 
-    const json = res.data;
+    const json = res.data as Record<string, unknown>;
     if (!json || typeof json !== 'object' || !json.quotas) {
       throw new Error('invalid response, cookie may be incorrect or expired');
     }
 
-    const limits    = json.quotas.limits    || {};
-    const remaining = json.quotas.remaining || {};
+    const quotas = json.quotas as Record<string, unknown>;
+    const limits    = (quotas.limits    as Record<string, unknown>) || {};
+    const remaining = (quotas.remaining as Record<string, unknown>) || {};
 
-    const result = {
+    const result: CopilotUsageData = {
       premium: {
         limit:        Number(limits.premiumInteractions)    || 0,
         remaining:    Number(remaining.premiumInteractions) || 0,
         percent:      Number(remaining.premiumInteractionsPercentage) || 0,
-        resetDate:    json.quotas.resetDate    || null,
-        resetDateUtc: json.quotas.resetDateUtc || null
+        resetDate:    quotas.resetDate    ? String(quotas.resetDate) : null,
+        resetDateUtc: quotas.resetDateUtc ? String(quotas.resetDateUtc) : null
       },
       chat: { percent: Number(remaining.chatPercentage) || 0 },
-      plan: json.plan || null,
-      licenseType: json.licenseType || null
+      plan: json.plan ? String(json.plan) : null,
+      licenseType: json.licenseType ? String(json.licenseType) : null
     };
 
     console.log('[usage:copilot] fetched data:', result);
     return result;
   }
 
-  // ==================== Utilities ====================
-
-  _calcPercent(remaining, limit) {
-    const r = Number(remaining) || 0;
-    const l = Number(limit) || 0;
-    if (l <= 0) return 0;
-    return Math.max(0, Math.min(100, Math.round((r / l) * 100)));
-  }
-
   // 对外提供快照(用于 init 推送)
-  snapshot() {
-    return JSON.parse(JSON.stringify(this.state));
+  snapshot(): UsageSnapshot {
+    return JSON.parse(JSON.stringify(this.state)) as UsageSnapshot;
   }
 }
 
+// ==================== 可测试的纯函数 ====================
+
+export function calcPercent(remaining: number | string, limit: number | string): number {
+  const r = Number(remaining) || 0;
+  const l = Number(limit) || 0;
+  if (l <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((r / l) * 100)));
+}
+
 // 解析代理 URL 为 axios 的 proxy 配置格式
-function parseProxyUrl(urlStr) {
+export function parseProxyUrl(urlStr: string): AxiosProxyConfig | null {
   if (!urlStr || typeof urlStr !== 'string') return null;
   try {
     const url = new URL(urlStr.trim());
-    const result = {
+    const result: AxiosProxyConfig = {
       protocol: url.protocol.replace(':', ''),
       host: url.hostname,
       port: parseInt(url.port, 10) || (url.protocol === 'https:' ? 443 : 80),
@@ -339,17 +356,19 @@ function parseProxyUrl(urlStr) {
 }
 
 // 把 axios 错误格式化成简短字符串
-function formatAxiosError(e) {
-  if (e.code === 'ECONNABORTED') return 'timeout';
-  if (e.code === 'ENOTFOUND') return 'DNS 解析失败';
-  if (e.code === 'ECONNREFUSED') return '连接被拒绝';
-  if (e.response) {
-    const body = typeof e.response.data === 'string'
-      ? e.response.data
-      : JSON.stringify(e.response.data || {});
-    return `HTTP ${e.response.status}: ${body.slice(0, 200)}`;
+export function formatAxiosError(e: unknown): string {
+  if (e && typeof e === 'object' && 'code' in e) {
+    const code = (e as { code: string }).code;
+    if (code === 'ECONNABORTED') return 'timeout';
+    if (code === 'ENOTFOUND') return 'DNS 解析失败';
+    if (code === 'ECONNREFUSED') return '连接被拒绝';
   }
-  return e.message || String(e);
+  if (e && typeof e === 'object' && 'response' in e) {
+    const err = e as AxiosError;
+    const body = typeof err.response?.data === 'string'
+      ? err.response.data
+      : JSON.stringify(err.response?.data || {});
+    return `HTTP ${err.response?.status}: ${body.slice(0, 200)}`;
+  }
+  return (e as Error)?.message || String(e);
 }
-
-module.exports = { UsageMonitor };
