@@ -52,14 +52,18 @@ function handleMessage(msg: WsMessage) {
 
 function handleClaudeData(data: AssistantStatus) {
   if (!data || !data.details) return;
+  console.log(data);
   projects.value = data.details.projects ?? [];
   if (data.details.lastUpdate) {
     const ts = typeof data.details.lastUpdate === 'string'
       ? new Date(data.details.lastUpdate).getTime()
       : data.details.lastUpdate;
     lastUpdate.value = ts;
-  } else if (typeof data.lastUpdate === 'number') {
-    lastUpdate.value = data.lastUpdate;
+  } else if (data.lastUpdate) {
+    const ts = typeof data.lastUpdate === 'string'
+      ? new Date(data.lastUpdate).getTime()
+      : data.lastUpdate;
+    if (!Number.isNaN(ts)) lastUpdate.value = ts;
   }
 }
 
@@ -141,9 +145,9 @@ const lastUpdateText = computed(() => {
     <TitleBar :is-pinned="isPinned" :is-electron="isElectron" @toggle-pin="togglePin" @minimize="minimize" />
 
     <div class="cards-container">
-      <ClaudeCard :projects="projects" :now="now" :is-refreshing="isRefreshing" @refresh="onRefresh" />
       <UsageCard :usage="usage" :now="now" :is-compact="isCompact" :is-refreshing="isUsageRefreshing"
                  @toggle-compact="toggleCompact" @refresh="onUsageRefresh" />
+      <ClaudeCard :projects="projects" :now="now" :is-refreshing="isRefreshing" @refresh="onRefresh" />
     </div>
 
     <div class="footer">

@@ -119,14 +119,13 @@ const copilotResetDateText = computed<string>(() => {
   // "2026-07-01" → "07-01"
   return d.length >= 10 ? d.slice(5, 10) : d;
 });
-
 // ---- 卡片头 / 底部 ----
 const usageLastTs = computed<number | null>(() => {
   const ks = [
-    props.usage.kimi?.lastUpdated,
-    props.usage.minimax?.lastUpdated,
-    props.usage.copilot?.lastUpdated,
-  ].filter((v): v is number => typeof v === 'number');
+    props.usage.kimi?.lastUpdated ?? null,
+    props.usage.minimax?.lastUpdated ?? null,
+    props.usage.copilot?.lastUpdated ?? null,
+  ].filter((v) => v !== null).map(x=> new Date().getTime()) as number[];
   if (ks.length === 0) return null;
   return Math.max(...ks);
 });
@@ -155,12 +154,12 @@ const allNoToken = computed<boolean>(() => {
 
     <div class="usage-list" :class="{ compact: isCompact }">
       <!-- Kimi -->
-      <div class="usage-row" :data-disabled="String(isProviderDisabled('kimi'))" data-provider="kimi">
+      <div class="usage-row" v-if="!isProviderDisabled('kimi')" :data-disabled="String(isProviderDisabled('kimi'))" data-provider="kimi">
         <div class="usage-row-header">
           <span class="usage-name">Kimi</span>
-          <span class="usage-status" :class="usageStatusClass('kimi')" :title="usage.kimi?.error || ''">
-            {{ usageStatusText('kimi') }}
-          </span>
+          <div class="usage-status-wrapper">
+            <span class="usage-status" :class="usageStatusClass('kimi')" :title="usage.kimi?.error || usageStatusText('kimi')"></span>
+          </div>
         </div>
         <template v-if="showUsageBars('kimi')">
           <div class="usage-bar-block" data-hide-compact>
@@ -199,12 +198,12 @@ const allNoToken = computed<boolean>(() => {
       
 
       <!-- MiniMax -->
-      <div class="usage-row" :data-disabled="String(isProviderDisabled('minimax'))" data-provider="minimax">
+      <div class="usage-row" v-if="!isProviderDisabled('minimax')" :data-disabled="String(isProviderDisabled('minimax'))" data-provider="minimax">
         <div class="usage-row-header">
           <span class="usage-name">MiniMax</span>
-          <span class="usage-status" :class="usageStatusClass('minimax')" :title="usage.minimax?.error || ''">
-            {{ usageStatusText('minimax') }}
-          </span>
+          <div class="usage-status-wrapper">
+            <span class="usage-status" :class="usageStatusClass('minimax')" :title="usage.minimax?.error || usageStatusText('minimax')"></span>
+          </div>
         </div>
         <template v-if="showUsageBars('minimax')">
           <div class="usage-bar-block">
@@ -234,12 +233,12 @@ const allNoToken = computed<boolean>(() => {
 
 
     <!-- Copilot -->
-      <div class="usage-row" :data-disabled="String(isProviderDisabled('copilot'))" data-provider="copilot">
+      <div class="usage-row" v-if="!isProviderDisabled('copilot')" :data-disabled="String(isProviderDisabled('copilot'))" data-provider="copilot">
         <div class="usage-row-header">
           <span class="usage-name">Copilot</span>
-          <span class="usage-status" :class="usageStatusClass('copilot')" :title="usage.copilot?.error || ''">
-            {{ usageStatusText('copilot') }}
-          </span>
+          <div class="usage-status-wrapper">
+            <span class="usage-status" :class="usageStatusClass('copilot')" :title="usage.copilot?.error || usageStatusText('copilot')"></span>
+          </div>
         </div>
         <div class="usage-bar-block" v-if="showUsageBars('copilot')">
           <div class="usage-bar-label">
