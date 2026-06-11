@@ -310,10 +310,6 @@ app.on('before-quit', () => {
 });
 
 // IPC 通信
-ipcMain.handle('get-status', async () => {
-  return server ? server.detector.getAllStatus() : {};
-});
-
 ipcMain.handle('toggle-always-on-top', async (event, enabled) => {
   if (mainWindow) {
     mainWindow.setAlwaysOnTop(enabled);

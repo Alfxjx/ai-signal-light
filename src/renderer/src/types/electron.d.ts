@@ -52,7 +52,6 @@ export interface WindowState {
 }
 
 export interface ElectronAPI {
-  getStatus: () => Promise<unknown>;
   toggleAlwaysOnTop: (enabled: boolean) => Promise<void>;
   platform: string;
   getSettings: () => Promise<SettingsPayload | null>;

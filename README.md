@@ -1,24 +1,36 @@
 # AI 助手状态监控面板
 
-一个轻量级桌面应用，实时显示 **Kimi Code CLI** 和 **Claude Code** 的工作状态。
+一个轻量级 Electron 桌面应用，实时展示 **Claude Code** 各项目的最近活跃时间，以及 **Kimi / MiniMax / Copilot** 的 API 用量余量。
 
 ## 功能特性
 
-- **三种状态显示**
-  - 空闲（绿色）- AI 等待用户输入
-  - 执行中（蓝色呼吸）- AI 正在思考/生成/执行工具
-  - 等待判断（黄色闪烁）- AI 提出了建议，等待用户确认
+- **Claude Code 项目监控** —— 扫描 `~/.claude/projects/` 下的对话记录，按时间倒序列出各项目距上次 assistant 响应的间隔
+  - `< 5min` 绿色（新鲜）
+  - `< 1h` 黄色（ warn ）
+  - 其他灰色（ stale ）
+  - 支持按 5h / 8h / 12h / 24h / 3d / 7d / 30d / All 过滤
 
-- **实时更新** - WebSocket 推送，2秒刷新
-- **系统托盘** - 最小化到托盘，不打扰工作
-- **置顶显示** - 可设置为始终置顶
-- **无边框设计** - 精致毛玻璃效果，支持拖拽
+- **Claude Code Hooks 事件推送** —— 接收 Claude Code 的 `Notification` / `Stop` / `PreToolUse` 事件，在项目行上显示红点提示，等待用户响应
+
+- **AI 用量监控** —— 配置 Token/Cookie 后，定时轮询以下平台的用量余量：
+  - **Kimi** —— 总配额 / 周配额 / 5h 窗口配额
+  - **MiniMax** —— 5h 窗口 / 周配额
+  - **GitHub Copilot** —— Premium 交互次数余量
+
+- **界面特性**
+  - 无边框毛玻璃设计，支持拖拽移动
+  - 始终置顶（可切换）
+  - 简略 / 完整 双模式切换
+  - 系统托盘菜单（显示/隐藏、用量开关、刷新周期、Token 设置）
+  - 窗口大小、位置、模式跨重启持久化，多显示器感知
 
 ## 技术栈
 
-- **Node.js + Electron** - 跨平台桌面应用
-- **WebSocket** - 实时状态推送
-- **进程监控** - 检测 AI 助手进程状态
+- **Electron** —— 跨平台桌面应用框架
+- **Vue 3 + TypeScript + Vite** —— 渲染层（单文件组件 + Composition API）
+- **WebSocket** —— 主进程与渲染层的实时推送
+- **Node.js fs/child_process** —— 本地 jsonl 文件扫描
+- **axios** —— 用量 API 轮询
 
 ## 快速开始
 
@@ -28,112 +40,63 @@
 npm install
 ```
 
-### 2. 根据你的 Claude Code 版本选择配置方式
+### 2. 开发模式（带 DevTools）
 
-#### A. Claude Code CLI 版（命令行版）
-
-Claude Code CLI 支持 `/statusLine` 配置，可以将实时状态输出到自定义脚本。
-
-**macOS / Linux:**
-```
-/config set statusLine "bash /path/to/scripts/claude-status.sh"
-```
-
-**Windows:**
-```
-/config set statusLine "node C:\path\to\scripts\status-reporter.js --claude-stdin"
-```
-
-#### B. Claude Code VS Code 插件版 ⭐ 你当前的情况
-
-**VS Code 插件没有 `statusLine` 机制，使用手动状态切换：**
-
-1. 启动监控面板（见步骤 3）
-2. 面板会自动检测 VS Code 是否在运行
-3. 鼠标悬停在 Claude Code 卡片上，会出现三个按钮：
-   - 🟢 空闲 - Claude 等待你输入
-   - 🔵 执行中 - Claude 正在思考/写代码
-   - 🟡 等待判断 - Claude 问你 Yes/No
-4. 点击对应按钮即可切换状态
-
-> 💡 **使用技巧**: 可以把面板放在屏幕角落，Claude 开始干活时点一下 🔵，它问你问题时点一下 🟡
-
-### 3. 配置 Kimi Code CLI 状态上报（可选）
-
-Kimi Code CLI 目前没有官方 statusLine 机制，使用进程监控 + 状态文件。
-
-**macOS / Linux:**
-```bash
-# 将 kimi-status.sh 加入 cron 或作为后台服务运行
-*/1 * * * * /path/to/scripts/kimi-status.sh
-```
-
-**Windows:**
-```powershell
-# 在 PowerShell 中启动持续监控
-node C:\path\to\scripts\status-reporter.js --watch
-```
-
-### 4. 启动监控面板
-
-**开发模式**
 ```bash
 npm run dev
 ```
 
-**生产模式**
+Vite 开发服务器运行在 `5173`，Electron 主进程自动等待并加载。
+
+### 3. 生产模式
+
 ```bash
 npm start
 ```
 
-### 5. 打包发布
+先构建渲染层产物到 `src/renderer/dist/`，再启动 Electron。
+
+### 4. 打包发布
 
 ```bash
 npm run build
 ```
 
-## Windows 特别说明
+使用 `electron-builder` 输出到 `dist/`：
+- Windows: `portable`
+- macOS: `dmg`
+- Linux: `AppImage`
 
-### Kimi Code CLI 进程检测
+## Claude Code 配置
 
-Kimi Code CLI 在 Windows 上有两种安装方式，对应不同的进程名：
+### 自动安装 Hooks（推荐）
 
-| 安装方式 | 进程名 | 检测方法 |
-|---------|--------|---------|
-| npm 全局安装 (`npm i -g kimi`) | `node.exe` | 通过命令行参数判断是否包含 "kimi" |
-| 独立安装包 | `kimi.exe` | 直接检测进程名 |
+1. 右键点击系统托盘图标 → **用量监控** → **设置 Token…**
+2. 在设置窗口的 **Claude Code Hooks** 标签页中：
+   - 勾选需要监听的事件（`Notification` / `Stop` / `PreToolUse`）
+   - 点击 **Install Hooks**
+   - 应用会自动将 hook helper 写入 `~/.ai-status-monitor/claude-hook.js`，并修改 `~/.claude/settings.json`
+3. 之后每次 Claude Code 触发对应事件，面板即会收到推送并在对应项目上显示红点
 
-本应用会自动尝试两种检测方式，确保能正确识别。
+### 手动配置（备用）
 
-### 状态文件位置
+在 Claude Code 中执行：
 
-Windows 上状态文件存储在：
 ```
-C:\Users\<用户名>\.ai-status-monitor\
-  ├── claude-status.json
-  └── kimi-status.json
-```
-
-### 权限问题
-
-如果 PowerShell 脚本执行被禁止，请以管理员身份运行：
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+/config set statusLine "node ~/.ai-status-monitor/claude-hook.js"
 ```
 
-## 状态检测原理
+或参考 `scripts/status-reporter.js --claude-stdin` 自行对接。
 
-### Claude Code
+## 用量监控配置
 
-1. **进程检测** - 检测 `claude` / `claude.exe` 进程是否存在
-2. **状态文件** - 读取 `~/.ai-status-monitor/claude-status.json`
-3. **JSON 分析** - 根据 `pendingToolUses`、`isGenerating` 等字段判断状态
-
-### Kimi Code CLI
-
-1. **进程检测** - 检测 `kimi` / `kimi.exe` / `node.exe`(带 kimi 参数) 进程
-2. **状态文件** - 读取 `~/.ai-status-monitor/kimi-status.json`
-3. **推断状态** - 基于进程存在推断运行状态
+1. 右键托盘 → **用量监控** → **设置 Token…**
+2. 填入各平台 Token/Cookie：
+   - **Kimi**: `Authorization: Bearer <token>` 中的 token
+   - **MiniMax**: API Key
+   - **Copilot**: 从浏览器开发者工具复制的 Cookie 整段字符串
+3. 勾选启用对应平台，设置刷新周期（5/10/15/30/60 分钟）
+4. 可选：配置代理 URL（支持带认证的 HTTP/HTTPS 代理）
 
 ## 项目结构
 
@@ -142,59 +105,64 @@ ai-assistant-status-monitor/
 ├── package.json
 ├── README.md
 ├── scripts/
-│   ├── claude-status.sh         # macOS/Linux Claude 上报脚本
-│   ├── claude-status.ps1        # Windows Claude 上报脚本 (PowerShell)
-│   ├── kimi-status.sh           # macOS/Linux Kimi 检测脚本
-│   ├── kimi-status.ps1          # Windows Kimi 检测脚本 (PowerShell)
-│   └── status-reporter.js       # 跨平台 Node.js 上报脚本 (推荐)
+│   ├── claude-status.sh         # macOS/Linux Claude 上报脚本（历史兼容）
+│   ├── claude-status.ps1        # Windows Claude 上报脚本（历史兼容）
+│   └── status-reporter.js       # 跨平台 Node.js 上报脚本
 └── src/
-    ├── main.js                  # Electron 主进程
-    ├── preload.js             # 安全预加载脚本
-    ├── server.js              # WebSocket + HTTP 服务器
-    ├── detector.js              # AI 状态检测器
+    ├── main.js                  # Electron 主进程：BrowserWindow、Tray、IPC
+    ├── preload.js               # contextBridge 安全预加载
+    ├── server.js                # HTTP + WebSocket 服务器（端口 3456）
+    ├── detector.js              # Claude Code 项目 jsonl 扫描器
+    ├── usage-monitor.js         # Kimi / MiniMax / Copilot 用量轮询
+    ├── config.js                # 配置持久化（userData/config.json）
     └── renderer/
-        ├── index.html           # 前端页面
-        ├── style.css            # 样式
-        └── app.js               # 前端逻辑
+        ├── src/                  # Vue 3 源码（Vite 构建）
+        │   ├── main.ts           # 主面板入口
+        │   ├── settings.ts       # 设置窗口入口
+        │   ├── App.vue           # 主面板根组件
+        │   ├── Settings.vue      # 设置窗口根组件
+        │   ├── components/
+        │   │   ├── TitleBar.vue
+        │   │   ├── ClaudeCard.vue     # Claude 项目列表卡片
+        │   │   └── UsageCard.vue      # 用量监控卡片
+        │   ├── composables/
+        │   │   └── useWebSocket.ts
+        │   ├── utils/
+        │   │   ├── time.ts
+        │   │   └── cwd.ts
+        │   ├── types/
+        │   │   ├── messages.ts
+        │   │   └── electron.d.ts
+        │   ├── styles/
+        │   │   ├── main.css
+        │   │   └── settings.css
+        │   ├── index.html
+        │   └── settings.html
+        └── dist/                 # Vite 构建产物（由 electron-builder 打包）
 ```
 
-## 扩展更多 AI 助手
+## 状态检测原理
 
-要添加新的 AI 助手支持，只需修改 `src/detector.js`：
+### Claude Code 项目活跃时间
 
-```javascript
-// 1. 在构造函数中注册新助手
-this.assistants.set('cursor', {
-  name: 'Cursor',
-  type: 'cursor',
-  status: Status.IDLE,
-  lastUpdate: null,
-  details: {},
-  pid: null
-});
+1. 每 30 秒扫描 `~/.claude/projects/<project>/` 下的所有 `.jsonl` 文件
+2. 读取文件尾部 8KB，反向搜索最近一条 `type=assistant && isSidechain!==true` 的记录
+3. 提取 `timestamp` 作为该项目的最后响应时间
+4. 项目显示名优先级：`cwd` 末级目录名 > `slug` > 项目目录 ID
 
-// 2. 添加检测方法
-async checkCursor() {
-  const pid = await this.findProcess('cursor');
-  // ... 状态分析逻辑
-}
+### Claude Code Hooks
 
-// 3. 在 checkAll() 中调用
-async checkAll() {
-  await this.checkClaude();
-  await this.checkKimi();
-  await this.checkCursor();  // 新增
-}
-```
-
-同时在 `src/renderer/index.html` 中添加对应的卡片。
+1. Claude Code 触发事件时，通过 `~/.claude/settings.json` 中配置的 `command` hook 调用 `claude-hook.js`
+2. `claude-hook.js` 将事件 JSON POST 到 `http://127.0.0.1:3456/api/hooks/claude`
+3. 服务端校验事件白名单（`Notification` / `Stop` / `PreToolUse`）和配置 gating 后，通过 WebSocket 推送给前端
+4. 前端按 `cwd` 匹配项目，显示红点；当项目的 `lastResponse` 时间比 hook 时间新时自动消除
 
 ## 注意事项
 
-1. **Claude Code statusLine** 需要 v0.2.0+ 版本支持
-2. **Kimi Code CLI** 状态检测基于进程监控，精确状态需要配合日志分析
-3. **Windows 用户** 推荐使用 Node.js 版本的 `status-reporter.js`，无需额外配置
-4. 首次运行时会自动创建 `~/.ai-status-monitor` 目录
+1. **Kimi Code CLI 支持已停用**：早期版本支持 Kimi 进程检测，当前版本已不再维护该功能
+2. **Claude Code 项目目录**：需要 Claude Code 在 `~/.claude/projects/` 下生成 jsonl 对话记录，Claude Code CLI 和 VS Code 扩展均支持
+3. **Windows 用户**：推荐开发模式下使用 `npm run dev`；生产打包输出为 `portable` 格式
+4. **首次运行**：应用会自动创建配置目录和默认配置文件
 
 ## 许可证
 
