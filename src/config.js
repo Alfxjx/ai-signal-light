@@ -14,10 +14,15 @@ const DEFAULTS = {
   copilot: { token: '', enabled: true, useProxy: false },
   proxy: { url: '' },
   intervalMinutes: 10,
-  window: { width: 240, height: 550, x: null, y: null, isCompact: true }
+  window: { width: 240, height: 550, x: null, y: null, isCompact: true },
+  hooks: {
+    enabled: { Notification: true, Stop: true, PreToolUse: true },
+    endpoint: { autoInstalled: false }
+  }
 };
 
 const VALID_INTERVALS = [5, 10, 15, 30, 60];
+const HOOK_EVENTS = ['Notification', 'Stop', 'PreToolUse'];
 
 class ConfigStore {
   constructor() {
@@ -43,6 +48,10 @@ class ConfigStore {
         copilot: { ...DEFAULTS.copilot, ...(parsed.copilot || {}) },
         proxy:   { ...DEFAULTS.proxy,   ...(parsed.proxy   || {}) },
         window:  { ...DEFAULTS.window,  ...(parsed.window  || {}) },
+        hooks: {
+          enabled:  { ...DEFAULTS.hooks.enabled,  ...((parsed.hooks && parsed.hooks.enabled)  || {}) },
+          endpoint: { ...DEFAULTS.hooks.endpoint, ...((parsed.hooks && parsed.hooks.endpoint) || {}) }
+        },
         intervalMinutes: VALID_INTERVALS.includes(parsed.intervalMinutes)
           ? parsed.intervalMinutes
           : DEFAULTS.intervalMinutes
@@ -76,6 +85,22 @@ class ConfigStore {
     }
     if (partial.window && typeof partial.window === 'object') {
       this.data.window = { ...this.data.window, ...partial.window };
+    }
+    if (partial.hooks && typeof partial.hooks === 'object') {
+      if (partial.hooks.enabled && typeof partial.hooks.enabled === 'object') {
+        const next = { ...this.data.hooks.enabled };
+        for (const ev of HOOK_EVENTS) {
+          if (typeof partial.hooks.enabled[ev] === 'boolean') {
+            next[ev] = partial.hooks.enabled[ev];
+          }
+        }
+        this.data.hooks.enabled = next;
+      }
+      if (partial.hooks.endpoint && typeof partial.hooks.endpoint === 'object') {
+        if (typeof partial.hooks.endpoint.autoInstalled === 'boolean') {
+          this.data.hooks.endpoint.autoInstalled = partial.hooks.endpoint.autoInstalled;
+        }
+      }
     }
     if (typeof partial.intervalMinutes === 'number'
         && VALID_INTERVALS.includes(partial.intervalMinutes)) {
@@ -117,4 +142,4 @@ class ConfigStore {
   }
 }
 
-module.exports = { ConfigStore, VALID_INTERVALS };
+module.exports = { ConfigStore, VALID_INTERVALS, HOOK_EVENTS };

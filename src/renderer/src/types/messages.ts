@@ -4,6 +4,8 @@
 export interface ClaudeProject {
   id: string;
   name: string;
+  source?: 'cwd' | 'slug' | 'id';
+  cwd?: string | null;
   lastResponse: number | string | null;
 }
 
@@ -99,9 +101,20 @@ export interface UsageUpdatePayload {
   [key: string]: unknown;
 }
 
+// Claude Code hook 事件（Notification/Stop/PreToolUse）broadcast 时的 WS 形状
+export interface ClaudeHookPayload {
+  event: 'Notification' | 'Stop' | 'PreToolUse';
+  cwd: string | null;
+  sessionId: string | null;
+  ts: number;
+  message?: string;
+  toolName?: string;
+}
+
 // WS 顶层联合类型
 export type WsMessage =
   | { type: 'init'; data: DetectorAllStatus & { usage?: UsageInitPayload } }
   | { type: 'statusChange'; assistantId: string; status?: unknown; data: AssistantStatus }
   | { type: 'usageInit'; data: UsageInitPayload }
-  | (UsageUpdatePayload & { type: 'usageUpdate' });
+  | (UsageUpdatePayload & { type: 'usageUpdate' })
+  | (ClaudeHookPayload & { type: 'claudeHook' });

@@ -80,44 +80,40 @@ class StatusServer {
 
     // 注册状态变更回调，推送给所有客户端
     this.detector.onStatusChange((assistantId, status, assistant) => {
-      const message = JSON.stringify({
+      this.broadcast({
         type: 'statusChange',
         assistantId,
         status,
         data: assistant
-      });
-
-      this.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(message);
-        }
       });
     });
 
     // 注册用量更新回调，推送给所有客户端
     if (this.usageMonitor) {
       this.usageMonitor.onUpdate((payload) => {
-        const message = JSON.stringify({
-          type: 'usageUpdate',
-          ...payload
-        });
-        this.clients.forEach(client => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(message);
-          }
-        });
+        this.broadcast({ type: 'usageUpdate', ...payload });
       });
     }
 
     // 启动检测器
     this.detector.start();
 
-    // 启动服务器
-    this.httpServer.listen(this.port, () => {
-      console.log(`[Server] Status server started: http://localhost:${this.port}`);
+    // 启动服务器，仅绑定本机回环（hook 与渲染层都在本机）
+    this.httpServer.listen(this.port, '127.0.0.1', () => {
+      console.log(`[Server] Status server started: http://127.0.0.1:${this.port}`);
     });
 
     return this;
+  }
+
+  // 向所有打开的 WS 客户端广播一条消息
+  broadcast(msg) {
+    const payload = JSON.stringify(msg);
+    this.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(payload);
+      }
+    });
   }
 
   handleHttp(req, res) {
@@ -176,6 +172,12 @@ class StatusServer {
       return;
     }
 
+    // API: Claude Code hooks 事件入口
+    if (req.method === 'POST' && url === '/api/hooks/claude') {
+      this.handleHookEvent(req, res);
+      return;
+    }
+
     // 静态文件服务（来自 Vite 构建产物 src/renderer/dist）
     const STATIC_ROOT = path.join(__dirname, 'renderer', 'dist');
     let filePath = path.join(STATIC_ROOT, url === '/' ? 'index.html' : url);
@@ -215,6 +217,72 @@ class StatusServer {
     this.detector.stop();
     if (this.wss) this.wss.close();
     if (this.httpServer) this.httpServer.close();
+  }
+
+  // 处理 Claude Code hook POST: 校验、按 config gating，再 broadcast
+  handleHookEvent(req, res) {
+    const MAX_BODY = 64 * 1024;
+    const WHITELIST = new Set(['Notification', 'Stop', 'PreToolUse']);
+
+    let body = '';
+    let aborted = false;
+    req.on('data', (chunk) => {
+      if (aborted) return;
+      body += chunk;
+      if (body.length > MAX_BODY) {
+        aborted = true;
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'body too large' }));
+        try { req.destroy(); } catch (e) {}
+      }
+    });
+    req.on('end', () => {
+      if (aborted) return;
+      let parsed;
+      try {
+        parsed = JSON.parse(body || '{}');
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid body' }));
+        return;
+      }
+
+      const event = parsed.hook_event_name || parsed.event;
+      if (!event || !WHITELIST.has(event)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'unsupported event' }));
+        return;
+      }
+
+      // 配置 gating：用户关掉的事件直接静默丢弃
+      const enabled = this.configStore && this.configStore.get().hooks
+        ? this.configStore.get().hooks.enabled
+        : null;
+      if (enabled && enabled[event] === false) {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      const sessionId = parsed.session_id || parsed.sessionId || null;
+      const cwd = typeof parsed.cwd === 'string' ? parsed.cwd : null;
+      const message = typeof parsed.message === 'string' ? parsed.message : undefined;
+      const toolName = typeof parsed.tool_name === 'string' ? parsed.tool_name : undefined;
+
+      this.broadcast({
+        type: 'claudeHook',
+        event,
+        cwd,
+        sessionId,
+        ts: Date.now(),
+        message,
+        toolName
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+    });
+    req.on('error', () => { aborted = true; });
   }
 }
 

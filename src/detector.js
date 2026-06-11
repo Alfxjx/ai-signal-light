@@ -387,7 +387,7 @@ class AIDetector {
   /**
    * 从 jsonl 头部读前 8KB，找第一条含 cwd / slug 的记录，返回显示名来源
    * @param {string} jsonlPath
-   * @returns {Promise<{name: string, source: 'cwd'|'slug'}|null>}
+   * @returns {Promise<{name: string, source: 'cwd'|'slug', cwd: string|null}|null>}
    */
   async extractProjectDisplayName(jsonlPath) {
     const HEAD_SIZE = 8 * 1024;
@@ -405,10 +405,10 @@ class AIDetector {
         try {
           const obj = JSON.parse(line);
           if (obj.cwd) {
-            return { name: path.basename(obj.cwd), source: 'cwd' };
+            return { name: path.basename(obj.cwd), source: 'cwd', cwd: obj.cwd };
           }
           if (obj.slug) {
-            return { name: obj.slug, source: 'slug' };
+            return { name: obj.slug, source: 'slug', cwd: null };
           }
         } catch (e) {
           // 跳过坏行
@@ -476,12 +476,14 @@ class AIDetector {
       // 提取显示名：只从项目根 jsonl（不在 subagents/ 里）取
       let name = entry.name;
       let source = 'id';
+      let cwd = null;
       for (const f of jsonlFiles) {
         if (f.includes(`${path.sep}subagents${path.sep}`)) continue;
         const display = await this.extractProjectDisplayName(f);
         if (display) {
           name = display.name;
           source = display.source;
+          cwd = display.cwd;
           break;
         }
       }
@@ -495,7 +497,7 @@ class AIDetector {
         }
       }
 
-      results.push({ id: entry.name, name, source, lastResponse });
+      results.push({ id: entry.name, name, source, cwd, lastResponse });
     }
 
     return results;

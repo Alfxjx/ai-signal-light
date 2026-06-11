@@ -211,6 +211,25 @@ body {
   max-width: 60%;
 }
 
+/* Claude Code hook 红点：紧贴 name，把 time 推到右边 */
+.hook-badge {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+  margin-left: 6px;
+  margin-right: auto;
+  cursor: pointer;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.6);
+  animation: hook-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes hook-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
 .project-time {
   font-size: 12px;
   font-variant-numeric: tabular-nums;

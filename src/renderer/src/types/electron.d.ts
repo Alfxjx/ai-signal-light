@@ -11,6 +11,10 @@ export interface SettingsPayload {
   hasMiniMaxToken: boolean;
   hasCopilotToken: boolean;
   hasProxy: boolean;
+  hooks?: {
+    enabled: { Notification: boolean; Stop: boolean; PreToolUse: boolean };
+    endpoint: { autoInstalled: boolean };
+  };
 }
 
 export interface SettingsSavePayload {
@@ -19,6 +23,26 @@ export interface SettingsSavePayload {
   copilot: { token: string; tokenChanged: boolean; enabled: boolean; useProxy: boolean };
   proxy: { url: string; urlChanged: boolean };
   intervalMinutes: number;
+  hooks?: { enabled: { Notification: boolean; Stop: boolean; PreToolUse: boolean } };
+}
+
+export interface HooksSnippetInfo {
+  snippet: string;
+  autoInstalled: boolean;
+  helperPath: string;
+}
+
+export interface HooksInstallResult {
+  success: boolean;
+  installed?: string[];
+  skipped?: string[];
+  error?: string;
+}
+
+export interface HooksUninstallResult {
+  success: boolean;
+  removed?: number;
+  error?: string;
 }
 
 export interface WindowState {
@@ -34,9 +58,13 @@ export interface ElectronAPI {
   getSettings: () => Promise<SettingsPayload | null>;
   saveSettings: (partial: SettingsSavePayload) => Promise<{ success: boolean }>;
   closeSettings: () => Promise<void>;
+  openSettings: () => Promise<void>;
   resizeWindow: (opts: { height: number }) => Promise<void>;
   getWindowState: () => Promise<WindowState | null>;
   setCompact: (isCompact: boolean) => Promise<void>;
+  getHooksSnippet: (enabledOverride?: Partial<{ Notification: boolean; Stop: boolean; PreToolUse: boolean }>) => Promise<HooksSnippetInfo | null>;
+  installHooks: () => Promise<HooksInstallResult>;
+  uninstallHooks: () => Promise<HooksUninstallResult>;
 }
 
 declare global {

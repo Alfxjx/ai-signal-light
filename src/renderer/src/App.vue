@@ -4,6 +4,7 @@ import TitleBar from './components/TitleBar.vue';
 import ClaudeCard from './components/ClaudeCard.vue';
 import UsageCard from './components/UsageCard.vue';
 import { useWebSocket } from './composables/useWebSocket';
+import { normalizeCwd } from './utils/cwd';
 import type {
   ClaudeProject,
   UsageState,
@@ -12,6 +13,7 @@ import type {
   UsageInitPayload,
   UsageUpdatePayload,
   ProviderId,
+  ClaudeHookPayload,
 } from './types/messages';
 
 // ====== State ======
@@ -28,6 +30,10 @@ const isCompact = ref(true);
 const lastUpdate = ref<number | null>(null);
 const isRefreshing = ref(false);
 const isUsageRefreshing = ref(false);
+
+// hook 触发的"待用户响应"标记，key 为归一化后的 cwd
+interface PendingHook { event: ClaudeHookPayload['event']; ts: number }
+const pendingByCwd = reactive<Record<string, PendingHook>>({});
 
 // 时间 tick，formatAge/ageClass 响应式依赖它
 const now = ref(Date.now());
@@ -47,13 +53,43 @@ function handleMessage(msg: WsMessage) {
     handleUsageInit(msg.data);
   } else if (msg.type === 'usageUpdate') {
     handleUsageUpdate(msg);
+  } else if (msg.type === 'claudeHook') {
+    handleClaudeHook(msg);
   }
+}
+
+function handleClaudeHook(msg: ClaudeHookPayload) {
+  const key = normalizeCwd(msg.cwd);
+  if (!key) return; // 没有 cwd 无法定位项目，丢弃
+  pendingByCwd[key] = { event: msg.event, ts: msg.ts };
+}
+
+function clearPending(cwd: string) {
+  const key = normalizeCwd(cwd);
+  if (key) delete pendingByCwd[key];
 }
 
 function handleClaudeData(data: AssistantStatus) {
   if (!data || !data.details) return;
-  console.log(data);
-  projects.value = data.details.projects ?? [];
+  const newProjects = (data.details.projects ?? []) as ClaudeProject[];
+  projects.value = newProjects;
+
+  // 自动消除已过期的红点：项目的 lastResponse 比 pending 时间新 → 说明 claude 已经响应了
+  for (const p of newProjects) {
+    const key = normalizeCwd(p.cwd ?? null);
+    if (!key) continue;
+    const pending = pendingByCwd[key];
+    if (!pending) continue;
+    if (p.lastResponse) {
+      const lastMs = typeof p.lastResponse === 'string'
+        ? new Date(p.lastResponse).getTime()
+        : p.lastResponse;
+      if (!Number.isNaN(lastMs) && lastMs > pending.ts) {
+        delete pendingByCwd[key];
+      }
+    }
+  }
+
   if (data.details.lastUpdate) {
     const ts = typeof data.details.lastUpdate === 'string'
       ? new Date(data.details.lastUpdate).getTime()
@@ -94,6 +130,10 @@ function minimize() {
   if (isElectron.value) {
     window.close();
   }
+}
+
+function openSettings() {
+  window.electronAPI?.openSettings();
 }
 
 function onRefresh() {
@@ -149,12 +189,14 @@ const lastUpdateText = computed(() => {
 
 <template>
   <div class="app">
-    <TitleBar :is-pinned="isPinned" :is-electron="isElectron" @toggle-pin="togglePin" @minimize="minimize" />
+    <TitleBar :is-pinned="isPinned" :is-electron="isElectron"
+              @toggle-pin="togglePin" @minimize="minimize" @open-settings="openSettings" />
 
     <div class="cards-container">
       <UsageCard :usage="usage" :now="now" :is-compact="isCompact" :is-refreshing="isUsageRefreshing"
                  @toggle-compact="toggleCompact" @refresh="onUsageRefresh" />
-      <ClaudeCard :projects="projects" :now="now" :is-refreshing="isRefreshing" @refresh="onRefresh" />
+      <ClaudeCard :projects="projects" :now="now" :is-refreshing="isRefreshing"
+                  :pending-by-cwd="pendingByCwd" @refresh="onRefresh" @clear-pending="clearPending" />
     </div>
 
     <div class="footer">

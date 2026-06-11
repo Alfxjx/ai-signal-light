@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import type { SettingsSavePayload } from './types/electron';
 
 interface ProviderState {
@@ -31,6 +31,83 @@ const hasProxy = ref<boolean>(false);
 const intervalMinutes = ref<number>(10);
 const saving = ref<boolean>(false);
 
+// ---- Claude Code hooks ----
+const hookEnabled = reactive<{ Notification: boolean; Stop: boolean; PreToolUse: boolean }>({
+  Notification: true,
+  Stop: true,
+  PreToolUse: true,
+});
+const hookHelperPath = ref<string>('');     // 主进程挂载时给一次
+const hookAutoInstalled = ref<boolean>(false);
+const hookBusy = ref<boolean>(false);
+const hookStatus = ref<string>('');
+const copyStatus = ref<string>('');
+
+// snippet 完全在 renderer 计算，勾选变化自动响应（不走 IPC，避免 reactive 序列化与 HMR 死角）
+const hookSnippet = computed<string>(() => {
+  if (!hookHelperPath.value) return '';
+  const cmd = `node ${JSON.stringify(hookHelperPath.value)}`;
+  const entry = { matcher: '', hooks: [{ type: 'command', command: cmd }] };
+  const hooks: Record<string, unknown[]> = {};
+  if (hookEnabled.Notification) hooks.Notification = [entry];
+  if (hookEnabled.Stop)         hooks.Stop = [entry];
+  if (hookEnabled.PreToolUse)   hooks.PreToolUse = [entry];
+  return JSON.stringify({ hooks }, null, 2);
+});
+
+async function refreshHelperPath() {
+  if (!window.electronAPI) return;
+  const snap = await window.electronAPI.getHooksSnippet();
+  if (snap) {
+    hookHelperPath.value = snap.helperPath;
+    hookAutoInstalled.value = snap.autoInstalled;
+  }
+}
+
+async function copySnippet() {
+  if (!hookSnippet.value) return;
+  try {
+    await navigator.clipboard.writeText(hookSnippet.value);
+    copyStatus.value = '已复制';
+  } catch (e) {
+    copyStatus.value = '复制失败';
+  }
+  setTimeout(() => { copyStatus.value = ''; }, 1500);
+}
+
+async function onAutoInstallToggle(ev: Event) {
+  if (!window.electronAPI) return;
+  const target = ev.target as HTMLInputElement;
+  const checked = target.checked;
+  hookBusy.value = true;
+  hookStatus.value = '';
+  try {
+    if (checked) {
+      const r = await window.electronAPI.installHooks();
+      if (r.success) {
+        hookAutoInstalled.value = true;
+        const ins = r.installed?.length ?? 0;
+        const skp = r.skipped?.length ?? 0;
+        hookStatus.value = `已安装 ${ins} 项${skp ? `（跳过 ${skp} 项已存在）` : ''}`;
+      } else {
+        target.checked = false;
+        hookStatus.value = '失败: ' + (r.error || '未知错误');
+      }
+    } else {
+      const r = await window.electronAPI.uninstallHooks();
+      if (r.success) {
+        hookAutoInstalled.value = false;
+        hookStatus.value = `已卸载 ${r.removed ?? 0} 项`;
+      } else {
+        target.checked = true;
+        hookStatus.value = '卸载失败: ' + (r.error || '未知错误');
+      }
+    }
+  } finally {
+    hookBusy.value = false;
+  }
+}
+
 onMounted(async () => {
   if (!window.electronAPI) {
     console.error('electronAPI not available');
@@ -59,6 +136,14 @@ onMounted(async () => {
   hasProxy.value = !!cfg.hasProxy;
 
   intervalMinutes.value = cfg.intervalMinutes || 10;
+
+  if (cfg.hooks?.enabled) {
+    hookEnabled.Notification = !!cfg.hooks.enabled.Notification;
+    hookEnabled.Stop = !!cfg.hooks.enabled.Stop;
+    hookEnabled.PreToolUse = !!cfg.hooks.enabled.PreToolUse;
+  }
+  hookAutoInstalled.value = !!cfg.hooks?.endpoint?.autoInstalled;
+  await refreshHelperPath();
 });
 
 async function onSave() {
@@ -90,6 +175,7 @@ async function onSave() {
         urlChanged: proxyUrlChanged.value,
       },
       intervalMinutes: intervalMinutes.value,
+      hooks: { enabled: { ...hookEnabled } },
     };
     await window.electronAPI.saveSettings(payload);
     onCancel();
@@ -252,6 +338,43 @@ function onCancel() {
           <option :value="30">30 分钟</option>
           <option :value="60">60 分钟</option>
         </select>
+      </div>
+
+      <!-- Claude Code Hooks -->
+      <div class="settings-section" data-section="hooks">
+        <div class="settings-section-header">
+          <span class="settings-section-title">Claude Code Hooks</span>
+        </div>
+        <div class="settings-field">
+          <label class="settings-toggle-label">
+            <input type="checkbox" v-model="hookEnabled.Notification">
+            <span>Notification（Claude 需要输入时）</span>
+          </label>
+          <label class="settings-toggle-label">
+            <input type="checkbox" v-model="hookEnabled.Stop">
+            <span>Stop（响应结束）</span>
+          </label>
+          <label class="settings-toggle-label">
+            <input type="checkbox" v-model="hookEnabled.PreToolUse">
+            <span>PreToolUse（工具调用前）</span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="hookSnippet">手动配置（粘贴到 ~/.claude/settings.json）</label>
+          <textarea id="hookSnippet" class="settings-textarea" readonly :value="hookSnippet" rows="8"></textarea>
+          <div class="settings-row">
+            <button type="button" class="btn-secondary" @click="copySnippet">复制 JSON</button>
+            <span v-if="copyStatus" class="settings-hint">{{ copyStatus }}</span>
+          </div>
+          <div class="settings-hint">勾选事件后片段实时更新；只含已勾选项。</div>
+        </div>
+        <div class="settings-field">
+          <label class="settings-toggle-label">
+            <input type="checkbox" :checked="hookAutoInstalled" disabled @change="onAutoInstallToggle">
+            <span>自动写入 ~/.claude/settings.json（已禁用）</span>
+          </label>
+          <span class="settings-hint">请手动复制上方 JSON 粘贴到 ~/.claude/settings.json</span>
+        </div>
       </div>
     </div>
 

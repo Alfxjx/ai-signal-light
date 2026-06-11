@@ -2,16 +2,28 @@
 import { computed, ref } from 'vue';
 import type { ClaudeProject } from '../types/messages';
 import { formatAge, ageClass } from '../utils/time';
+import { normalizeCwd } from '../utils/cwd';
+
+interface PendingHook { event: string; ts: number }
 
 const props = defineProps<{
   projects: ClaudeProject[];
   now: number;
   isRefreshing: boolean;
+  pendingByCwd: Record<string, PendingHook>;
 }>();
 
 const emit = defineEmits<{
   refresh: [];
+  'clear-pending': [cwd: string];
 }>();
+
+// 取项目对应的 pending 条目（已归一化 key）
+function pendingFor(p: ClaudeProject): PendingHook | null {
+  const key = normalizeCwd(p.cwd ?? null);
+  if (!key) return null;
+  return props.pendingByCwd[key] ?? null;
+}
 
 // 范围选择本地态。默认 5h（与原版一致）
 const rangeMs = ref<number>(18_000_000);
@@ -54,6 +66,12 @@ const filteredProjects = computed<ClaudeProject[]>(() => {
       <li v-if="filteredProjects.length === 0" class="project-empty">No projects</li>
       <li v-for="p in filteredProjects" :key="p.id" class="project-row">
         <span class="project-name" :title="p.id">{{ p.name }}</span>
+        <span
+          v-if="pendingFor(p)"
+          class="hook-badge"
+          :title="pendingFor(p)!.event"
+          @click.stop="emit('clear-pending', p.cwd!)"
+        />
         <span class="project-time" :class="ageClass(p.lastResponse, now)" :data-ts="p.lastResponse">
           {{ formatAge(p.lastResponse, now) }}
         </span>
