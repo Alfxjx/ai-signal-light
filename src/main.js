@@ -20,9 +20,16 @@ const isDev = process.argv.includes('--dev');
 const RENDERER_BASE = isDev ? 'http://localhost:5173' : 'http://localhost:3456';
 
 function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 240,
-    height: 550,
+  const cfgWin = (configStore && configStore.get().window) || {};
+  const persistedW = Number.isFinite(cfgWin.width) ? cfgWin.width : 240;
+  const persistedH = Number.isFinite(cfgWin.height) ? cfgWin.height : 550;
+  // 持久化的 x/y 必须落在当前某个显示器内才有效（防止断开副屏后窗口飞到屏外）
+  const hasSavedPos = Number.isFinite(cfgWin.x) && Number.isFinite(cfgWin.y)
+    && isRectVisible(cfgWin.x, cfgWin.y, persistedW, persistedH);
+
+  const winOpts = {
+    width: persistedW,
+    height: persistedH,
     minWidth: 220,
     minHeight: 352,
     resizable: true,
@@ -39,7 +46,13 @@ function createWindow() {
     },
     icon: path.join(__dirname, 'renderer', 'technical-support.png'),
     show: false               // 初始隐藏，等加载完成再显示
-  });
+  };
+  if (hasSavedPos) {
+    winOpts.x = cfgWin.x;
+    winOpts.y = cfgWin.y;
+  }
+
+  mainWindow = new BrowserWindow(winOpts);
 
   // 加载页面
   mainWindow.loadURL(RENDERER_BASE);
@@ -50,8 +63,23 @@ function createWindow() {
   // 加载完成后显示
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    positionWindow();
+    // 无持久化位置（首次启动或越界 fallback）才自动贴当前光标所在屏右上角
+    if (!hasSavedPos) positionWindow();
   });
+
+  // 持久化窗口尺寸/位置（debounce 400ms）
+  const saveBounds = () => {
+    if (!mainWindow || mainWindow.isDestroyed() || !configStore) return;
+    const b = mainWindow.getBounds();
+    configStore.update({ window: { width: b.width, height: b.height, x: b.x, y: b.y } });
+  };
+  let boundsTimer = null;
+  const scheduleSave = () => {
+    if (boundsTimer) clearTimeout(boundsTimer);
+    boundsTimer = setTimeout(saveBounds, 400);
+  };
+  mainWindow.on('resize', scheduleSave);
+  mainWindow.on('move', scheduleSave);
 
   // 关闭按钮只是隐藏窗口
   mainWindow.on('close', (event) => {
@@ -66,17 +94,29 @@ function createWindow() {
   });
 }
 
-// 将窗口定位到屏幕右上角
+// 将窗口贴到「光标所在显示器」的右上角（fallback：primary）
 function positionWindow() {
   if (!mainWindow) return;
 
   const { screen } = require('electron');
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width } = primaryDisplay.workAreaSize;
+  const cursor = screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(cursor) || screen.getPrimaryDisplay();
+  const wa = display.workArea; // 含 x/y/width/height，相对于全局坐标系
 
   const [winWidth] = mainWindow.getSize();
+  mainWindow.setPosition(wa.x + wa.width - winWidth - 20, wa.y + 20);
+}
 
-  mainWindow.setPosition(width - winWidth - 20, 20);
+// 判断一个矩形是否至少有一部分落在某个显示器的工作区内
+function isRectVisible(x, y, w, h) {
+  if (![x, y, w, h].every(Number.isFinite)) return false;
+  const { screen } = require('electron');
+  const displays = screen.getAllDisplays();
+  return displays.some((d) => {
+    const a = d.workArea;
+    // 矩形重叠判断
+    return x < a.x + a.width && x + w > a.x && y < a.y + a.height && y + h > a.y;
+  });
 }
 
 // 创建系统托盘
@@ -211,7 +251,6 @@ function toggleWindow() {
     mainWindow.hide();
   } else {
     mainWindow.show();
-    positionWindow();
   }
 }
 
@@ -338,13 +377,26 @@ ipcMain.handle('settings:close', async () => {
   }
 });
 
-// 主窗口调整大小（保持宽度，只调高度，重新贴右上角）
+// 主窗口调整大小（保持宽度+位置，只调高度。多屏下 setSize 会被某些 Windows DPI
+// 组合重定位，所以这里用 setBounds 把 x/y 一起锁死）
 ipcMain.handle('window:resize', async (event, { height }) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    const [width] = mainWindow.getSize();
-    mainWindow.setSize(width, height);
-    positionWindow();
+    const b = mainWindow.getBounds();
+    mainWindow.setBounds({ x: b.x, y: b.y, width: b.width, height });
   }
+});
+
+// 渲染层启动时读窗口状态（主要为了同步 isCompact）
+ipcMain.handle('window:get-state', async () => {
+  if (!configStore) return null;
+  const w = configStore.get().window || {};
+  return { width: w.width, height: w.height, isCompact: w.isCompact !== false };
+});
+
+// 渲染层切换简略模式后持久化 isCompact
+ipcMain.handle('window:set-compact', async (event, isCompact) => {
+  if (!configStore) return;
+  configStore.update({ window: { isCompact: !!isCompact } });
 });
 
 function maskToken(token) {

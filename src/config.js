@@ -13,7 +13,8 @@ const DEFAULTS = {
   minimax: { token: '', enabled: true, useProxy: false },
   copilot: { token: '', enabled: true, useProxy: false },
   proxy: { url: '' },
-  intervalMinutes: 10
+  intervalMinutes: 10,
+  window: { width: 240, height: 550, x: null, y: null, isCompact: true }
 };
 
 const VALID_INTERVALS = [5, 10, 15, 30, 60];
@@ -41,6 +42,7 @@ class ConfigStore {
         minimax: { ...DEFAULTS.minimax, ...(parsed.minimax || {}) },
         copilot: { ...DEFAULTS.copilot, ...(parsed.copilot || {}) },
         proxy:   { ...DEFAULTS.proxy,   ...(parsed.proxy   || {}) },
+        window:  { ...DEFAULTS.window,  ...(parsed.window  || {}) },
         intervalMinutes: VALID_INTERVALS.includes(parsed.intervalMinutes)
           ? parsed.intervalMinutes
           : DEFAULTS.intervalMinutes
@@ -71,6 +73,9 @@ class ConfigStore {
     }
     if (partial.proxy && typeof partial.proxy === 'object') {
       this.data.proxy = { ...this.data.proxy, ...partial.proxy };
+    }
+    if (partial.window && typeof partial.window === 'object') {
+      this.data.window = { ...this.data.window, ...partial.window };
     }
     if (typeof partial.intervalMinutes === 'number'
         && VALID_INTERVALS.includes(partial.intervalMinutes)) {

@@ -114,6 +114,7 @@ function toggleCompact() {
   if (isElectron.value) {
     const newHeight = isCompact.value ? 380 : 550;
     window.electronAPI?.resizeWindow({ height: newHeight });
+    window.electronAPI?.setCompact(isCompact.value);
   }
 }
 
@@ -123,6 +124,12 @@ let ageTimer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
   connect();
   ageTimer = setInterval(() => { now.value = Date.now(); }, 60_000);
+  // 同步主进程持久化的 isCompact，避免重启后 UI 模式跟窗口高度对不上
+  if (isElectron.value) {
+    window.electronAPI?.getWindowState().then((s) => {
+      if (s && typeof s.isCompact === 'boolean') isCompact.value = s.isCompact;
+    });
+  }
 });
 
 onBeforeUnmount(() => {

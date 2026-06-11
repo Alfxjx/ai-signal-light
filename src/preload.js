@@ -17,5 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   closeSettings: () => ipcRenderer.invoke('settings:close'),
 
   // 窗口控制
-  resizeWindow: (opts) => ipcRenderer.invoke('window:resize', opts)
+  resizeWindow: (opts) => ipcRenderer.invoke('window:resize', opts),
+  getWindowState: () => ipcRenderer.invoke('window:get-state'),
+  setCompact: (isCompact) => ipcRenderer.invoke('window:set-compact', isCompact)
 });

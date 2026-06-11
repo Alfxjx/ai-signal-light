@@ -21,6 +21,12 @@ export interface SettingsSavePayload {
   intervalMinutes: number;
 }
 
+export interface WindowState {
+  width: number;
+  height: number;
+  isCompact: boolean;
+}
+
 export interface ElectronAPI {
   getStatus: () => Promise<unknown>;
   toggleAlwaysOnTop: (enabled: boolean) => Promise<void>;
@@ -29,6 +35,8 @@ export interface ElectronAPI {
   saveSettings: (partial: SettingsSavePayload) => Promise<{ success: boolean }>;
   closeSettings: () => Promise<void>;
   resizeWindow: (opts: { height: number }) => Promise<void>;
+  getWindowState: () => Promise<WindowState | null>;
+  setCompact: (isCompact: boolean) => Promise<void>;
 }
 
 declare global {
