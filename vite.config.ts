@@ -3,9 +3,9 @@ import vue from '@vitejs/plugin-vue';
 import { resolve } from 'path';
 
 // renderer 源码根 = src/renderer/src/
-// 构建产物 = src/renderer/dist/，由 src/server.js 在端口 3456 直接服务给 Electron
+// 构建产物 = dist/renderer/，由 main/server.ts 在端口 3456 直接服务给 Electron
 const RENDERER_SRC = resolve(__dirname, 'src/renderer/src');
-const RENDERER_DIST = resolve(__dirname, 'src/renderer/dist');
+const RENDERER_DIST = resolve(__dirname, 'dist/renderer');
 
 export default defineConfig({
   plugins: [vue()],

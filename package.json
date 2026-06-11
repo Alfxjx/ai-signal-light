@@ -7,7 +7,7 @@
     "dev": "concurrently -k -n VITE,ELECTRON -c blue,green \"vite\" \"wait-on http://localhost:5173 && electron dist/main/main.js --dev\"",
     "start": "npm run build:main && npm run build:renderer && electron dist/main/main.js",
     "build:main": "tsc -p tsconfig.main.json",
-    "build:renderer": "vue-tsc --noEmit && vite build",
+    "build:renderer": "vue-tsc --noEmit && vite build && node scripts/copy-renderer-assets.js",
     "build": "npm run build:main && npm run build:renderer && electron-builder",
     "typecheck": "vue-tsc --noEmit && tsc -p tsconfig.main.json --noEmit",
     "test": "vitest run",
@@ -48,6 +48,10 @@
     },
     "files": [
       "dist/**/*",
+      "!dist/win-unpacked{,/**/*}",
+      "!dist/*.exe",
+      "!dist/builder-*",
+      "!dist/*.yaml",
       "node_modules/**/*"
     ],
     "mac": {

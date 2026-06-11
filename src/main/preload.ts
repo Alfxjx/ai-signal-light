@@ -1,5 +1,19 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC_CHANNELS } from '../shared/types/ipc';
+
+/** IPC 通道名称常量（与主进程保持一致） */
+const IPC_CHANNELS = {
+  TOGGLE_ALWAYS_ON_TOP: 'toggle-always-on-top',
+  SETTINGS_GET: 'settings:get',
+  SETTINGS_SAVE: 'settings:save',
+  SETTINGS_CLOSE: 'settings:close',
+  SETTINGS_OPEN: 'settings:open',
+  WINDOW_RESIZE: 'window:resize',
+  WINDOW_GET_STATE: 'window:get-state',
+  WINDOW_SET_COMPACT: 'window:set-compact',
+  HOOKS_GET_SNIPPET: 'hooks:get-snippet',
+  HOOKS_INSTALL: 'hooks:install',
+  HOOKS_UNINSTALL: 'hooks:uninstall',
+} as const;
 
 // 安全地暴露 API 给渲染进程
 contextBridge.exposeInMainWorld('electronAPI', {

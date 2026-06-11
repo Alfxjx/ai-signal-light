@@ -191,8 +191,8 @@ export class StatusServer {
       return;
     }
 
-    // 静态文件服务（来自 Vite 构建产物 src/renderer/dist）
-    const STATIC_ROOT = path.join(__dirname, '..', 'renderer', 'dist');
+    // 静态文件服务（来自 Vite 构建产物 dist/renderer）
+    const STATIC_ROOT = path.join(__dirname, '..', 'renderer');
     let filePath = path.join(STATIC_ROOT, url === '/' ? 'index.html' : url);
 
     // 安全检查
