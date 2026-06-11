@@ -125,7 +125,7 @@ const usageLastTs = computed<number | null>(() => {
     props.usage.kimi?.lastUpdated ?? null,
     props.usage.minimax?.lastUpdated ?? null,
     props.usage.copilot?.lastUpdated ?? null,
-  ].filter((v) => v !== null).map(x=> new Date().getTime()) as number[];
+  ].filter((v) => v !== null).map((_)=> new Date().getTime()) as number[];
   if (ks.length === 0) return null;
   return Math.max(...ks);
 });
