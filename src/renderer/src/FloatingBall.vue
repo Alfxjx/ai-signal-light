@@ -7,7 +7,7 @@ import { useUsageState } from './composables/useUsageState';
 const {
   kimiFiveHour,
   minimaxFiveHour,
-  minimaxWeekly,
+  // minimaxWeekly,
   copilotSlot,
   isProviderConfigured,
   pendingByCwd
