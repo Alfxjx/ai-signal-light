@@ -14,6 +14,7 @@ export interface SettingsSavePayload {
   proxy: { url: string; urlChanged: boolean };
   intervalMinutes: number;
   hooks?: { enabled: { Notification: boolean; Stop: boolean; PreToolUse: boolean } };
+  floatingBall?: { enabled: boolean };
 }
 
 export interface HooksSnippetInfo {
@@ -41,6 +42,11 @@ export interface WindowState {
   isCompact: boolean;
 }
 
+export interface FloatingBallState {
+  visible: boolean;
+  enabled: boolean;
+}
+
 /** 渲染进程侧 API 接口 */
 export interface ElectronAPI {
   toggleAlwaysOnTop: (enabled: boolean) => Promise<void>;
@@ -55,6 +61,12 @@ export interface ElectronAPI {
   getHooksSnippet: (enabledOverride?: Partial<{ Notification: boolean; Stop: boolean; PreToolUse: boolean }>) => Promise<HooksSnippetInfo | null>;
   installHooks: () => Promise<HooksInstallResult>;
   uninstallHooks: () => Promise<HooksUninstallResult>;
+  floatingBall: {
+    toggle: () => Promise<void>;
+    openMain: () => Promise<void>;
+    getState: () => Promise<FloatingBallState>;
+    notifyCleared: (cwd: string) => Promise<void>;
+  };
 }
 
 /** IPC 通道名称常量（主进程和 preload 共用） */
@@ -70,4 +82,8 @@ export const IPC_CHANNELS = {
   HOOKS_GET_SNIPPET: 'hooks:get-snippet',
   HOOKS_INSTALL: 'hooks:install',
   HOOKS_UNINSTALL: 'hooks:uninstall',
+  FLOATING_BALL_TOGGLE: 'floating-ball:toggle',
+  FLOATING_BALL_OPEN_MAIN: 'floating-ball:open-main',
+  FLOATING_BALL_GET_STATE: 'floating-ball:get-state',
+  FLOATING_BALL_NOTIFY_CLEARED: 'floating-ball:notify-cleared',
 } as const;

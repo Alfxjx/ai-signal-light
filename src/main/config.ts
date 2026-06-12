@@ -18,7 +18,8 @@ const DEFAULTS: AppConfig = {
   hooks: {
     enabled: { Notification: true, Stop: true, PreToolUse: true },
     endpoint: { autoInstalled: false }
-  }
+  },
+  floatingBall: { enabled: false, x: null, y: null, isVisible: false }
 };
 
 export const VALID_INTERVALS = [5, 10, 15, 30, 60] as const;
@@ -59,6 +60,7 @@ export class ConfigStore {
           enabled:  { ...DEFAULTS.hooks.enabled,  ...((parsed.hooks && parsed.hooks.enabled)  || {}) },
           endpoint: { ...DEFAULTS.hooks.endpoint, ...((parsed.hooks && parsed.hooks.endpoint) || {}) }
         },
+        floatingBall: { ...DEFAULTS.floatingBall, ...(parsed.floatingBall || {}) },
         intervalMinutes: VALID_INTERVALS.includes(parsed.intervalMinutes as ValidInterval)
           ? (parsed.intervalMinutes as ValidInterval)
           : DEFAULTS.intervalMinutes
@@ -112,6 +114,13 @@ export class ConfigStore {
     if (typeof partial.intervalMinutes === 'number'
         && VALID_INTERVALS.includes(partial.intervalMinutes as ValidInterval)) {
       this.data.intervalMinutes = partial.intervalMinutes as ValidInterval;
+    }
+    if (partial.floatingBall && typeof partial.floatingBall === 'object') {
+      const fb = partial.floatingBall;
+      if (typeof fb.enabled === 'boolean') this.data.floatingBall.enabled = fb.enabled;
+      if (fb.x === null || Number.isFinite(fb.x)) this.data.floatingBall.x = fb.x as number | null;
+      if (fb.y === null || Number.isFinite(fb.y)) this.data.floatingBall.y = fb.y as number | null;
+      if (typeof fb.isVisible === 'boolean') this.data.floatingBall.isVisible = fb.isVisible;
     }
 
     this._save();

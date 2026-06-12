@@ -477,8 +477,8 @@ body {
   transition: width 0.6s ease, background 0.3s ease;
 }
 
-.usage-bar-fill.warn { background: #facc15; }
-.usage-bar-fill.danger { background: #ef4444; }
+.usage-bar-fill.warn { background: #a78d25; }
+.usage-bar-fill.danger { background: #610c0c; }
 
 .usage-empty {
   padding: 8px;

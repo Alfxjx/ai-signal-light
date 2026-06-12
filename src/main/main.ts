@@ -8,9 +8,18 @@ import { UsageMonitor } from './usage-monitor';
 import { IPC_CHANNELS } from '../shared/types/ipc';
 import type { HooksInstallResult, HooksUninstallResult } from '../shared/types/ipc';
 
+// 统一 dev 与打包后的 userData 目录名，并刻意区分二者。
+// - dev 模式 (electron dist/main/main.js --dev) 用 "AI状态监控-dev" → %APPDATA%/AI状态监控-dev/
+// - 打包后 (electron-builder 写 productName="AI状态监控") 用 "AI状态监控" → %APPDATA%/AI状态监控/
+// 区分的好处：dev 的设置 / 悬浮球位置 / 调试日志都不会污染线上配置。
+// 必须在 app.whenReady 之前调用，且早于 ConfigStore 构造（后者读 app.getPath('userData')）。
+const _isDevForName = process.argv.includes('--dev');
+app.setName(_isDevForName ? 'AI状态监控-dev' : 'AI状态监控');
+
 // 保持全局引用，防止被垃圾回收
 let mainWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
+let floatingBallWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let server: StatusServer | null = null;
 let configStore: ConfigStore | null = null;
@@ -164,6 +173,7 @@ function buildTrayMenu(): Electron.Menu {
 
   return Menu.buildFromTemplate([
     { label: '显示/隐藏面板', click: () => toggleWindow() },
+    { label: '显示/隐藏悬浮球', click: () => toggleFloatingBall() },
     { type: 'separator' },
     {
       label: '用量监控',
@@ -264,6 +274,126 @@ function toggleWindow(): void {
   }
 }
 
+// ==================== Floating Bar（输入法浮窗风格小方块） ====================
+
+const FB_WIDTH = 120;
+const FB_HEIGHT = 80;
+
+// 创建悬浮球窗口（不可拖动标题栏/工具栏样式，整球可拖）
+function createFloatingBallWindow(): void {
+  if (floatingBallWindow && !floatingBallWindow.isDestroyed()) {
+    return;
+  }
+  if (!configStore) return;
+  const cfg = configStore.get().floatingBall;
+
+  const winOpts: Electron.BrowserWindowConstructorOptions = {
+    width: FB_WIDTH,
+    height: FB_HEIGHT,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    hasShadow: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    },
+    show: false
+  };
+
+  // 持久化坐标校验：必须落在某个显示器工作区
+  if (cfg.x != null && cfg.y != null && isRectVisible(cfg.x, cfg.y, FB_WIDTH, FB_HEIGHT)) {
+    winOpts.x = cfg.x;
+    winOpts.y = cfg.y;
+  } else {
+    // 默认贴光标所在屏右下角
+    const cursor = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(cursor) || screen.getPrimaryDisplay();
+    const wa = display.workArea;
+    winOpts.x = wa.x + wa.width - FB_WIDTH - 20;
+    winOpts.y = wa.y + wa.height - FB_HEIGHT - 20;
+  }
+
+  floatingBallWindow = new BrowserWindow(winOpts);
+  floatingBallWindow.loadURL(`${RENDERER_BASE}/floating-ball.html`);
+  floatingBallWindow.once('ready-to-show', () => floatingBallWindow?.show());
+
+  // 拖动持久化（debounce 400ms，复用主窗口的 scheduleSave 模式）
+  const saveFbBounds = () => {
+    if (!floatingBallWindow || floatingBallWindow.isDestroyed() || !configStore) return;
+    const b = floatingBallWindow.getBounds();
+    configStore.update({ floatingBall: { x: b.x, y: b.y } });
+  };
+  let fbTimer: NodeJS.Timeout | null = null;
+  const scheduleFbSave = () => {
+    if (fbTimer) clearTimeout(fbTimer);
+    fbTimer = setTimeout(saveFbBounds, 400);
+  };
+  floatingBallWindow.on('moved', scheduleFbSave);
+
+  // 关闭按钮只是隐藏窗口（和主窗口一致）
+  floatingBallWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      floatingBallWindow?.hide();
+    }
+  });
+
+  floatingBallWindow.on('closed', () => {
+    floatingBallWindow = null;
+  });
+}
+
+function toggleFloatingBall(): void {
+  if (!configStore) return;
+  if (!configStore.get().floatingBall.enabled) {
+    // 强制启用（首次从托盘点开）
+    configStore.update({ floatingBall: { enabled: true, isVisible: true } });
+    rebuildTray();
+  }
+  if (!floatingBallWindow || floatingBallWindow.isDestroyed()) {
+    createFloatingBallWindow();
+    return;
+  }
+  if (floatingBallWindow.isVisible()) {
+    floatingBallWindow.hide();
+    if (configStore) configStore.update({ floatingBall: { isVisible: false } });
+  } else {
+    floatingBallWindow.show();
+    if (configStore) configStore.update({ floatingBall: { isVisible: true } });
+  }
+}
+
+function hideFloatingBall(): void {
+  if (floatingBallWindow && !floatingBallWindow.isDestroyed() && floatingBallWindow.isVisible()) {
+    floatingBallWindow.hide();
+    if (configStore) configStore.update({ floatingBall: { isVisible: false } });
+  }
+}
+
+// 设置开关同步：启用则创建窗口并显示，禁用则隐藏并销毁
+function syncFloatingBallFromConfig(): void {
+  if (!configStore) return;
+  const cfg = configStore.get().floatingBall;
+  if (cfg.enabled && cfg.isVisible) {
+    if (!floatingBallWindow || floatingBallWindow.isDestroyed()) {
+      createFloatingBallWindow();
+    } else if (!floatingBallWindow.isVisible()) {
+      floatingBallWindow.show();
+    }
+  } else {
+    if (floatingBallWindow && !floatingBallWindow.isDestroyed()) {
+      floatingBallWindow.hide();
+    }
+  }
+}
+
 // 应用就绪
 app.whenReady().then(() => {
   // 1. 加载配置
@@ -282,6 +412,9 @@ app.whenReady().then(() => {
   // 5. 创建窗口和托盘
   createWindow();
   createTray();
+
+  // 6. 如果上次退出时悬浮球是显示的，自动恢复
+  syncFloatingBallFromConfig();
 
   // 6. 生成 Claude Code hooks helper 脚本（每次启动覆盖以保证最新）
   try { ensureHookHelper(); } catch (e) { console.warn('[hooks] ensureHookHelper failed:', (e as Error).message); }
@@ -333,7 +466,8 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, async () => {
     hooks: {
       enabled: { ...cfg.hooks.enabled },
       endpoint: { autoInstalled: !!cfg.hooks.endpoint.autoInstalled }
-    }
+    },
+    floatingBall: { enabled: !!cfg.floatingBall.enabled }
   };
 });
 
@@ -385,6 +519,8 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_SAVE, async (_event, partial: Record<string
   configStore.update(next as Parameters<ConfigStore['update']>[0]);
   rebuildTray();
   if (usageMonitor) usageMonitor.checkAll();
+  // 悬浮球开关同步：启用即开窗口；关闭即隐藏
+  syncFloatingBallFromConfig();
   return { success: true };
 });
 
@@ -396,6 +532,42 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_CLOSE, async () => {
 
 ipcMain.handle(IPC_CHANNELS.SETTINGS_OPEN, async () => {
   openSettingsWindow();
+});
+
+// 悬浮球：显示/隐藏（托盘和 preload 都走这里）
+ipcMain.handle(IPC_CHANNELS.FLOATING_BALL_TOGGLE, async () => {
+  toggleFloatingBall();
+});
+
+// 悬浮球：单击 = 切到主窗口
+ipcMain.handle(IPC_CHANNELS.FLOATING_BALL_OPEN_MAIN, async () => {
+  // 悬浮球本身可以被隐藏（自身销毁）—— 切主窗口前先关悬浮球
+  hideFloatingBall();
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+  } else if (mainWindow.isVisible()) {
+    mainWindow.hide();
+  } else {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
+
+// 悬浮球：读取当前状态
+ipcMain.handle(IPC_CHANNELS.FLOATING_BALL_GET_STATE, async () => {
+  if (!configStore) return { visible: false, enabled: false };
+  const cfg = configStore.get().floatingBall;
+  return {
+    visible: !!(floatingBallWindow && !floatingBallWindow.isDestroyed() && floatingBallWindow.isVisible()),
+    enabled: !!cfg.enabled
+  };
+});
+
+// 主窗口通知：某 cwd 的 pending 已被消费
+ipcMain.handle(IPC_CHANNELS.FLOATING_BALL_NOTIFY_CLEARED, async (_event, cwd: string) => {
+  if (server && typeof cwd === 'string') {
+    server.clearPendingByCwd(cwd);
+  }
 });
 
 // 主窗口调整大小（保持宽度+位置，只调高度。多屏下 setSize 会被某些 Windows DPI

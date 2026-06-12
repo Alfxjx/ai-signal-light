@@ -22,6 +22,7 @@ export type {
 
 export type {
   ClaudeHookPayload,
+  PendingHook,
   WsMessage,
 } from '../../../shared/types/websocket';
 

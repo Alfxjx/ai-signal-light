@@ -30,6 +30,7 @@ const proxyUrlChanged = ref<boolean>(false);
 const hasProxy = ref<boolean>(false);
 const intervalMinutes = ref<number>(10);
 const saving = ref<boolean>(false);
+const floatingBallEnabled = ref<boolean>(false);
 
 // ---- Claude Code hooks ----
 const hookEnabled = reactive<{ Notification: boolean; Stop: boolean; PreToolUse: boolean }>({
@@ -143,6 +144,7 @@ onMounted(async () => {
     hookEnabled.PreToolUse = !!cfg.hooks.enabled.PreToolUse;
   }
   hookAutoInstalled.value = !!cfg.hooks?.endpoint?.autoInstalled;
+  floatingBallEnabled.value = !!cfg.floatingBall?.enabled;
   await refreshHelperPath();
 });
 
@@ -176,6 +178,7 @@ async function onSave() {
       },
       intervalMinutes: intervalMinutes.value,
       hooks: { enabled: { ...hookEnabled } },
+      floatingBall: { enabled: floatingBallEnabled.value },
     };
     await window.electronAPI.saveSettings(payload);
     onCancel();
@@ -338,6 +341,20 @@ function onCancel() {
           <option :value="30">30 分钟</option>
           <option :value="60">60 分钟</option>
         </select>
+      </div>
+
+      <!-- 悬浮球 -->
+      <div class="settings-section" data-section="floating-ball">
+        <div class="settings-section-header">
+          <span class="settings-section-title">悬浮球</span>
+          <label class="settings-toggle">
+            <input type="checkbox" v-model="floatingBallEnabled">
+            <span class="settings-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <div class="settings-hint">桌面右下角常驻 80×80 状态指示器：中心 5h 剩余百分比、底部多模型 mini bar、有通知时顶部亮红点。单击切到主窗口，可拖动改位置。</div>
+        </div>
       </div>
 
       <!-- Claude Code Hooks -->

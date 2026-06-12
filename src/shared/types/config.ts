@@ -27,6 +27,13 @@ export interface HooksConfig {
   endpoint: HooksEndpointConfig;
 }
 
+export interface FloatingBallConfig {
+  enabled: boolean;
+  x: number | null;
+  y: number | null;
+  isVisible: boolean;
+}
+
 export interface AppConfig {
   kimi: ProviderConfig;
   minimax: ProviderConfig;
@@ -35,9 +42,10 @@ export interface AppConfig {
   intervalMinutes: number;
   window: WindowConfig;
   hooks: HooksConfig;
+  floatingBall: FloatingBallConfig;
 }
 
-export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'window' | 'proxy'>> & {
+export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'window' | 'proxy' | 'floatingBall'>> & {
   kimi?: Partial<ProviderConfig>;
   minimax?: Partial<ProviderConfig>;
   copilot?: Partial<ProviderConfig>;
@@ -47,4 +55,5 @@ export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax'
     enabled?: Partial<HooksEnabledConfig>;
     endpoint?: Partial<HooksEndpointConfig>;
   }>;
+  floatingBall?: Partial<FloatingBallConfig>;
 };

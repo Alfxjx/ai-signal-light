@@ -10,9 +10,18 @@ export interface ClaudeHookPayload {
   toolName?: string;
 }
 
+export interface PendingHook {
+  event: ClaudeHookPayload['event'];
+  ts: number;
+  message?: string;
+  toolName?: string;
+}
+
 export type WsMessage =
-  | { type: 'init'; data: DetectorAllStatus & { usage?: UsageSnapshot & { enabled?: Record<string, boolean>; intervalMinutes?: number } } }
+  | { type: 'init'; data: DetectorAllStatus & { usage?: UsageSnapshot & { enabled?: Record<string, boolean>; intervalMinutes?: number }; pending?: Record<string, PendingHook> } }
   | { type: 'statusChange'; assistantId: string; data: { status?: string; details: { projects: unknown[] } } }
   | { type: 'usageInit'; data: UsageSnapshot & { enabled?: Record<string, boolean>; intervalMinutes?: number } }
   | (UsageUpdatePayload & { type: 'usageUpdate' })
-  | (ClaudeHookPayload & { type: 'claudeHook' });
+  | (ClaudeHookPayload & { type: 'claudeHook' })
+  | { type: 'pendingChanged'; byCwd: Record<string, PendingHook> }
+  | { type: 'floatingBallState'; visible: boolean };

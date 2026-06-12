@@ -9,6 +9,7 @@ export type {
   HooksInstallResult,
   HooksUninstallResult,
   WindowState,
+  FloatingBallState,
   ElectronAPI,
 } from '../../../shared/types/ipc';
 

@@ -5,7 +5,7 @@ import fs from 'fs';
 import { AIDetector } from './detector';
 import type { ConfigStore } from './config';
 import type { UsageMonitor } from './usage-monitor';
-import type { WsMessage } from '../shared/types/websocket';
+import type { WsMessage, PendingHook } from '../shared/types/websocket';
 
 interface ServerOptions {
   configStore?: ConfigStore | null;
@@ -23,6 +23,8 @@ export class StatusServer {
   private wss: WebSocket.Server | null = null;
   private httpServer: http.Server | null = null;
   private clients = new Set<WebSocket>();
+  // 跨窗口共享的 hook 待办状态。主窗口消费（点项目 / 收到新响应）后通过 IPC 通知清除
+  private pendingByCwd = new Map<string, PendingHook>();
 
   constructor(port = 3456, options: ServerOptions = {}) {
     this.port = port;
@@ -44,10 +46,13 @@ export class StatusServer {
       console.log('[Server] Client connected');
       this.clients.add(ws);
 
-      // 发送当前状态
+      // 发送当前状态（捎带 pending 快照，让新客户端立刻知道有未消费的通知）
       ws.send(JSON.stringify({
         type: 'init',
-        data: this.detector.getAllStatus()
+        data: {
+          ...this.detector.getAllStatus(),
+          pending: this.getPendingSnapshot()
+        }
       } as WsMessage));
 
       // 发送当前用量快照
@@ -290,9 +295,35 @@ export class StatusServer {
         toolName
       });
 
+      // 同步维护跨窗口的 pending 状态
+      if (cwd) {
+        this.pendingByCwd.set(cwd, { event: eventTyped, ts: Date.now(), message, toolName });
+        this.broadcast({
+          type: 'pendingChanged',
+          byCwd: Object.fromEntries(this.pendingByCwd)
+        });
+      }
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true }));
     });
     req.on('error', () => { aborted = true; });
+  }
+
+  // 主窗口通过 IPC 通知某 cwd 的 pending 已被消费（点开了项目 / 收到新响应）
+  // 同步清除 + 广播给所有 WS 客户端（含悬浮球）
+  clearPendingByCwd(cwd: string): void {
+    if (!cwd) return;
+    if (this.pendingByCwd.delete(cwd)) {
+      this.broadcast({
+        type: 'pendingChanged',
+        byCwd: Object.fromEntries(this.pendingByCwd)
+      });
+    }
+  }
+
+  // 暴露当前 pending 快照给新连接的客户端（在 init 消息里捎带）
+  getPendingSnapshot(): Record<string, PendingHook> {
+    return Object.fromEntries(this.pendingByCwd);
   }
 }

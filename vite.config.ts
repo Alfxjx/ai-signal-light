@@ -18,6 +18,7 @@ export default defineConfig({
       input: {
         main: resolve(RENDERER_SRC, 'index.html'),
         settings: resolve(RENDERER_SRC, 'settings.html'),
+        'floating-ball': resolve(RENDERER_SRC, 'floating-ball.html'),
       },
     },
   },

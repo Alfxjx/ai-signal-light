@@ -13,6 +13,10 @@ const IPC_CHANNELS = {
   HOOKS_GET_SNIPPET: 'hooks:get-snippet',
   HOOKS_INSTALL: 'hooks:install',
   HOOKS_UNINSTALL: 'hooks:uninstall',
+  FLOATING_BALL_TOGGLE: 'floating-ball:toggle',
+  FLOATING_BALL_OPEN_MAIN: 'floating-ball:open-main',
+  FLOATING_BALL_GET_STATE: 'floating-ball:get-state',
+  FLOATING_BALL_NOTIFY_CLEARED: 'floating-ball:notify-cleared',
 } as const;
 
 // 安全地暴露 API 给渲染进程
@@ -39,5 +43,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getHooksSnippet: (enabledOverride?: unknown) =>
     ipcRenderer.invoke(IPC_CHANNELS.HOOKS_GET_SNIPPET, enabledOverride),
   installHooks: () => ipcRenderer.invoke(IPC_CHANNELS.HOOKS_INSTALL),
-  uninstallHooks: () => ipcRenderer.invoke(IPC_CHANNELS.HOOKS_UNINSTALL)
+  uninstallHooks: () => ipcRenderer.invoke(IPC_CHANNELS.HOOKS_UNINSTALL),
+
+  // 悬浮球
+  floatingBall: {
+    toggle: () => ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_TOGGLE),
+    openMain: () => ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_OPEN_MAIN),
+    getState: () => ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_GET_STATE),
+    notifyCleared: (cwd: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_NOTIFY_CLEARED, cwd)
+  }
 });

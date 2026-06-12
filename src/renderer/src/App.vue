@@ -66,7 +66,13 @@ function handleClaudeHook(msg: ClaudeHookPayload) {
 
 function clearPending(cwd: string) {
   const key = normalizeCwd(cwd);
-  if (key) delete pendingByCwd[key];
+  if (key) {
+    delete pendingByCwd[key];
+    // 通知主进程广播给悬浮球（让指示灯同步熄灭）
+    if (isElectron.value) {
+      window.electronAPI?.floatingBall?.notifyCleared(key);
+    }
+  }
 }
 
 function handleClaudeData(data: AssistantStatus) {
