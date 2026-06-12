@@ -18,7 +18,7 @@ export interface FiveHourSlot {
   /** 剩余百分比 0-100（用于填充 mini bar） */
   percent: number;
   /** 5h 周期绝对 reset 时间，可能为 null */
-  resetTime: string | number | null;
+  resetTime: Date | string | number | null;
   /** "Reset in 2h 14m" 文本，空表示没有 reset 概念 */
   resetText: string;
   /** "fresh" | "warn" | "danger" —— barClass 三档 */
@@ -86,21 +86,32 @@ export function useUsageState() {
     return 'fresh';
   }
 
-  function formatReset(absolute: string | number | null, nowMs: number): string {
-    if (absolute === null || absolute === undefined || absolute === '') return '';
-    let target = Number(absolute);
-    if (Number.isNaN(target)) {
-      const d = new Date(absolute as string);
-      if (Number.isNaN(d.getTime())) return '';
-      target = d.getTime();
+  function makeResetTime(raw: string | number | Date | null): number | null {
+    if (raw === null || raw === undefined || raw === '') return null;
+    if (raw instanceof Date) return raw.getTime();
+    const n = Number(raw);
+    if (!Number.isNaN(n) && n > 0 && n < 31536000000) {
+      // 小于 365 天视为相对毫秒数
+      return Date.now() + n;
     }
+    if (!Number.isNaN(n)) return n;
+    const d = new Date(raw as string);
+    return Number.isNaN(d.getTime()) ? null : d.getTime();
+  }
+
+  function formatReset(absolute: Date | string | number | null, nowMs: number): string {
+    const target = makeResetTime(absolute);
+    if (target === null) return '';
     const ms = target - nowMs;
     if (ms <= 0) return '';
-    const totalMin = Math.floor(ms / 60_000);
-    const h = Math.floor(totalMin / 60);
-    const m = totalMin % 60;
-    if (h > 0) return `${h}h${m}m`;
-    return `${m}m`;
+    const days = Math.floor(ms / 86_400_000);
+    const hours = Math.floor((ms % 86_400_000) / 3_600_000);
+    const mins = Math.floor((ms % 3_600_000) / 60_000);
+    const parts: string[] = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0 || (days > 0 && mins > 0)) parts.push(`${hours}h`);
+    if (mins > 0 || parts.length === 0) parts.push(`${mins}m`);
+    return parts.join(' ');
   }
 
   const kimiFiveHour = computed<FiveHourSlot>(() => {
@@ -129,8 +140,23 @@ export function useUsageState() {
     const percent = Math.max(0, Math.min(100, 100 - (data.fiveHourPercent ?? 0)));
     return {
       percent,
-      resetTime: data.fiveHourResetTime ?? null,
+      resetTime: makeResetTime(data.fiveHourResetTime ?? null),
       resetText: formatReset(data.fiveHourResetTime ?? null, now.value),
+      level: barLevel(percent)
+    };
+  });
+
+  const minimaxWeekly = computed<FiveHourSlot>(() => {
+    const state = minimax.value;
+    const data = state?.data as MinimaxUsageData | undefined;
+    if (!state || state.error || !data) {
+      return { percent: 0, resetTime: null, resetText: '', level: 'muted' };
+    }
+    const percent = Math.max(0, Math.min(100, 100 - (data.weeklyPercent ?? 0)));
+    return {
+      percent,
+      resetTime: makeResetTime(data.weeklyResetTime ?? null),
+      resetText: formatReset(data.weeklyResetTime ?? null, now.value),
       level: barLevel(percent)
     };
   });
@@ -168,6 +194,7 @@ export function useUsageState() {
     isConnected,
     kimiFiveHour,
     minimaxFiveHour,
+    minimaxWeekly,
     copilotSlot,
     isProviderEnabled,
     isProviderConfigured,

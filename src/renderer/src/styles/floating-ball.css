@@ -7,8 +7,8 @@
 }
 
 html, body {
-  width: 120px;
-  height: 80px;
+  width: 140px;
+  height: 104px;
   background: transparent;
   overflow: hidden;
   user-select: none;
@@ -18,8 +18,8 @@ html, body {
 
 .fb {
   position: relative;
-  width: 120px;
-  height: 80px;
+  width: 140px;
+  height: 104px;
   background: rgba(20, 20, 30, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -129,7 +129,15 @@ html, body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 5px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fb-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: none;
   min-width: 0;
 }
 
@@ -180,4 +188,23 @@ html, body {
   text-align: right;
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
+}
+
+.fb-bar-row--secondary {
+  margin-top: 1px;
+}
+
+.fb-bar-row--secondary .fb-bar-label {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.fb-reset {
+  font-size: 8px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.35);
+  padding-left: 14px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

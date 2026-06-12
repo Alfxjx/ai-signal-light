@@ -164,6 +164,12 @@ function toggleCompact() {
   }
 }
 
+function toggleFloatingBall() {
+  if (isElectron.value) {
+    window.electronAPI?.floatingBall?.toggle();
+  }
+}
+
 // ====== Age timer ======
 let ageTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -196,7 +202,8 @@ const lastUpdateText = computed(() => {
 <template>
   <div class="app">
     <TitleBar :is-pinned="isPinned" :is-electron="isElectron"
-              @toggle-pin="togglePin" @minimize="minimize" @open-settings="openSettings" />
+              @toggle-pin="togglePin" @minimize="minimize" @open-settings="openSettings"
+              @toggle-floating-ball="toggleFloatingBall" />
 
     <div class="cards-container">
       <UsageCard :usage="usage" :now="now" :is-compact="isCompact" :is-refreshing="isUsageRefreshing"

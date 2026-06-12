@@ -18,7 +18,9 @@ export interface KimiUsageData {
 export interface MinimaxUsageData {
   fiveHourPercent: number;
   weeklyPercent: number;
+  // 毫秒级时间戳，距离现在的 reset 时间（服务端给的不是绝对时间，而是距离重置的剩余时间）
   fiveHourResetTime: string | null;
+  weeklyResetTime: string | null;
 }
 
 export interface CopilotPremiumData {

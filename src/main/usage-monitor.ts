@@ -258,15 +258,17 @@ export class UsageMonitor {
     if (!general) {
       throw new Error('general model not found');
     }
-    console.log('[usage:minimax] general model found:', {
+    console.log('[usage:minimax] general model found:', JSON.stringify({
       fiveHourPercent: Number(general.current_interval_remaining_percent) || 0,
       weeklyPercent: Number(general.current_weekly_remaining_percent) || 0,
       fiveHourResetTime: general.remains_time || null,
-    });
+      weeklyResetTime: general.weekly_remains_time || null
+    }));
     return {
       fiveHourPercent: Number(general.current_interval_remaining_percent) || 0,
       weeklyPercent: Number(general.current_weekly_remaining_percent) || 0,
       fiveHourResetTime: general.remains_time ? String(general.remains_time) : null,
+      weeklyResetTime: general.weekly_remains_time ? String(general.weekly_remains_time) : null
     };
   }
 

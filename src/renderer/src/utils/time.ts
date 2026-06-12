@@ -37,5 +37,12 @@ export function formatResetTime(ts: number | string | null | undefined): string 
     if (isNaN(d.getTime()) || d < now) return '';
     ms = d.getTime() - now.getTime();
   }
-  return `Reset in ${Math.ceil(ms / 60_000)} min`;
+  const days = Math.floor(ms / 86_400_000);
+  const hours = Math.floor((ms % 86_400_000) / 3_600_000);
+  const mins = Math.ceil((ms % 3_600_000) / 60_000);
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0 || (days > 0 && mins > 0)) parts.push(`${hours}h`);
+  if (mins > 0 || parts.length === 0) parts.push(`${mins}m`);
+  return `Next loop: ${parts.slice(0,2).join(' ')}`;
 }

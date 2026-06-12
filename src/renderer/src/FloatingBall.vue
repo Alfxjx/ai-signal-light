@@ -7,6 +7,7 @@ import { useUsageState } from './composables/useUsageState';
 const {
   kimiFiveHour,
   minimaxFiveHour,
+  minimaxWeekly,
   copilotSlot,
   isProviderConfigured,
   pendingByCwd
@@ -86,32 +87,51 @@ function onClickBar() {
 
     <!-- 模型用量：纵向堆叠（disabled 不画整行） -->
     <div class="fb-bars">
-      <div class="fb-bar-row" v-if="kimiVisible">
-        <span class="fb-bar-label">K</span>
-        <div class="fb-bar">
-          <div class="fb-bar-fill"
-               :class="`fb-bar-fill--${kimiFiveHour.level}`"
-               :style="{ width: kimiFiveHour.percent + '%' }"></div>
+      <div class="fb-row" v-if="kimiVisible">
+        <div class="fb-bar-row">
+          <span class="fb-bar-label">K</span>
+          <div class="fb-bar">
+            <div class="fb-bar-fill"
+                 :class="`fb-bar-fill--${kimiFiveHour.level}`"
+                 :style="{ width: kimiFiveHour.percent + '%' }"></div>
+          </div>
+          <span class="fb-bar-pct">{{ 100 - kimiFiveHour.percent }}%</span>
         </div>
-        <span class="fb-bar-pct">{{ 100 - kimiFiveHour.percent }}%</span>
+        <div class="fb-reset" v-if="kimiFiveHour.resetText">{{ kimiFiveHour.resetText }}</div>
       </div>
-      <div class="fb-bar-row" v-if="minimaxVisible">
-        <span class="fb-bar-label">M</span>
-        <div class="fb-bar">
-          <div class="fb-bar-fill"
-               :class="`fb-bar-fill--${minimaxFiveHour.level}`"
-               :style="{ width: minimaxFiveHour.percent + '%' }"></div>
+      <div class="fb-row" v-if="minimaxVisible">
+        <div class="fb-bar-row">
+          <span class="fb-bar-label">M</span>
+          <div class="fb-bar">
+            <div class="fb-bar-fill"
+                 :class="`fb-bar-fill--${minimaxFiveHour.level}`"
+                 :style="{ width: minimaxFiveHour.percent + '%' }"></div>
+          </div>
+          <span class="fb-bar-pct">{{ 100 - minimaxFiveHour.percent }}%</span>
         </div>
-        <span class="fb-bar-pct">{{ 100 - minimaxFiveHour.percent }}%</span>
+        <div class="fb-reset" v-if="minimaxFiveHour.resetText">{{ minimaxFiveHour.resetText }}</div>
+        <!-- <div class="fb-bar-row fb-bar-row--secondary" v-if="minimaxWeekly.percent > 0 || minimaxWeekly.resetText">
+          <span class="fb-bar-label">W</span>
+          <div class="fb-bar">
+            <div class="fb-bar-fill fb-bar-fill--muted"
+                 :class="`fb-bar-fill--${minimaxWeekly.level}`"
+                 :style="{ width: minimaxWeekly.percent + '%' }"></div>
+          </div>
+          <span class="fb-bar-pct">{{ 100 - minimaxWeekly.percent }}%</span>
+        </div>
+        <div class="fb-reset" v-if="minimaxWeekly.resetText">{{ minimaxWeekly.resetText }}</div> -->
       </div>
-      <div class="fb-bar-row" v-if="copilotVisible">
-        <span class="fb-bar-label">C</span>
-        <div class="fb-bar">
-          <div class="fb-bar-fill"
-               :class="`fb-bar-fill--${copilotSlot.level}`"
-               :style="{ width: copilotSlot.percent + '%' }"></div>
+      <div class="fb-row" v-if="copilotVisible">
+        <div class="fb-bar-row">
+          <span class="fb-bar-label">C</span>
+          <div class="fb-bar">
+            <div class="fb-bar-fill"
+                 :class="`fb-bar-fill--${copilotSlot.level}`"
+                 :style="{ width: copilotSlot.percent + '%' }"></div>
+          </div>
+          <span class="fb-bar-pct">{{ 100 - copilotSlot.percent }}%</span>
         </div>
-        <span class="fb-bar-pct">{{ 100 - copilotSlot.percent }}%</span>
+        <div class="fb-reset" v-if="copilotSlot.resetText">{{ copilotSlot.resetText }}</div>
       </div>
     </div>
   </div>

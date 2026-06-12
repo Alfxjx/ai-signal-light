@@ -276,8 +276,8 @@ function toggleWindow(): void {
 
 // ==================== Floating Bar（输入法浮窗风格小方块） ====================
 
-const FB_WIDTH = 120;
-const FB_HEIGHT = 80;
+const FB_WIDTH = 140;
+const FB_HEIGHT = 104;
 
 // 创建悬浮球窗口（不可拖动标题栏/工具栏样式，整球可拖）
 function createFloatingBallWindow(): void {
