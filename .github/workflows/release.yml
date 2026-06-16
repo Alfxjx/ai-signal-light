@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要重新构建的 tag（如 v1.1.0）'
+        required: true
+        type: string
+      platform:
+        description: '目标平台'
+        required: true
+        default: 'windows-latest'
+        type: choice
+        options:
+          - windows-latest
+          - macos-latest
+          - ubuntu-latest
+
+jobs:
+  release:
+    runs-on: ${{ github.event.inputs.platform || 'windows-latest' }}
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build application
+        run: npm run build
+
+      - name: Extract release notes from CHANGELOG
+        id: changelog
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          awk -v ver="## \\[${VERSION}\\]" '
+            $0 ~ ver { flag=1; next }
+            flag && /^## \[/ { exit }
+            flag { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md || true
+          [ -s RELEASE_NOTES.md ] || echo "Release notes for ${TAG}" > RELEASE_NOTES.md
+
+      - name: Upload artifacts to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          files: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+          generate_release_notes: false
+          prerelease: ${{ contains(github.event.inputs.tag || github.ref_name, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
