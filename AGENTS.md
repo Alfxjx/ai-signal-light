@@ -15,6 +15,8 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 | Production run | `npm start` | `electron .` |
 | Package for distribution | `npm run build` | Uses electron-builder → `dist/` (nsis/dmg/AppImage) |
 | Run a single script | `node scripts/status-reporter.js --watch` | Cross-platform status reporter (see below) |
+| 预览发布 | `npm run release:dry-run` | 只读，输出版本号和 changelog 预览 |
+| 正式发布 | `npm run release` | 自动 bump、生成 CHANGELOG、打 tag、推送 |
 
 There is **no test suite or linter configured** — `npm test` will not work. No JS framework or bundler; the renderer is plain HTML/CSS/JS served directly by the embedded HTTP server.
 
