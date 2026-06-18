@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.2.0](https://github.com/Alfxjx/ai-signal-light/compare/v1.1.0...v1.2.0) (2026-06-18)
+
+
+### ✨ 新功能
+
+* make usage bar thresholds configurable and unify usage percentage semantics ([012f685](https://github.com/Alfxjx/ai-signal-light/commit/012f685ac6e8e4650f4f05c04a53f04c45ae26e6))
+* refactor usage state and improve WebSocket handling with shared constants ([87a4849](https://github.com/Alfxjx/ai-signal-light/commit/87a484972d51d5bb3be2c0aa1e5eb89f1cc453f9))
+
 ## 1.1.0 (2026-06-16)
 
 

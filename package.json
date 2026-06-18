@@ -1,6 +1,6 @@
 {
   "name": "ai-assistant-status-monitor",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "AI助手状态监控面板 - 支持 Kimi Code CLI 和 Claude Code",
   "main": "dist/main/main.js",
   "scripts": {
