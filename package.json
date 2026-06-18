@@ -54,12 +54,8 @@
       "output": "dist"
     },
     "files": [
-      "dist/**/*",
-      "!dist/win-unpacked{,/**/*}",
-      "!dist/*.exe",
-      "!dist/builder-*",
-      "!dist/*.yaml",
-      "node_modules/**/*"
+      "dist/main/**/*",
+      "dist/renderer/**/*"
     ],
     "mac": {
       "target": "dmg"

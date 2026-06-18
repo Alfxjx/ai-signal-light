@@ -50,17 +50,18 @@ describe('ageClass', () => {
 });
 
 describe('barClass', () => {
-  it('returns empty for <= 50%', () => {
-    expect(barClass(40)).toBe('');
+  it('returns empty for >= 50% remaining', () => {
+    expect(barClass(60)).toBe('');
+    expect(barClass(50)).toBe('');
   });
 
-  it('returns warn for 50-80%', () => {
-    expect(barClass(60)).toBe('warn');
-    expect(barClass(75)).toBe('warn');
+  it('returns warn for 20-50% remaining', () => {
+    expect(barClass(40)).toBe('warn');
+    expect(barClass(20)).toBe('warn');
   });
 
-  it('returns danger for > 80%', () => {
-    expect(barClass(90)).toBe('danger');
+  it('returns danger for < 20% remaining', () => {
+    expect(barClass(10)).toBe('danger');
   });
 });
 
@@ -70,7 +71,12 @@ describe('formatResetTime', () => {
   });
 
   it('formats remaining ms', () => {
-    expect(formatResetTime(30 * 60 * 1000)).toBe('Reset in 30 min');
+    expect(formatResetTime(30 * 60 * 1000, true)).toBe('Reset in 30m');
+  });
+
+  it('formats future absolute date', () => {
+    const future = new Date(Date.now() + 2 * 60 * 60 * 1000 + 14 * 60 * 1000).toISOString();
+    expect(formatResetTime(future)).toMatch(/^Reset in 2h14m$/);
   });
 
   it('returns empty for past date', () => {

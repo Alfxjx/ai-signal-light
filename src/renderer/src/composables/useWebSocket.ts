@@ -1,10 +1,11 @@
 import { ref, onBeforeUnmount } from 'vue';
+import { WS_PORT } from '../../../shared/constants';
 import type { WsMessage } from '../types/messages';
 
-// 开发环境下 Vite 在 5173，但 WS 服务仍在 3456（Electron 主进程启动的 server.js）；
-// 生产环境页面由 server.js 自身在 3456 提供，window.location.host 即对。
+// 开发环境下 Vite 在 5173，但 WS 服务仍在 WS_PORT（Electron 主进程启动的 server.js）；
+// 生产环境页面由 server.js 自身在 WS_PORT 提供，window.location.host 即对。
 function resolveWsUrl(): string {
-  const host = import.meta.env.DEV ? 'localhost:3456' : window.location.host;
+  const host = import.meta.env.DEV ? `localhost:${WS_PORT}` : window.location.host;
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${protocol}//${host}`;
 }

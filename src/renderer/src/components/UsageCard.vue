@@ -70,7 +70,8 @@ function kimiText(key: keyof KimiUsageData): string {
 function kimiPercent(key: keyof KimiUsageData): number {
   const d = kimiData(key);
   if (!d || !d.limit) return 0;
-  return Math.max(0, Math.min(100, d.used ?? 0));
+  // 统一显示"剩余 %"
+  return Math.max(0, Math.min(100, d.percent ?? 0));
 }
 
 // ---- MiniMax 专用 ----
@@ -89,11 +90,11 @@ const minimaxWeeklyPercent = computed<number>(() => {
 });
 
 const minimaxFiveHourText = computed<string>(() => {
-  return `${minimaxData.value?.fiveHourPercent ?? 0}%`;
+  return `${minimaxFiveHourPercent.value}%`;
 });
 
 const minimaxWeeklyText = computed<string>(() => {
-  return `${minimaxData.value?.weeklyPercent ?? 0}%`;
+  return `${minimaxWeeklyPercent.value}%`;
 });
 
 // ---- Copilot 专用 ----
@@ -121,11 +122,13 @@ const copilotResetDateText = computed<string>(() => {
 });
 // ---- 卡片头 / 底部 ----
 const usageLastTs = computed<number | null>(() => {
-  const ks = [
-    props.usage.kimi?.lastUpdated ?? null,
-    props.usage.minimax?.lastUpdated ?? null,
-    props.usage.copilot?.lastUpdated ?? null,
-  ].filter((v) => v !== null).map((_) => new Date().getTime()) as number[];
+  const ks = ([
+    props.usage.kimi?.lastUpdated,
+    props.usage.minimax?.lastUpdated,
+    props.usage.copilot?.lastUpdated,
+  ].filter((v): v is string => typeof v === 'string')
+    .map((v) => new Date(v).getTime())
+    .filter((t) => !Number.isNaN(t))) as number[];
   if (ks.length === 0) return null;
   return Math.max(...ks);
 });
@@ -221,7 +224,7 @@ const allNoToken = computed<boolean>(() => {
             <div class="usage-bar-label">
               <div class="usage-time">
                 <span>5h</span>
-                <div class="usage-bar-meta">{{ formatResetTime(minimaxData?.fiveHourResetTime) }}</div>
+                <div class="usage-bar-meta">{{ formatResetTime(minimaxData?.fiveHourResetTime, true) }}</div>
               </div>
               <span class="usage-bar-value">{{ minimaxFiveHourText }}</span>
             </div>
@@ -235,7 +238,7 @@ const allNoToken = computed<boolean>(() => {
               <div class="usage-time">
                 <span>week</span>
                 <div class="usage-bar-meta" v-if="minimaxData?.weeklyResetTime">{{
-                  formatResetTime(minimaxData.weeklyResetTime) }}</div>
+                  formatResetTime(minimaxData.weeklyResetTime, true) }}</div>
               </div>
               <span class="usage-bar-value">{{ minimaxWeeklyText }}</span>
             </div>
@@ -269,7 +272,7 @@ const allNoToken = computed<boolean>(() => {
         </div>
         <div class="usage-bar">
           <div class="usage-bar-fill" :style="{ width: copilotPremiumPercent + '%' }"
-            :class="barClass(100 - copilotPremiumPercent)"></div>
+            :class="barClass(copilotPremiumPercent)"></div>
         </div>
       </div>
     </div>

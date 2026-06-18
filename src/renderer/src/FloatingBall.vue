@@ -7,31 +7,28 @@ import { useUsageState } from './composables/useUsageState';
 const {
   kimiFiveHour,
   minimaxFiveHour,
-  // minimaxWeekly,
+  minimaxWeekly,
   copilotSlot,
-  isProviderConfigured
-  // pendingByCwd
+  isProviderVisible,
+  pendingByCwd
 } = useUsageState();
 
-const kimiVisible = computed<boolean>(() => isProviderConfigured('kimi'));
-const minimaxVisible = computed<boolean>(() => isProviderConfigured('minimax'));
-const copilotVisible = computed<boolean>(() => isProviderConfigured('copilot'));
+const kimiVisible = computed<boolean>(() => isProviderVisible('kimi'));
+const minimaxVisible = computed<boolean>(() => isProviderVisible('minimax'));
+const copilotVisible = computed<boolean>(() => isProviderVisible('copilot'));
 
-// 红点/项目名暂时注释掉
-// const pendingCount = computed<number>(() => Object.keys(pendingByCwd).length);
+const pendingCount = computed<number>(() => Object.keys(pendingByCwd).length);
 
-// ===== hover tooltip：项目名（暂时注释掉） =====
-// pendingByCwd 的 key 是归一化后的 cwd；只有一个时显示项目 basename，多个时显示"N 项待处理"
-// function basenameOf(p: string): string {
-//   return p.split(/[\\/]/).filter(Boolean).pop() || p;
-// }
+function basenameOf(p: string): string {
+  return p.split(/[\\/]/).filter(Boolean).pop() || p;
+}
 
-// const projectName = computed<string>(() => {
-//   const keys = Object.keys(pendingByCwd);
-//   if (keys.length === 0) return '空闲';
-//   if (keys.length === 1) return basenameOf(keys[0]);
-//   return `${keys.length} 项待处理`;
-// });
+const projectName = computed<string>(() => {
+  const keys = Object.keys(pendingByCwd);
+  if (keys.length === 0) return '空闲';
+  if (keys.length === 1) return basenameOf(keys[0]);
+  return `${keys.length} 项待处理`;
+});
 
 // ===== 短按 vs 拖动 判定 =====
 const CLICK_DISTANCE = 4;   // px
@@ -79,12 +76,12 @@ function onClickBar() {
       </svg>
     </div>
 
-    <!-- 顶部：通知指示灯 + 项目名（暂时注释掉项目状态）
+    <!-- 顶部：通知指示灯 + 项目名 -->
     <div class="fb-header">
       <div class="fb-dot" :class="{ 'fb-dot--active': pendingCount > 0 }"></div>
       <div class="fb-name" :class="{ 'fb-name--idle': pendingCount === 0 }">{{ projectName }}</div>
     </div>
-    -->
+
     <!-- 模型用量：纵向堆叠（disabled 不画整行） -->
     <div class="fb-bars">
       <div class="fb-row" v-if="kimiVisible">
@@ -95,7 +92,7 @@ function onClickBar() {
                  :class="`fb-bar-fill--${kimiFiveHour.level}`"
                  :style="{ width: kimiFiveHour.percent + '%' }"></div>
           </div>
-          <span class="fb-bar-pct">{{ 100 - kimiFiveHour.percent }}%</span>
+          <span class="fb-bar-pct">{{ kimiFiveHour.percent }}%</span>
         </div>
         <div class="fb-reset" v-if="kimiFiveHour.resetText">{{ kimiFiveHour.resetText }}</div>
       </div>
@@ -107,19 +104,19 @@ function onClickBar() {
                  :class="`fb-bar-fill--${minimaxFiveHour.level}`"
                  :style="{ width: minimaxFiveHour.percent + '%' }"></div>
           </div>
-          <span class="fb-bar-pct">{{ 100 - minimaxFiveHour.percent }}%</span>
+          <span class="fb-bar-pct">{{ minimaxFiveHour.percent }}%</span>
         </div>
         <div class="fb-reset" v-if="minimaxFiveHour.resetText">{{ minimaxFiveHour.resetText }}</div>
-        <!-- <div class="fb-bar-row fb-bar-row--secondary" v-if="minimaxWeekly.percent > 0 || minimaxWeekly.resetText">
+        <div class="fb-bar-row fb-bar-row--secondary" v-if="minimaxWeekly.percent > 0 || minimaxWeekly.resetText">
           <span class="fb-bar-label">W</span>
           <div class="fb-bar">
             <div class="fb-bar-fill fb-bar-fill--muted"
                  :class="`fb-bar-fill--${minimaxWeekly.level}`"
                  :style="{ width: minimaxWeekly.percent + '%' }"></div>
           </div>
-          <span class="fb-bar-pct">{{ 100 - minimaxWeekly.percent }}%</span>
+          <span class="fb-bar-pct">{{ minimaxWeekly.percent }}%</span>
         </div>
-        <div class="fb-reset" v-if="minimaxWeekly.resetText">{{ minimaxWeekly.resetText }}</div> -->
+        <div class="fb-reset" v-if="minimaxWeekly.resetText">{{ minimaxWeekly.resetText }}</div>
       </div>
       <div class="fb-row" v-if="copilotVisible">
         <div class="fb-bar-row">
@@ -129,7 +126,7 @@ function onClickBar() {
                  :class="`fb-bar-fill--${copilotSlot.level}`"
                  :style="{ width: copilotSlot.percent + '%' }"></div>
           </div>
-          <span class="fb-bar-pct">{{ 100 - copilotSlot.percent }}%</span>
+          <span class="fb-bar-pct">{{ copilotSlot.percent }}%</span>
         </div>
         <div class="fb-reset" v-if="copilotSlot.resetText">{{ copilotSlot.resetText }}</div>
       </div>

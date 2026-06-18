@@ -3,6 +3,8 @@ import http from 'http';
 import path from 'path';
 import fs from 'fs';
 import { AIDetector } from './detector';
+import { WS_PORT } from '../shared/constants';
+import { normalizeCwd } from '../shared/utils/cwd';
 import type { ConfigStore } from './config';
 import type { UsageMonitor } from './usage-monitor';
 import type { WsMessage, PendingHook } from '../shared/types/websocket';
@@ -26,7 +28,7 @@ export class StatusServer {
   // 跨窗口共享的 hook 待办状态。主窗口消费（点项目 / 收到新响应）后通过 IPC 通知清除
   private pendingByCwd = new Map<string, PendingHook>();
 
-  constructor(port = 3456, options: ServerOptions = {}) {
+  constructor(port = WS_PORT, options: ServerOptions = {}) {
     this.port = port;
     this.detector = new AIDetector();
     this.configStore = options.configStore || null;
@@ -81,8 +83,8 @@ export class StatusServer {
             this.detector.checkAll();
             if (this.usageMonitor) this.usageMonitor.checkAll();
           }
-        } catch {
-          // 忽略非 JSON 消息
+        } catch (err) {
+          console.warn('[Server] WS message handler error:', err);
         }
       });
 
@@ -281,7 +283,8 @@ export class StatusServer {
       }
 
       const sessionId = (parsed.session_id || parsed.sessionId || null) as string | null;
-      const cwd = typeof parsed.cwd === 'string' ? parsed.cwd : null;
+      const rawCwd = typeof parsed.cwd === 'string' ? parsed.cwd : null;
+      const cwd = normalizeCwd(rawCwd, process.platform === 'win32');
       const message = typeof parsed.message === 'string' ? parsed.message : undefined;
       const toolName = typeof parsed.tool_name === 'string' ? parsed.tool_name : undefined;
 
@@ -313,8 +316,9 @@ export class StatusServer {
   // 主窗口通过 IPC 通知某 cwd 的 pending 已被消费（点开了项目 / 收到新响应）
   // 同步清除 + 广播给所有 WS 客户端（含悬浮球）
   clearPendingByCwd(cwd: string): void {
-    if (!cwd) return;
-    if (this.pendingByCwd.delete(cwd)) {
+    const key = normalizeCwd(cwd, process.platform === 'win32');
+    if (!key) return;
+    if (this.pendingByCwd.delete(key)) {
       this.broadcast({
         type: 'pendingChanged',
         byCwd: Object.fromEntries(this.pendingByCwd)

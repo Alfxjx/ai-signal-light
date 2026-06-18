@@ -177,7 +177,7 @@ html, body {
 
 .fb-bar-fill--fresh  { background: #22a150; }
 .fb-bar-fill--warn   { background: #a78d25; }
-.fb-bar-fill--danger { background: #610c0c; }
+.fb-bar-fill--danger { background: #ef4444; }
 .fb-bar-fill--muted  { background: rgba(255, 255, 255, 0.2); }
 
 .fb-bar-pct {

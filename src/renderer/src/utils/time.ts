@@ -20,23 +20,16 @@ export function ageClass(ts: number | string | null | undefined, now: number): s
   return 'age-stale';
 }
 
-// usage bar 颜色阈值
-export function barClass(percent: number): string {
-  if (percent > 80) return 'danger';
-  if (percent > 50) return 'warn';
+// usage bar 颜色阈值（按"剩余 %"分级：越少越危险）
+export function barClass(remainingPercent: number): string {
+  if (remainingPercent < 20) return 'danger';
+  if (remainingPercent < 50) return 'warn';
   return '';
 }
 
-// "Reset in N min" —— 可能是绝对时间戳或剩余毫秒数
-export function formatResetTime(ts: number | string | null | undefined): string {
-  if (ts === null || ts === undefined || ts === '') return '';
-  let ms = Number(ts);
-  if (isNaN(ms)) {
-    const d = new Date(ts);
-    const now = new Date();
-    if (isNaN(d.getTime()) || d < now) return '';
-    ms = d.getTime() - now.getTime();
-  }
+// 把相对毫秒数格式化为 XdYhZm（用于 MiniMax 的 remaining ms）
+function formatDuration(ms: number): string {
+  if (ms <= 0) return '';
   const days = Math.floor(ms / 86_400_000);
   const hours = Math.floor((ms % 86_400_000) / 3_600_000);
   const mins = Math.ceil((ms % 3_600_000) / 60_000);
@@ -44,5 +37,21 @@ export function formatResetTime(ts: number | string | null | undefined): string 
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0 || (days > 0 && mins > 0)) parts.push(`${hours}h`);
   if (mins > 0 || parts.length === 0) parts.push(`${mins}m`);
-  return `Next loop: ${parts.slice(0,2).join(' ')}`;
+  return parts.join('');
+}
+
+// "Reset in ..." —— isDuration=true 表示 ts 是相对毫秒数；否则优先当绝对时间解析
+export function formatResetTime(ts: number | string | null | undefined, isDuration = false): string {
+  if (ts === null || ts === undefined || ts === '') return '';
+  if (isDuration) {
+    const ms = Number(ts);
+    if (Number.isNaN(ms)) return '';
+    const text = formatDuration(ms);
+    return text ? `Reset in ${text}` : '';
+  }
+  const d = new Date(ts);
+  const now = new Date();
+  if (Number.isNaN(d.getTime()) || d < now) return '';
+  const text = formatDuration(d.getTime() - now.getTime());
+  return text ? `Reset in ${text}` : '';
 }

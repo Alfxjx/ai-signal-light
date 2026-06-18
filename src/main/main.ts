@@ -5,6 +5,7 @@ import os from 'os';
 import { StatusServer } from './server';
 import { ConfigStore, VALID_INTERVALS, HOOK_EVENTS } from './config';
 import { UsageMonitor } from './usage-monitor';
+import { WS_PORT } from '../shared/constants';
 import { IPC_CHANNELS } from '../shared/types/ipc';
 import type { HooksInstallResult, HooksUninstallResult } from '../shared/types/ipc';
 
@@ -29,9 +30,9 @@ let isQuitting = false;
 // 判断是否为开发模式
 const isDev = process.argv.includes('--dev');
 
-// dev 模式下渲染层走 Vite (5173)；生产环境走内嵌 server (3456)
+// dev 模式下渲染层走 Vite (5173)；生产环境走内嵌 server (WS_PORT)
 // 注意：server 现在 bind 127.0.0.1，所以这里也用 127.0.0.1 防止 IPv6 解析跑偏
-const RENDERER_BASE = isDev ? 'http://localhost:5173' : 'http://127.0.0.1:3456';
+const RENDERER_BASE = isDev ? 'http://localhost:5173' : `http://127.0.0.1:${WS_PORT}`;
 
 // Claude Code hooks 相关常量
 const HOOK_HELPER_DIR = path.join(os.homedir(), '.ai-status-monitor');
@@ -298,6 +299,7 @@ function createFloatingBallWindow(): void {
     minimizable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
+    focusable: false,
     hasShadow: false,
     webPreferences: {
       nodeIntegration: false,
@@ -403,7 +405,7 @@ app.whenReady().then(() => {
   usageMonitor = new UsageMonitor(configStore);
 
   // 3. 启动状态服务器（注入 configStore + usageMonitor 让它能广播用量）
-  server = new StatusServer(3456, { configStore, usageMonitor });
+  server = new StatusServer(WS_PORT, { configStore, usageMonitor });
   server.start();
 
   // 4. 启动用量轮询
@@ -614,7 +616,7 @@ process.stdin.setEncoding('utf8');
 process.stdin.on('data', (c) => { data += c; if (data.length > 65536) process.exit(0); });
 process.stdin.on('end', () => {
   const req = http.request({
-    host: '127.0.0.1', port: 3456, path: '/api/hooks/claude',
+    host: '127.0.0.1', port: ${WS_PORT}, path: '/api/hooks/claude',
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
     timeout: 1500

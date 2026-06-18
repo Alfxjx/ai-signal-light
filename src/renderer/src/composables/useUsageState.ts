@@ -25,6 +25,9 @@ export interface FiveHourSlot {
   level: 'fresh' | 'warn' | 'danger' | 'muted';
 }
 
+// 小于 365 天的毫秒数视为"相对剩余时间"，否则视为绝对时间戳
+const MAX_RELATIVE_MS = 365 * 24 * 60 * 60 * 1000;
+
 export function useUsageState() {
   const kimi = ref<UsageProviderState | null>(null);
   const minimax = ref<UsageProviderState | null>(null);
@@ -59,9 +62,10 @@ export function useUsageState() {
       const en = (msg.data as { enabled?: Record<string, boolean> }).enabled;
       if (en) for (const k of Object.keys(en)) enabled[k] = !!en[k];
     } else if (msg.type === 'usageUpdate') {
-      if (msg.provider === 'kimi')    kimi.value    = { ...(kimi.value    || {} as UsageProviderState), ...msg };
-      if (msg.provider === 'minimax') minimax.value = { ...(minimax.value || {} as UsageProviderState), ...msg };
-      if (msg.provider === 'copilot') copilot.value = { ...(copilot.value || {} as UsageProviderState), ...msg };
+      const update = { data: msg.data, lastUpdated: msg.lastUpdated, error: msg.error };
+      if (msg.provider === 'kimi')    kimi.value    = { ...(kimi.value    || {} as UsageProviderState), ...update };
+      if (msg.provider === 'minimax') minimax.value = { ...(minimax.value || {} as UsageProviderState), ...update };
+      if (msg.provider === 'copilot') copilot.value = { ...(copilot.value || {} as UsageProviderState), ...update };
     } else if (msg.type === 'pendingChanged') {
       for (const k of Object.keys(pendingByCwd)) delete pendingByCwd[k];
       Object.assign(pendingByCwd, msg.byCwd);
@@ -90,8 +94,8 @@ export function useUsageState() {
     if (raw === null || raw === undefined || raw === '') return null;
     if (raw instanceof Date) return raw.getTime();
     const n = Number(raw);
-    if (!Number.isNaN(n) && n > 0 && n < 31536000000) {
-      // 小于 365 天视为相对毫秒数
+    if (!Number.isNaN(n) && n > 0 && n < MAX_RELATIVE_MS) {
+      // 相对毫秒数：换算成绝对时间戳
       return Date.now() + n;
     }
     if (!Number.isNaN(n)) return n;
@@ -121,7 +125,8 @@ export function useUsageState() {
     if (!state || state.error || !m || !m.limit) {
       return { percent: 0, resetTime: null, resetText: '', level: 'muted' };
     }
-    const percent = Math.max(0, Math.min(100, m.used ?? 0));
+    // 统一显示"剩余 %"：服务端 percent 字段本身就是剩余 %
+    const percent = Math.max(0, Math.min(100, m.percent ?? 0));
     return {
       percent,
       resetTime: m.resetTime ?? null,
@@ -167,21 +172,17 @@ export function useUsageState() {
     if (!state || state.error || !data?.premium?.limit) {
       return { percent: 0, resetTime: null, resetText: '', level: 'muted' };
     }
-    // Copilot 给的是 remaining/percent，bar 填充直接用 percent（剩的越多 bar 越长）
+    // Copilot 给的是 remaining/percent，bar 填充直接用剩余 %
     const remainingPct = Math.max(0, Math.min(100, data.premium.percent ?? 0));
-    // level 按"已用"算 = 100 - remaining
     return {
       percent: remainingPct,
       resetTime: data.premium.resetDate ?? null,
       resetText: data.premium.resetDate ? data.premium.resetDate.slice(5, 10) : '',
-      level: barLevel(100 - remainingPct)
+      level: barLevel(remainingPct)
     };
   });
 
-  const isProviderEnabled = (id: 'kimi' | 'minimax' | 'copilot') =>
-    enabled[id] !== false && kimi.value?.error !== 'disabled' && minimax.value?.error !== 'disabled' && copilot.value?.error !== 'disabled';
-
-  const isProviderConfigured = (id: 'kimi' | 'minimax' | 'copilot') => {
+  const isProviderVisible = (id: 'kimi' | 'minimax' | 'copilot') => {
     const err = id === 'kimi' ? kimi.value?.error
               : id === 'minimax' ? minimax.value?.error
               : copilot.value?.error;
@@ -196,8 +197,7 @@ export function useUsageState() {
     minimaxFiveHour,
     minimaxWeekly,
     copilotSlot,
-    isProviderEnabled,
-    isProviderConfigured,
+    isProviderVisible,
     pendingCount,
     pendingByCwd
   };
