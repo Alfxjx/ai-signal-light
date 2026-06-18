@@ -55,7 +55,8 @@
     },
     "files": [
       "dist/main/**/*",
-      "dist/renderer/**/*"
+      "dist/renderer/**/*",
+      "dist/shared/**/*"
     ],
     "mac": {
       "target": "dmg"

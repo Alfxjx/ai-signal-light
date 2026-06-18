@@ -21,3 +21,8 @@
 - 时间：2026-06-18
 - 范围：把 barClass / barLevel 硬编码的 warn/danger 阈值暴露为设置窗口可配置，存 config.json，WS 推送
 - 关联：`src/main/config.ts`、`src/main/server.ts`、`src/renderer/src/Settings.vue`、`src/renderer/src/utils/time.ts`、`src/renderer/src/composables/useUsageState.ts`
+
+## [fix-packaged-missing-shared](plans/fix-packaged-missing-shared.md) | [history](history/fix-packaged-missing-shared.md)
+- 时间：2026-06-18
+- 范围：electron-builder files 漏声明 `dist/shared/**/*`，打包后主进程 require `../shared/constants` 失败；追加该 glob 修复
+- 关联：`package.json`
