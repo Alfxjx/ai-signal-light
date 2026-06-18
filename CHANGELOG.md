@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.3.0](https://github.com/Alfxjx/ai-signal-light/compare/v1.2.0...v1.3.0) (2026-06-18)
+
+
+### ✨ 新功能
+
+* add missing shared files to electron-builder configuration and document the fix ([bd7db32](https://github.com/Alfxjx/ai-signal-light/commit/bd7db32593de1908a0f41963c4a7df99536a5464))
+
 ## [1.2.0](https://github.com/Alfxjx/ai-signal-light/compare/v1.1.0...v1.2.0) (2026-06-18)
 
 
