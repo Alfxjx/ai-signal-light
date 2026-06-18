@@ -2,78 +2,95 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Harness Conventions
+
+### 共识记忆
+- 共识记忆目录：`.vibe-harness/`
+  - `plans/` — 实施计划
+  - `history/` — 实际改动记录
+  - `README.md` — 目录使用说明
+  - `index.md` — 任务索引
+
+### Session 纪律
+- **一个任务一个 session**：禁止把多个任务塞进同一个对话
+- **新 session 第一步**：阅读 `.vibe-harness/index.md` 定位相关历史，避免破坏已有功能
+- **上下文隔离**：每个任务从干净上下文开始，靠 `.vibe-harness/` 跨 session 传递信息
+
+### Coding 流程
+1. 任务开始 → 读相关 `history/`（了解已有约束）
+2. `/plan` → 实施计划写入 `.vibe-harness/plans/<task-name>.md`
+3. 实施编码
+4. 完成后 → 改动摘要 + 影响范围 写入 `.vibe-harness/history/<task-name>.md`
+5. 更新 `index.md`
+
+### 文件命名
+- `<task-name>.md`，语义化 kebab-case（如 `fix-login-redirect`）
+- **禁用** 日期、随机字符、任务序号
+
+### 换模型 / 升级
+- 历史完整 → 换更强模型后可针对性重构、强对比优劣
+- 这是 harness 的正向闭环收益之一
+
 ## Project Overview
 
-`ai-assistant-status-monitor` (产品名: **AI状态监控**) is a lightweight Electron desktop app that shows for each Claude Code project how long it has been since the AI last responded, via a small always-on-top, frameless panel. It uses WebSocket push (30s scanning fallback) for live updates. Kimi Code CLI support is currently disabled.
+`ai-assistant-status-monitor` (产品名: **AI状态监控**) is an Electron desktop app that monitors Claude Code project activity and AI model usage quotas (Kimi, MiniMax, Copilot). It shows a small always-on-top main panel and an optional floating status bar, using WebSocket push for live updates.
 
 ## Commands
 
 | Task | Command | Notes |
 |------|---------|-------|
 | Install deps | `npm install` | One-time setup |
-| Dev mode (with DevTools) | `npm run dev` | Passes `--dev` flag to main process |
-| Production run | `npm start` | `electron .` |
-| Package for distribution | `npm run build` | Uses electron-builder → `dist/` (nsis/dmg/AppImage) |
-| Run a single script | `node scripts/status-reporter.js --watch` | Cross-platform status reporter (see below) |
-
-There is **no test suite or linter configured** — `npm test` will not work. No JS framework or bundler; the renderer is plain HTML/CSS/JS served directly by the embedded HTTP server.
+| Dev mode | `npm run dev` | Vite dev server (5173) + Electron main (`--dev`) |
+| Production run | `npm start` | Build main/renderer then run `electron dist/main/main.js` |
+| Package for distribution | `npm run build` | `tsc` + `vite build` + `electron-builder` → `dist/` |
+| Type check | `npm run typecheck` | `vue-tsc` + `tsc` for renderer and main |
+| Run tests | `npm test` | Vitest |
 
 ## Architecture
 
-The app is a single Electron process running an **embedded HTTP + WebSocket server** that also serves the renderer. No IPC traffic — the renderer talks to the server over WebSocket using the page's own origin (loaded from `http://localhost:3456`).
+The app uses **Vue 3 + Vite + TypeScript** for the renderer and **Node/Electron** for the main process. The main process embeds an HTTP + WebSocket server that the renderer connects to.
 
 ```
 src/
-├── main.js          # Electron main: BrowserWindow (frameless, alwaysOnTop, transparent),
-│                    # Tray menu, lifecycle, IPC handlers (get-status, toggle-always-on-top).
-│                    # Boots StatusServer on port 3456 inside app.whenReady().
-├── preload.js       # contextBridge: exposes electronAPI (getStatus, toggleAlwaysOnTop, platform).
-│                    # nodeIntegration is disabled, contextIsolation is enabled.
-├── server.js        # StatusServer: http + ws.Server on same port. Serves /src/renderer/* statically
-│                    # (with path-traversal guard), exposes /api/status and /api/status/:id (GET/POST).
-│                    # On WS connect, pushes {type:'init', data} then {type:'statusChange'} on changes.
-├── detector.js      # AIDetector: scanClaudeProjects() 每 30s 扫 ~/.claude/projects/,
-│                    # 对每个项目读所有 jsonl 尾部 8KB 反向扫最近 type=assistant 的 timestamp,
-│                    # 原始数据通过 WebSocket 推给前端，前端做过滤与时间格式化。
-│                    # 不再做 idle/executing/waiting 状态判断。Kimi 已停用。
-└── renderer/
-    ├── index.html   # 单 .status-card[data-assistant="claude"] + 24h/7d/30d/全部 select + 项目列表 ul
-    ├── style.css    # Frameless/glassmorphism look; 项目行布局 + age-fresh/warn/stale 颜色
-    └── app.js       # StatusMonitor class: renderProjects + formatAge + applyAgeColor,
-                     # 60s 定时器刷新相对时间，range 切换即时重渲染（不重新拉数据）。
-
-scripts/
-├── status-reporter.js   # Cross-platform Node reporter. Modes:
-│                        #   --claude-stdin   read JSON from stdin (Claude Code statusLine pipe)
-│                        #   --kimi           one-shot Kimi process check
-│                        #   --watch          continuous Kimi monitoring every 5s
-├── claude-status.sh / .ps1  # Bash / PowerShell equivalents of --claude-stdin mode
-└── kimi-status.sh / .ps1    # Bash / PowerShell equivalents of --kimi mode
+├── main/
+│   ├── main.ts            # Electron bootstrap: main/settings/floating windows, tray, IPC
+│   ├── preload.ts         # contextBridge: exposes electronAPI to renderer
+│   ├── server.ts          # StatusServer: HTTP static + WS push, pendingByCwd sync
+│   ├── usage-monitor.ts   # Polls Kimi/MiniMax/Copilot APIs
+│   ├── config.ts          # Config persistence with atomic writes
+│   └── detector.ts        # Scans ~/.claude/projects/ for assistant timestamps
+├── renderer/src/
+│   ├── App.vue            # Main panel root
+│   ├── Settings.vue       # Settings window
+│   ├── FloatingBall.vue   # Floating status bar window
+│   ├── components/        # UsageCard, ClaudeCard, TitleBar
+│   ├── composables/       # useWebSocket, useUsageState
+│   ├── utils/             # time formatting, cwd normalization
+│   └── styles/            # Component styles
+├── shared/
+│   ├── types/             # IPC, WebSocket, usage types
+│   ├── constants.ts       # WS_PORT (single source of truth)
+│   └── utils/cwd.ts       # Cross-process cwd normalization
+└── scripts/
+    └── copy-renderer-assets.js  # Copies PNGs into dist/renderer/
 ```
 
 ## State Model
 
-Claude Code 项目监控的"状态"= 距上次 assistant 响应的时间差。在前端做颜色染色（`<5min` 绿 / `<1h` 黄 / 其他灰）。
-
-不再使用 `Status` 枚举中的 IDLE/EXECUTING/WAITING；它们保留在代码里仅作历史兼容。
-
-## Detection Strategy
-
-| Assistant | 数据源 | 读策略 | 轮询 |
-|---|---|---|---|
-| Claude Code CLI | `~/.claude/projects/<project>/*.jsonl`（主+子代理） | 尾部 8KB 反向扫最近 `type=assistant && isSidechain!==true` 的 timestamp | 30s |
-| Kimi Code CLI | — | 已停用 | — |
-
-项目显示名优先级：`cwd` 末级 > `slug` > 项目目录名。
-
-## 已废弃：Adding a New AI Assistant
-
-本项目当前只监控 Claude Code，不再支持通用助手添加流程。如需恢复 Kimi 或新增助手，需重新设计状态模型。
+- **Claude Code status**: time since last `type=assistant` response in jsonl logs. Rendered with age-based colors (`<5min` green / `<1h` yellow / older gray).
+- **Pending notifications**: `StatusServer` maintains `pendingByCwd` from Claude hooks; broadcasts `pendingChanged` to all WS clients. The main window consumes pending by clicking a project or receiving a newer response; it notifies the main process via IPC, which clears the pending entry and re-broadcasts.
+- **Usage quotas**: `UsageMonitor` polls provider APIs every `intervalMinutes`; pushes `usageInit` / `usageUpdate` over WS. Percentages are displayed as **remaining %** consistently across all providers.
 
 ## Conventions
 
-- Comments and UI strings are in Simplified Chinese — keep new user-facing copy consistent.
-- Renderer is intentionally dependency-free (no React/build step). Keep it that way unless there's strong reason to change.
-- HTTP server in `server.js:75` does its own path-traversal check via `path.join(__dirname, 'renderer', url)` + `startsWith` — preserve this when adding new static routes.
-- WS port **3456** is hardcoded in both `main.js` (where StatusServer is constructed) and `renderer/app.js` (the `window.location.host` used to build the WS URL). If changing, update both.
-- WebSocket reconnection in `app.js:144` uses exponential backoff capped at 30s.
+- UI strings and comments are in Simplified Chinese — keep new user-facing copy consistent.
+- `WS_PORT` in `src/shared/constants.ts` is the single source of truth for the embedded server port.
+- `normalizeCwd` in `src/shared/utils/cwd.ts` is used by both main process and renderer to handle Windows case-insensitive paths consistently.
+- Static file serving in `server.ts` guards against path traversal via `path.join(STATIC_ROOT, url)` + `startsWith(STATIC_ROOT)`.
+- WebSocket reconnection in `useWebSocket.ts` uses exponential backoff capped at 30s.
+- Dev vs packaged config is isolated via `app.setName('AI状态监控-dev')` in dev mode.
+
+## Notes
+
+- The deprecated `Status` enum (IDLE/EXECUTING/WAITING) still exists in some type casts for historical compatibility; new code should not rely on it.
+- The floating bar is intentionally `focusable: false` so it does not steal focus from the IDE when clicked.
