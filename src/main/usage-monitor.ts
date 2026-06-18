@@ -191,7 +191,7 @@ export class UsageMonitor {
       limit: Number(total.limit) || 0,
       used: Number(total.used) || 0,
       remaining: Number(total.remaining) || 0,
-      percent: calcPercent(Number(total.remaining), Number(total.limit))
+      percent: calcPercent(Number(total.used), Number(total.limit))
     };
 
     // 解析 FEATURE_CODING usages 数组
@@ -207,7 +207,7 @@ export class UsageMonitor {
       limit:     Number(dTotal.limit)     || 0,
       used:      Number(dTotal.used)      || 0,
       remaining: Number(dTotal.remaining) || 0,
-      percent:   calcPercent(Number(dTotal.remaining), Number(dTotal.limit)),
+      percent:   calcPercent(Number(dTotal.used), Number(dTotal.limit)),
       resetTime: dTotal.resetTime ? String(dTotal.resetTime) : null
     };
 
@@ -215,7 +215,7 @@ export class UsageMonitor {
       limit:     Number(d5h.limit)     || 0,
       used:      Number(d5h.used)      || 0,
       remaining: Number(d5h.remaining) || 0,
-      percent:   calcPercent(Number(d5h.remaining), Number(d5h.limit)),
+      percent:   calcPercent(Number(d5h.used), Number(d5h.limit)),
       resetTime: d5h.resetTime ? String(d5h.resetTime) : null
     };
 
@@ -310,7 +310,10 @@ export class UsageMonitor {
       premium: {
         limit:        Number(limits.premiumInteractions)    || 0,
         remaining:    Number(remaining.premiumInteractions) || 0,
-        percent:      Number(remaining.premiumInteractionsPercentage) || 0,
+        percent:      calcPercent(
+                        (Number(limits.premiumInteractions) || 0) - (Number(remaining.premiumInteractions) || 0),
+                        Number(limits.premiumInteractions)
+                      ),
         resetDate:    quotas.resetDate    ? String(quotas.resetDate) : null,
         resetDateUtc: quotas.resetDateUtc ? String(quotas.resetDateUtc) : null
       },
@@ -331,11 +334,11 @@ export class UsageMonitor {
 
 // ==================== 可测试的纯函数 ====================
 
-export function calcPercent(remaining: number | string, limit: number | string): number {
-  const r = Number(remaining) || 0;
+export function calcPercent(used: number | string, limit: number | string): number {
+  const u = Number(used) || 0;
   const l = Number(limit) || 0;
   if (l <= 0) return 0;
-  return Math.max(0, Math.min(100, Math.round((r / l) * 100)));
+  return Math.max(0, Math.min(100, Math.round((u / l) * 100)));
 }
 
 // 解析代理 URL 为 axios 的 proxy 配置格式

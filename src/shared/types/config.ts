@@ -34,6 +34,15 @@ export interface FloatingBallConfig {
   isVisible: boolean;
 }
 
+export interface UsageThresholds {
+  /** 超过该已用 % 进入 warn (黄) */
+  warn: number;
+  /** 超过该已用 % 进入 danger (红)，必须大于 warn */
+  danger: number;
+}
+
+export const DEFAULT_USAGE_THRESHOLDS: UsageThresholds = { warn: 50, danger: 80 };
+
 export interface AppConfig {
   kimi: ProviderConfig;
   minimax: ProviderConfig;
@@ -43,9 +52,10 @@ export interface AppConfig {
   window: WindowConfig;
   hooks: HooksConfig;
   floatingBall: FloatingBallConfig;
+  thresholds: UsageThresholds;
 }
 
-export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'window' | 'proxy' | 'floatingBall'>> & {
+export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'window' | 'proxy' | 'floatingBall' | 'thresholds'>> & {
   kimi?: Partial<ProviderConfig>;
   minimax?: Partial<ProviderConfig>;
   copilot?: Partial<ProviderConfig>;
@@ -56,4 +66,5 @@ export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax'
     endpoint?: Partial<HooksEndpointConfig>;
   }>;
   floatingBall?: Partial<FloatingBallConfig>;
+  thresholds?: Partial<UsageThresholds>;
 };

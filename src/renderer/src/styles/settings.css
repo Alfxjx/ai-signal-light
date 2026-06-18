@@ -165,6 +165,17 @@ body {
   margin-bottom: 4px;
 }
 
+/* 行内 label：和输入框并排的简短标签（如阈值段 "warn"/"danger"） */
+.settings-label-inline {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* 短数字输入（如阈值），避免 .settings-input 的 flex:1 把同行控件拉变形 */
+.settings-input--narrow {
+  flex: 0 0 64px;
+}
+
 .settings-input-wrap {
   position: relative;
   display: flex;

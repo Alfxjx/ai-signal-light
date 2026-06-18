@@ -71,7 +71,7 @@ npm run build
 
 ### 自动安装 Hooks（推荐）
 
-1. 右键点击系统托盘图标 → **用量监控** → **设置 Token…**
+1. 右键点击系统托盘图标 → **设置 Token…**
 2. 在设置窗口的 **Claude Code Hooks** 标签页中：
    - 勾选需要监听的事件（`Notification` / `Stop` / `PreToolUse`）
    - 点击 **Install Hooks**
@@ -90,7 +90,7 @@ npm run build
 
 ## 用量监控配置
 
-1. 右键托盘 → **用量监控** → **设置 Token…**
+1. 右键托盘 → **设置 Token…**
 2. 填入各平台 Token/Cookie：
    - **Kimi**: `Authorization: Bearer <token>` 中的 token
    - **MiniMax**: API Key

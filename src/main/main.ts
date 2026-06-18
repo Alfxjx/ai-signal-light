@@ -177,42 +177,36 @@ function buildTrayMenu(): Electron.Menu {
     { label: '显示/隐藏悬浮球', click: () => toggleFloatingBall() },
     { type: 'separator' },
     {
-      label: '用量监控',
-      submenu: [
-        {
-          label: '启用 Kimi',
-          type: 'checkbox',
-          checked: cfg.kimi.enabled,
-          click: (item: Electron.MenuItem) => {
-            configStore!.update({ kimi: { enabled: item.checked } });
-            rebuildTray();
-          }
-        },
-        {
-          label: '启用 MiniMax',
-          type: 'checkbox',
-          checked: cfg.minimax.enabled,
-          click: (item: Electron.MenuItem) => {
-            configStore!.update({ minimax: { enabled: item.checked } });
-            rebuildTray();
-          }
-        },
-        {
-          label: '启用 Copilot',
-          type: 'checkbox',
-          checked: cfg.copilot.enabled,
-          click: (item: Electron.MenuItem) => {
-            configStore!.update({ copilot: { enabled: item.checked } });
-            rebuildTray();
-          }
-        },
-        { type: 'separator' },
-        { label: '设置 Token…', click: () => openSettingsWindow() },
-        { label: '刷新周期', submenu: intervalSubmenu },
-        { type: 'separator' },
-        { label: '立即刷新', click: () => usageMonitor && usageMonitor.checkAll() }
-      ]
+      label: '启用 Kimi',
+      type: 'checkbox',
+      checked: cfg.kimi.enabled,
+      click: (item: Electron.MenuItem) => {
+        configStore!.update({ kimi: { enabled: item.checked } });
+        rebuildTray();
+      }
     },
+    {
+      label: '启用 MiniMax',
+      type: 'checkbox',
+      checked: cfg.minimax.enabled,
+      click: (item: Electron.MenuItem) => {
+        configStore!.update({ minimax: { enabled: item.checked } });
+        rebuildTray();
+      }
+    },
+    {
+      label: '启用 Copilot',
+      type: 'checkbox',
+      checked: cfg.copilot.enabled,
+      click: (item: Electron.MenuItem) => {
+        configStore!.update({ copilot: { enabled: item.checked } });
+        rebuildTray();
+      }
+    },
+    { type: 'separator' },
+    { label: '设置 Token…', click: () => openSettingsWindow() },
+    { label: `刷新周期 (${cfg.intervalMinutes} 分钟)`, submenu: intervalSubmenu },
+    { label: '立即刷新', click: () => usageMonitor && usageMonitor.checkAll() },
     { type: 'separator' },
     {
       label: '退出',
@@ -469,7 +463,8 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, async () => {
       enabled: { ...cfg.hooks.enabled },
       endpoint: { autoInstalled: !!cfg.hooks.endpoint.autoInstalled }
     },
-    floatingBall: { enabled: !!cfg.floatingBall.enabled }
+    floatingBall: { enabled: !!cfg.floatingBall.enabled },
+    thresholds: { ...cfg.thresholds }
   };
 });
 

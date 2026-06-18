@@ -20,10 +20,14 @@ export function ageClass(ts: number | string | null | undefined, now: number): s
   return 'age-stale';
 }
 
-// usage bar 颜色阈值（按"剩余 %"分级：越少越危险）
-export function barClass(remainingPercent: number): string {
-  if (remainingPercent < 20) return 'danger';
-  if (remainingPercent < 50) return 'warn';
+// usage bar 颜色阈值（按"已用 %"分级：越多越危险）
+// thresholds 由用户在设置窗口配置；默认 { warn: 50, danger: 80 }
+export function barClass(
+  usedPercent: number,
+  thresholds: { warn: number; danger: number }
+): string {
+  if (usedPercent > thresholds.danger) return 'danger';
+  if (usedPercent > thresholds.warn)   return 'warn';
   return '';
 }
 

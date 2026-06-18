@@ -50,18 +50,28 @@ describe('ageClass', () => {
 });
 
 describe('barClass', () => {
-  it('returns empty for >= 50% remaining', () => {
-    expect(barClass(60)).toBe('');
-    expect(barClass(50)).toBe('');
+  const T = { warn: 50, danger: 80 };
+
+  it('returns empty for <= 50% used', () => {
+    expect(barClass(40, T)).toBe('');
+    expect(barClass(50, T)).toBe('');
   });
 
-  it('returns warn for 20-50% remaining', () => {
-    expect(barClass(40)).toBe('warn');
-    expect(barClass(20)).toBe('warn');
+  it('returns warn for 50-80% used', () => {
+    expect(barClass(60, T)).toBe('warn');
+    expect(barClass(80, T)).toBe('warn');
   });
 
-  it('returns danger for < 20% remaining', () => {
-    expect(barClass(10)).toBe('danger');
+  it('returns danger for > 80% used', () => {
+    expect(barClass(90, T)).toBe('danger');
+  });
+
+  it('respects custom thresholds (strict >, boundary inclusive)', () => {
+    const custom = { warn: 30, danger: 70 };
+    expect(barClass(30, custom)).toBe('');    // 严格大于 → 等于不算
+    expect(barClass(31, custom)).toBe('warn');
+    expect(barClass(70, custom)).toBe('warn'); // 严格大于 → 等于不算 danger
+    expect(barClass(71, custom)).toBe('danger');
   });
 });
 

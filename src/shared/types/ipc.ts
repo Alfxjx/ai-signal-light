@@ -1,4 +1,4 @@
-import type { AppConfig } from './config';
+import type { AppConfig, UsageThresholds } from './config';
 
 export interface SettingsPayload extends AppConfig {
   hasKimiToken: boolean;
@@ -15,6 +15,7 @@ export interface SettingsSavePayload {
   intervalMinutes: number;
   hooks?: { enabled: { Notification: boolean; Stop: boolean; PreToolUse: boolean } };
   floatingBall?: { enabled: boolean };
+  thresholds?: UsageThresholds;
 }
 
 export interface HooksSnippetInfo {

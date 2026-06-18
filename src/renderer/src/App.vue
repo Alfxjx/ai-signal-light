@@ -15,6 +15,7 @@ import type {
   ProviderId,
   ClaudeHookPayload,
 } from './types/messages';
+import { DEFAULT_USAGE_THRESHOLDS } from './types/messages';
 
 // ====== State ======
 const projects = ref<ClaudeProject[]>([]);
@@ -23,6 +24,7 @@ const usage = reactive<UsageState>({
   minimax: null,
   copilot: null,
   enabled: {},
+  thresholds: { ...DEFAULT_USAGE_THRESHOLDS },
 });
 
 const isPinned = ref(true);
@@ -55,6 +57,8 @@ function handleMessage(msg: WsMessage) {
     handleUsageUpdate(msg);
   } else if (msg.type === 'claudeHook') {
     handleClaudeHook(msg);
+  } else if (msg.type === 'thresholdsChanged') {
+    usage.thresholds = { warn: msg.thresholds.warn, danger: msg.thresholds.danger };
   }
 }
 
@@ -115,6 +119,12 @@ function handleUsageInit(payload: UsageInitPayload) {
   usage.minimax = payload.minimax ?? null;
   usage.copilot = payload.copilot ?? null;
   usage.enabled = payload.enabled ?? {};
+  if (payload.thresholds) {
+    usage.thresholds = {
+      warn:   payload.thresholds.warn   ?? DEFAULT_USAGE_THRESHOLDS.warn,
+      danger: payload.thresholds.danger ?? DEFAULT_USAGE_THRESHOLDS.danger,
+    };
+  }
 }
 
 function handleUsageUpdate(payload: UsageUpdatePayload) {

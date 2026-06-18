@@ -79,7 +79,7 @@ src/
 
 - **Claude Code status**: time since last `type=assistant` response in jsonl logs. Rendered with age-based colors (`<5min` green / `<1h` yellow / older gray).
 - **Pending notifications**: `StatusServer` maintains `pendingByCwd` from Claude hooks; broadcasts `pendingChanged` to all WS clients. The main window consumes pending by clicking a project or receiving a newer response; it notifies the main process via IPC, which clears the pending entry and re-broadcasts.
-- **Usage quotas**: `UsageMonitor` polls provider APIs every `intervalMinutes`; pushes `usageInit` / `usageUpdate` over WS. Percentages are displayed as **remaining %** consistently across all providers.
+- **Usage quotas**: `UsageMonitor` polls provider APIs every `intervalMinutes`; pushes `usageInit` / `usageUpdate` over WS. Progress bar fill width and label percent both represent **used %** across all providers (bar wider = closer to limit).
 
 ## Conventions
 

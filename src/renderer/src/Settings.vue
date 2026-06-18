@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import type { SettingsSavePayload } from './types/electron';
+import { DEFAULT_USAGE_THRESHOLDS } from './types/messages';
 
 interface ProviderState {
   enabled: boolean;
@@ -31,6 +32,35 @@ const hasProxy = ref<boolean>(false);
 const intervalMinutes = ref<number>(10);
 const saving = ref<boolean>(false);
 const floatingBallEnabled = ref<boolean>(false);
+
+// ---- 用量阈值 ----
+const warnThreshold = ref<number>(DEFAULT_USAGE_THRESHOLDS.warn);
+const dangerThreshold = ref<number>(DEFAULT_USAGE_THRESHOLDS.danger);
+const thresholdError = ref<string>('');
+
+const thresholdsValid = computed<boolean>(() =>
+  Number.isInteger(warnThreshold.value) &&
+  Number.isInteger(dangerThreshold.value) &&
+  warnThreshold.value >= 0 && warnThreshold.value <= 99 &&
+  dangerThreshold.value >= 1 && dangerThreshold.value <= 100 &&
+  warnThreshold.value < dangerThreshold.value
+);
+
+function validateThresholds(): void {
+  if (thresholdsValid.value) {
+    thresholdError.value = '';
+    return;
+  }
+  if (warnThreshold.value >= dangerThreshold.value) {
+    thresholdError.value = 'warn 必须小于 danger';
+  } else if (warnThreshold.value < 0 || warnThreshold.value > 99) {
+    thresholdError.value = 'warn 必须在 0–99 之间';
+  } else if (dangerThreshold.value < 1 || dangerThreshold.value > 100) {
+    thresholdError.value = 'danger 必须在 1–100 之间';
+  } else {
+    thresholdError.value = '请输入整数';
+  }
+}
 
 // ---- Claude Code hooks ----
 const hookEnabled = reactive<{ Notification: boolean; Stop: boolean; PreToolUse: boolean }>({
@@ -145,6 +175,10 @@ onMounted(async () => {
   }
   hookAutoInstalled.value = !!cfg.hooks?.endpoint?.autoInstalled;
   floatingBallEnabled.value = !!cfg.floatingBall?.enabled;
+  if (cfg.thresholds) {
+    warnThreshold.value = cfg.thresholds.warn;
+    dangerThreshold.value = cfg.thresholds.danger;
+  }
   await refreshHelperPath();
 });
 
@@ -179,6 +213,10 @@ async function onSave() {
       intervalMinutes: intervalMinutes.value,
       hooks: { enabled: { ...hookEnabled } },
       floatingBall: { enabled: floatingBallEnabled.value },
+      thresholds: {
+        warn: warnThreshold.value,
+        danger: dangerThreshold.value,
+      },
     };
     await window.electronAPI.saveSettings(payload);
     onCancel();
@@ -343,6 +381,38 @@ function onCancel() {
         </select>
       </div>
 
+      <!-- 用量阈值 -->
+      <div class="settings-section" data-section="thresholds">
+        <div class="settings-section-header">
+          <span class="settings-section-title">用量阈值</span>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label">进度条颜色切换点（已用 %）</label>
+          <div class="settings-row">
+            <label class="settings-label-inline" for="warnThreshold">warn</label>
+            <input
+              id="warnThreshold"
+              type="number"
+              class="settings-input settings-input--narrow"
+              min="0" max="99" step="1"
+              v-model.number="warnThreshold"
+              @input="validateThresholds"
+            >
+            <label class="settings-label-inline" for="dangerThreshold">danger</label>
+            <input
+              id="dangerThreshold"
+              type="number"
+              class="settings-input settings-input--narrow"
+              min="1" max="100" step="1"
+              v-model.number="dangerThreshold"
+              @input="validateThresholds"
+            >
+          </div>
+          <div class="settings-hint" v-if="thresholdError">{{ thresholdError }}</div>
+          <div class="settings-hint" v-else>已用 % 超过 danger 变红，超过 warn 变黄，否则绿。warn 必须小于 danger。</div>
+        </div>
+      </div>
+
       <!-- 悬浮球 -->
       <div class="settings-section" data-section="floating-ball">
         <div class="settings-section-header">
@@ -397,7 +467,7 @@ function onCancel() {
 
     <div class="settings-footer">
       <button class="btn-cancel" @click="onCancel">取消</button>
-      <button class="btn-save" :disabled="saving" @click="onSave">{{ saving ? '保存中...' : '保存' }}</button>
+      <button class="btn-save" :disabled="saving || !thresholdsValid" @click="onSave">{{ saving ? '保存中...' : '保存' }}</button>
     </div>
   </div>
 </template>

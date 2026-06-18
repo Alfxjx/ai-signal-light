@@ -13,6 +13,7 @@ import type {
   MinimaxUsageData,
   CopilotUsageData,
 } from '../types/messages';
+import { DEFAULT_USAGE_THRESHOLDS } from '../types/messages';
 
 export interface FiveHourSlot {
   /** 剩余百分比 0-100（用于填充 mini bar） */
@@ -34,6 +35,7 @@ export function useUsageState() {
   const copilot = ref<UsageProviderState | null>(null);
   const enabled = reactive<Record<string, boolean>>({});
   const pendingByCwd = reactive<Record<string, PendingHook>>({});
+  const thresholds = reactive<{ warn: number; danger: number }>({ ...DEFAULT_USAGE_THRESHOLDS });
 
   // 1s tick 用于 5h 倒计时秒级刷新
   const now = ref<number>(Date.now());
@@ -61,6 +63,14 @@ export function useUsageState() {
       if (msg.data.copilot) copilot.value = msg.data.copilot;
       const en = (msg.data as { enabled?: Record<string, boolean> }).enabled;
       if (en) for (const k of Object.keys(en)) enabled[k] = !!en[k];
+      const t = (msg.data as { thresholds?: { warn: number; danger: number } }).thresholds;
+      if (t && typeof t.warn === 'number' && typeof t.danger === 'number') {
+        thresholds.warn = t.warn;
+        thresholds.danger = t.danger;
+      }
+    } else if (msg.type === 'thresholdsChanged') {
+      thresholds.warn = msg.thresholds.warn;
+      thresholds.danger = msg.thresholds.danger;
     } else if (msg.type === 'usageUpdate') {
       const update = { data: msg.data, lastUpdated: msg.lastUpdated, error: msg.error };
       if (msg.provider === 'kimi')    kimi.value    = { ...(kimi.value    || {} as UsageProviderState), ...update };
@@ -84,9 +94,9 @@ export function useUsageState() {
 
   // ===== 派生 5h slot（Kimi / MiniMax 强制 5h，Copilot fallback 周） =====
 
-  function barLevel(percent: number): FiveHourSlot['level'] {
-    if (percent > 80) return 'danger';
-    if (percent > 50) return 'warn';
+  function barLevel(percent: number, t: { warn: number; danger: number }): FiveHourSlot['level'] {
+    if (percent > t.danger) return 'danger';
+    if (percent > t.warn)   return 'warn';
     return 'fresh';
   }
 
@@ -125,13 +135,13 @@ export function useUsageState() {
     if (!state || state.error || !m || !m.limit) {
       return { percent: 0, resetTime: null, resetText: '', level: 'muted' };
     }
-    // 统一显示"剩余 %"：服务端 percent 字段本身就是剩余 %
+    // 统一显示"已用 %"：main 进程已翻转
     const percent = Math.max(0, Math.min(100, m.percent ?? 0));
     return {
       percent,
       resetTime: m.resetTime ?? null,
       resetText: formatReset(m.resetTime ?? null, now.value),
-      level: barLevel(percent)
+      level: barLevel(percent, thresholds)
     };
   });
 
@@ -147,7 +157,7 @@ export function useUsageState() {
       percent,
       resetTime: makeResetTime(data.fiveHourResetTime ?? null),
       resetText: formatReset(data.fiveHourResetTime ?? null, now.value),
-      level: barLevel(percent)
+      level: barLevel(percent, thresholds)
     };
   });
 
@@ -162,7 +172,7 @@ export function useUsageState() {
       percent,
       resetTime: makeResetTime(data.weeklyResetTime ?? null),
       resetText: formatReset(data.weeklyResetTime ?? null, now.value),
-      level: barLevel(percent)
+      level: barLevel(percent, thresholds)
     };
   });
 
@@ -172,13 +182,13 @@ export function useUsageState() {
     if (!state || state.error || !data?.premium?.limit) {
       return { percent: 0, resetTime: null, resetText: '', level: 'muted' };
     }
-    // Copilot 给的是 remaining/percent，bar 填充直接用剩余 %
-    const remainingPct = Math.max(0, Math.min(100, data.premium.percent ?? 0));
+    // Copilot：main 进程已把 percent 翻成「已用 %」，直接用
+    const usedPct = Math.max(0, Math.min(100, data.premium.percent ?? 0));
     return {
-      percent: remainingPct,
+      percent: usedPct,
       resetTime: data.premium.resetDate ?? null,
       resetText: data.premium.resetDate ? data.premium.resetDate.slice(5, 10) : '',
-      level: barLevel(remainingPct)
+      level: barLevel(usedPct, thresholds)
     };
   });
 

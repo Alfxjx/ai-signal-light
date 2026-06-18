@@ -70,7 +70,7 @@ function kimiText(key: keyof KimiUsageData): string {
 function kimiPercent(key: keyof KimiUsageData): number {
   const d = kimiData(key);
   if (!d || !d.limit) return 0;
-  // 统一显示"剩余 %"
+  // 统一显示"已用 %"（main 进程已翻转）
   return Math.max(0, Math.min(100, d.percent ?? 0));
 }
 
@@ -103,7 +103,7 @@ const copilotData = computed<CopilotUsageData | null>(() => {
 });
 
 const copilotPremiumPercent = computed<number>(() => {
-  // 服务端给的是「剩余 %」，bar 填充宽度直接用它（剩得少 = bar 窄）
+  // main 进程已把 percent 翻成「已用 %」，bar 填充宽度直接用
   if (!copilotData.value?.premium?.limit) return 0;
   return Math.max(0, Math.min(100, copilotData.value.premium.percent ?? 0));
 });
@@ -111,7 +111,7 @@ const copilotPremiumPercent = computed<number>(() => {
 const copilotPremiumText = computed<string>(() => {
   const p = copilotData.value?.premium;
   if (!p || !p.limit) return '—';
-  return `${p.remaining}/${p.limit}`;
+  return `${p.percent}%`;
 });
 
 const copilotResetDateText = computed<string>(() => {
@@ -175,7 +175,7 @@ const allNoToken = computed<boolean>(() => {
             </div>
             <div class="usage-bar">
               <div class="usage-bar-fill" :style="{ width: kimiPercent('total') + '%' }"
-                :class="barClass(kimiPercent('total'))"></div>
+                :class="barClass(kimiPercent('total'), usage.thresholds)"></div>
             </div>
           </div>
           <div class="usage-bar-block" data-hide-compact>
@@ -188,7 +188,7 @@ const allNoToken = computed<boolean>(() => {
             </div>
             <div class="usage-bar">
               <div class="usage-bar-fill" :style="{ width: kimiPercent('codingWeekly') + '%' }"
-                :class="barClass(kimiPercent('codingWeekly'))"></div>
+                :class="barClass(kimiPercent('codingWeekly'), usage.thresholds)"></div>
             </div>
           </div>
           <div class="usage-bar-block">
@@ -201,7 +201,7 @@ const allNoToken = computed<boolean>(() => {
             </div>
             <div class="usage-bar">
               <div class="usage-bar-fill" :style="{ width: kimiPercent('codingFiveHour') + '%' }"
-                :class="barClass(kimiPercent('codingFiveHour'))"></div>
+                :class="barClass(kimiPercent('codingFiveHour'), usage.thresholds)"></div>
             </div>
           </div>
         </template>
@@ -230,7 +230,7 @@ const allNoToken = computed<boolean>(() => {
             </div>
             <div class="usage-bar">
               <div class="usage-bar-fill" :style="{ width: minimaxFiveHourPercent + '%' }"
-                :class="barClass(minimaxFiveHourPercent)"></div>
+                :class="barClass(minimaxFiveHourPercent, usage.thresholds)"></div>
             </div>
           </div>
           <div class="usage-bar-block" data-hide-compact>
@@ -244,7 +244,7 @@ const allNoToken = computed<boolean>(() => {
             </div>
             <div class="usage-bar">
               <div class="usage-bar-fill" :style="{ width: minimaxWeeklyPercent + '%' }"
-                :class="barClass(minimaxWeeklyPercent)"></div>
+                :class="barClass(minimaxWeeklyPercent, usage.thresholds)"></div>
             </div>
           </div>
         </template>
@@ -272,7 +272,7 @@ const allNoToken = computed<boolean>(() => {
         </div>
         <div class="usage-bar">
           <div class="usage-bar-fill" :style="{ width: copilotPremiumPercent + '%' }"
-            :class="barClass(copilotPremiumPercent)"></div>
+            :class="barClass(copilotPremiumPercent, usage.thresholds)"></div>
         </div>
       </div>
     </div>

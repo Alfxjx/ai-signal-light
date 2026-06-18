@@ -14,7 +14,7 @@ const emit = defineEmits<{
 
 <template>
   <div class="title-bar">
-    <div class="title">Coding Status</div>
+    <div class="title">USAiGE</div>
     <div class="window-controls">
       <button class="btn-ball" title="悬浮窗" @click="emit('toggleFloatingBall')">⬡</button>
       <button class="btn-pin" title="Pin" :style="{ opacity: isPinned ? '1' : '0.4' }" @click="emit('togglePin')">📌</button>

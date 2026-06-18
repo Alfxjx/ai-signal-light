@@ -6,7 +6,8 @@
 import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
-import type { AppConfig, ConfigPartial, HooksEnabledConfig } from '../shared/types/config';
+import type { AppConfig, ConfigPartial, HooksEnabledConfig, UsageThresholds } from '../shared/types/config';
+import { DEFAULT_USAGE_THRESHOLDS } from '../shared/types/config';
 
 const DEFAULTS: AppConfig = {
   kimi:    { token: '', enabled: true, useProxy: false },
@@ -19,11 +20,23 @@ const DEFAULTS: AppConfig = {
     enabled: { Notification: true, Stop: true, PreToolUse: true },
     endpoint: { autoInstalled: false }
   },
-  floatingBall: { enabled: false, x: null, y: null, isVisible: false }
+  floatingBall: { enabled: false, x: null, y: null, isVisible: false },
+  thresholds: { ...DEFAULT_USAGE_THRESHOLDS }
 };
 
 export const VALID_INTERVALS = [5, 10, 15, 30, 60] as const;
 export type ValidInterval = typeof VALID_INTERVALS[number];
+
+/** 校验 warn/danger 阈值对。0≤warn<danger≤100，两个都必须是整数。 */
+export function isValidThresholds(t: unknown): t is UsageThresholds {
+  if (!t || typeof t !== 'object') return false;
+  const w = (t as UsageThresholds).warn;
+  const d = (t as UsageThresholds).danger;
+  return Number.isInteger(w) && Number.isInteger(d)
+      && w >= 0 && w <= 99
+      && d >= 1 && d <= 100
+      && w < d;
+}
 
 export const HOOK_EVENTS = ['Notification', 'Stop', 'PreToolUse'] as const;
 export type HookEvent = typeof HOOK_EVENTS[number];
@@ -63,7 +76,10 @@ export class ConfigStore {
         floatingBall: { ...DEFAULTS.floatingBall, ...(parsed.floatingBall || {}) },
         intervalMinutes: VALID_INTERVALS.includes(parsed.intervalMinutes as ValidInterval)
           ? (parsed.intervalMinutes as ValidInterval)
-          : DEFAULTS.intervalMinutes
+          : DEFAULTS.intervalMinutes,
+        thresholds: isValidThresholds(parsed.thresholds)
+          ? { ...DEFAULTS.thresholds, ...parsed.thresholds }
+          : { ...DEFAULTS.thresholds }
       };
     } catch (e) {
       console.warn('[Config] load failed, using defaults:', (e as Error).message);
@@ -121,6 +137,14 @@ export class ConfigStore {
       if (fb.x === null || Number.isFinite(fb.x)) this.data.floatingBall.x = fb.x as number | null;
       if (fb.y === null || Number.isFinite(fb.y)) this.data.floatingBall.y = fb.y as number | null;
       if (typeof fb.isVisible === 'boolean') this.data.floatingBall.isVisible = fb.isVisible;
+    }
+    if (partial.thresholds && typeof partial.thresholds === 'object') {
+      const t = partial.thresholds as Partial<UsageThresholds>;
+      const next: UsageThresholds = { ...this.data.thresholds };
+      if (typeof t.warn === 'number')   next.warn   = t.warn;
+      if (typeof t.danger === 'number') next.danger = t.danger;
+      if (isValidThresholds(next)) this.data.thresholds = next;
+      // 否则静默忽略非法 partial —— 设置 UI 已防住，这里是兜底
     }
 
     this._save();

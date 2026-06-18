@@ -26,12 +26,19 @@ export type {
   WsMessage,
 } from '../../../shared/types/websocket';
 
+export type {
+  UsageThresholds,
+} from '../../../shared/types/config';
+
+export { DEFAULT_USAGE_THRESHOLDS } from '../../../shared/types/config';
+
 // App 内部聚合的 usage 状态形状（渲染层专用）
 export interface UsageState {
   kimi: import('../../../shared/types/usage').UsageProviderState | null;
   minimax: import('../../../shared/types/usage').UsageProviderState | null;
   copilot: import('../../../shared/types/usage').UsageProviderState | null;
   enabled: Record<string, boolean>;
+  thresholds: import('../../../shared/types/config').UsageThresholds;
 }
 
 // usageInit 推送的 payload 形状
@@ -41,4 +48,5 @@ export interface UsageInitPayload {
   copilot: import('../../../shared/types/usage').UsageProviderState | null;
   enabled?: Record<string, boolean>;
   intervalMinutes?: number;
+  thresholds?: import('../../../shared/types/config').UsageThresholds;
 }

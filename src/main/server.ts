@@ -59,18 +59,20 @@ export class StatusServer {
 
       // 发送当前用量快照
       if (this.usageMonitor) {
+        const cfg = this.configStore ? this.configStore.get() : null;
         ws.send(JSON.stringify({
           type: 'usageInit',
           data: {
             kimi:    this.usageMonitor.state.kimi,
             minimax: this.usageMonitor.state.minimax,
             copilot: this.usageMonitor.state.copilot,
-            enabled: this.configStore ? {
-              kimi:    this.configStore.get().kimi.enabled,
-              minimax: this.configStore.get().minimax.enabled,
-              copilot: this.configStore.get().copilot.enabled
+            enabled: cfg ? {
+              kimi:    cfg.kimi.enabled,
+              minimax: cfg.minimax.enabled,
+              copilot: cfg.copilot.enabled
             } : { kimi: true, minimax: true, copilot: true },
-            intervalMinutes: this.configStore ? this.configStore.get().intervalMinutes : 10
+            intervalMinutes: cfg ? cfg.intervalMinutes : 10,
+            thresholds:      cfg ? cfg.thresholds      : { warn: 50, danger: 80 }
           }
         } as WsMessage));
       }
@@ -112,6 +114,13 @@ export class StatusServer {
     if (this.usageMonitor) {
       this.usageMonitor.onUpdate((payload) => {
         this.broadcast({ type: 'usageUpdate', ...payload } as WsMessage);
+      });
+    }
+
+    // 注册配置变更回调：阈值变化时推送给所有客户端
+    if (this.configStore) {
+      this.configStore.onChange((cfg) => {
+        this.broadcast({ type: 'thresholdsChanged', thresholds: cfg.thresholds } as WsMessage);
       });
     }
 
