@@ -32,9 +32,10 @@ class UsageRepositoryImpl @Inject constructor(
     private val _usageFlow = MutableStateFlow(UsageSnapshot())
     override fun observeUsage(): StateFlow<UsageSnapshot> = _usageFlow.asStateFlow()
 
-    override suspend fun refresh() {
+    override suspend fun refresh(): UsageSnapshot {
         val snapshot = fetchAll()
         _usageFlow.value = snapshot
+        return snapshot
     }
 
     override suspend fun fetchAll(): UsageSnapshot = withContext(Dispatchers.IO) {
