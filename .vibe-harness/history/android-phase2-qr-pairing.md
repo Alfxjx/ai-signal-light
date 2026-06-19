@@ -63,6 +63,6 @@
 - `./gradlew testDebugUnitTest` 通过
 
 ## 已知限制 / 下一阶段
+- ✅ Phase 3 已实现 Claude 项目状态 LAN 同步（见 `android-phase3-lan-sync.md`）
 - 二维码使用完整明文配置，需依赖 UI 提示用户不要截图分享
-- Phase 3 需实现 Android 端 `DesktopSyncClient`（WebSocket LAN 连接）与 Claude 项目状态同步
-- Room 缓存将在 Phase 3 接入，用于离线展示项目列表
+- 云端中继同步列为未来可选增强
