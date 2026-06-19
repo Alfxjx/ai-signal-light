@@ -12,4 +12,9 @@
     <string name="error_disabled">已禁用</string>
     <string name="last_update">最后更新：%1$s</string>
     <string name="offline_hint">离线：显示缓存数据</string>
+    <string name="connection_connected">桌面同步已连接</string>
+    <string name="connection_disconnected">桌面同步断开：%1$s</string>
+    <string name="connection_last_sync">最后同步：%1$s</string>
+    <string name="notification_permission_denied">通知权限被拒绝，阈值提醒可能无法送达</string>
+    <string name="settings_scan">扫码导入配置</string>
 </resources>

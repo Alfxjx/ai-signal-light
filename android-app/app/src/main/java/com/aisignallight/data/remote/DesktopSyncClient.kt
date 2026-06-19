@@ -94,17 +94,37 @@ class DesktopSyncClient @Inject constructor(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    val msg = e.message ?: e.toString()
+                    val error = classifyError(e)
                     _connectionState.value = ConnectionState(
                         isConnected = false,
                         lastSyncAt = _connectionState.value.lastSyncAt,
-                        error = msg
+                        error = error
                     )
                     attempt++
                     val backoff = (1000L * (1 shl attempt.coerceAtMost(5))).coerceAtMost(30000L)
                     delay(backoff)
                 }
             }
+        }
+    }
+
+    private fun classifyError(e: Throwable): String {
+        val msg = e.message ?: e.toString()
+        return when {
+            msg.contains("401", ignoreCase = true) ||
+                    msg.contains("Unauthorized", ignoreCase = true) ->
+                "鉴权失败，请重新扫码导入配置"
+            msg.contains("Unable to resolve host", ignoreCase = true) ||
+                    msg.contains("UnknownHost", ignoreCase = true) ->
+                "无法解析桌面地址"
+            msg.contains("ECONNREFUSED", ignoreCase = true) ||
+                    msg.contains("Connection refused", ignoreCase = true) ||
+                    msg.contains("Failed to connect", ignoreCase = true) ->
+                "连接被拒绝，请确认桌面端已开启 LAN 模式"
+            msg.contains("timeout", ignoreCase = true) ||
+                    msg.contains("SocketTimeout", ignoreCase = true) ->
+                "连接超时"
+            else -> "连接异常：$msg"
         }
     }
 

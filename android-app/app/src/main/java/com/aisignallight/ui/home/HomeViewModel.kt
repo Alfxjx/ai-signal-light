@@ -60,13 +60,7 @@ class HomeViewModel @Inject constructor(
                 _uiState.update { it.copy(projectSync = state) }
             }
         }
-        projectSyncRepository.connect()
         refresh()
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        projectSyncRepository.disconnect()
     }
 
     fun refresh() {

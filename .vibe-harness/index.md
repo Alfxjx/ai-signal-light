@@ -22,6 +22,11 @@
 - 范围：原生 Android 版 Phase 3：LAN WebSocket 同步 Claude 项目状态、Room 缓存、ClaudeTab UI
 - 关联：`android-app/data/remote/DesktopSyncClient.kt`、`android-app/ui/home/ClaudeTab.kt`、`android-app/data/local/*`
 
+## [android-native-app-phase4](../.claude/plans/app-app-hazy-starfish.md) | [history](history/android-phase4-notifications-lifecycle.md)
+- 时间：2026-06-19
+- 范围：原生 Android 版 Phase 4：用量阈值通知、桌面同步连接状态展示、ProcessLifecycleOwner 前台/后台优化
+- 关联：`android-app/data/notification/NotificationHelper.kt`、`android-app/lifecycle/AppLifecycleObserver.kt`、`android-app/ui/home/HomeScreen.kt`
+
 ## [tray-menu-flatten](plans/tray-menu-flatten.md) | [history](history/tray-menu-flatten.md)
 - 时间：2026-06-18
 - 范围：托盘菜单拍平为单层（保留刷新周期为唯一子菜单，label 显示当前值）；README 同步

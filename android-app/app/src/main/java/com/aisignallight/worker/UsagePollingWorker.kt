@@ -7,6 +7,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.aisignallight.data.notification.NotificationHelper
 import com.aisignallight.domain.repository.ConfigRepository
 import com.aisignallight.domain.repository.UsageRepository
 import dagger.assisted.Assisted
@@ -18,12 +19,15 @@ class UsagePollingWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val configRepository: ConfigRepository,
-    private val usageRepository: UsageRepository
+    private val usageRepository: UsageRepository,
+    private val notificationHelper: NotificationHelper
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         return try {
-            usageRepository.refresh()
+            val snapshot = usageRepository.refresh()
+            val config = configRepository.getConfig()
+            notificationHelper.checkAndNotify(config, snapshot)
             Result.success()
         } catch (e: Exception) {
             Result.retry()
