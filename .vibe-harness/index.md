@@ -7,6 +7,16 @@
 - 关联：相关模块/文件
 -->
 
+## [android-native-app](../.claude/plans/app-app-hazy-starfish.md) | [history](history/android-phase1-usage-display.md)
+- 时间：2026-06-19
+- 范围：原生 Android 版 AI 状态监控 Phase 1：项目骨架、用量显示、手动配置、后台轮询
+- 关联：`android-app/**/*`
+
+## [android-native-app-phase2](../.claude/plans/app-app-hazy-starfish.md) | [history](history/android-phase2-qr-pairing.md)
+- 时间：2026-06-19
+- 范围：原生 Android 版 Phase 2：桌面端 LAN 模式、二维码窗口、手机端 CameraX + ML Kit 扫码导入配置
+- 关联：`src/main/main.ts`、`src/main/server.ts`、`src/main/preload.ts`、`src/renderer/src/Settings.vue`、`android-app/ui/scan/**/*`
+
 ## [tray-menu-flatten](plans/tray-menu-flatten.md) | [history](history/tray-menu-flatten.md)
 - 时间：2026-06-18
 - 范围：托盘菜单拍平为单层（保留刷新周期为唯一子菜单，label 显示当前值）；README 同步

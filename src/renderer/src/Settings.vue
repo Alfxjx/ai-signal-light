@@ -32,6 +32,7 @@ const hasProxy = ref<boolean>(false);
 const intervalMinutes = ref<number>(10);
 const saving = ref<boolean>(false);
 const floatingBallEnabled = ref<boolean>(false);
+const lanModeEnabled = ref<boolean>(false);
 
 // ---- 用量阈值 ----
 const warnThreshold = ref<number>(DEFAULT_USAGE_THRESHOLDS.warn);
@@ -175,6 +176,7 @@ onMounted(async () => {
   }
   hookAutoInstalled.value = !!cfg.hooks?.endpoint?.autoInstalled;
   floatingBallEnabled.value = !!cfg.floatingBall?.enabled;
+  lanModeEnabled.value = !!cfg.lanMode?.enabled;
   if (cfg.thresholds) {
     warnThreshold.value = cfg.thresholds.warn;
     dangerThreshold.value = cfg.thresholds.danger;
@@ -217,6 +219,7 @@ async function onSave() {
         warn: warnThreshold.value,
         danger: dangerThreshold.value,
       },
+      lanMode: { enabled: lanModeEnabled.value },
     };
     await window.electronAPI.saveSettings(payload);
     onCancel();
@@ -234,6 +237,11 @@ function onCancel() {
   } else {
     window.close();
   }
+}
+
+async function openQrCode() {
+  if (!window.electronAPI) return;
+  await window.electronAPI.openQrWindow();
 }
 </script>
 
@@ -424,6 +432,24 @@ function onCancel() {
         </div>
         <div class="settings-field">
           <div class="settings-hint">桌面右下角常驻 80×80 状态指示器：中心 5h 剩余百分比、底部多模型 mini bar、有通知时顶部亮红点。单击切到主窗口，可拖动改位置。</div>
+        </div>
+      </div>
+
+      <!-- 手机配对（LAN 模式） -->
+      <div class="settings-section" data-section="lan-mode">
+        <div class="settings-section-header">
+          <span class="settings-section-title">手机配对（LAN 同步）</span>
+          <label class="settings-toggle">
+            <input type="checkbox" v-model="lanModeEnabled">
+            <span class="settings-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <div class="settings-hint">开启后桌面服务会监听局域网，手机 App 可通过同一 Wi-Fi 同步项目状态。</div>
+          <div class="settings-row">
+            <button type="button" class="btn-secondary" @click="openQrCode">显示配对二维码</button>
+          </div>
+          <div class="settings-hint" style="color: rgba(211, 47, 47, 0.9);">⚠ 二维码包含明文 Token，请勿截图分享或让他人拍照。</div>
         </div>
       </div>
 

@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">AI 状态监控</string>
+    <string name="usage_title">用量</string>
+    <string name="claude_title">项目</string>
+    <string name="settings_title">设置</string>
+    <string name="scan_title">扫描二维码</string>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="refresh">刷新</string>
+    <string name="loading">加载中…</string>
+    <string name="error_no_token">未配置 Token</string>
+    <string name="error_disabled">已禁用</string>
+    <string name="last_update">最后更新：%1$s</string>
+    <string name="offline_hint">离线：显示缓存数据</string>
+</resources>

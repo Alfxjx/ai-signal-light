@@ -41,8 +41,21 @@ export class StatusServer {
       this.handleHttp(req, res);
     });
 
-    // 创建 WebSocket 服务器
-    this.wss = new WebSocket.Server({ server: this.httpServer });
+    // 创建 WebSocket 服务器，并校验 upgrade 请求的 Authorization
+    this.wss = new WebSocket.Server({
+      server: this.httpServer,
+      verifyClient: (info, cb) => {
+        if (this.isLocalRequest(info.req)) {
+          cb(true);
+          return;
+        }
+        if (this.verifyAuth(info.req)) {
+          cb(true);
+          return;
+        }
+        cb(false, 401, 'Unauthorized');
+      }
+    });
 
     this.wss.on('connection', (ws) => {
       console.log('[Server] Client connected');
@@ -127,9 +140,12 @@ export class StatusServer {
     // 启动检测器
     this.detector.start();
 
-    // 启动服务器，仅绑定本机回环（hook 与渲染层都在本机）
-    this.httpServer.listen(this.port, '127.0.0.1', () => {
-      console.log(`[Server] Status server started: http://127.0.0.1:${this.port}`);
+    // 根据 lanMode 决定绑定地址：localhost-only 或 LAN
+    const cfg = this.configStore?.get();
+    const lanEnabled = cfg?.lanMode?.enabled ?? false;
+    const host = lanEnabled ? '0.0.0.0' : '127.0.0.1';
+    this.httpServer.listen(this.port, host, () => {
+      console.log(`[Server] Status server started: http://${host}:${this.port} (lanMode=${lanEnabled})`);
     });
 
     return this;
@@ -143,6 +159,41 @@ export class StatusServer {
         client.send(payload);
       }
     });
+  }
+
+  private isLocalRequest(req: http.IncomingMessage): boolean {
+    const addr = req.socket.remoteAddress || '';
+    return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+  }
+
+  private getExpectedApiKey(): string | null {
+    return this.configStore?.get().lanMode?.apiKey || null;
+  }
+
+  private verifyAuth(req: http.IncomingMessage): boolean {
+    const expected = this.getExpectedApiKey();
+    if (!expected) return false;
+    const auth = req.headers.authorization || '';
+    return auth === `Bearer ${expected}`;
+  }
+
+  private requireAuth(req: http.IncomingMessage, res: http.ServerResponse, next: () => void): void {
+    if (this.isLocalRequest(req)) {
+      next();
+      return;
+    }
+    const cfg = this.configStore?.get();
+    if (!cfg?.lanMode?.enabled) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'LAN mode is not enabled' }));
+      return;
+    }
+    if (this.verifyAuth(req)) {
+      next();
+      return;
+    }
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Unauthorized' }));
   }
 
   private handleHttp(req: http.IncomingMessage, res: http.ServerResponse): void {
@@ -161,53 +212,70 @@ export class StatusServer {
 
     // API: 获取所有状态
     if (url === '/api/status') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(this.detector.getAllStatus()));
+      this.requireAuth(req, res, () => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(this.detector.getAllStatus()));
+      });
       return;
     }
 
     // API: 获取单个助手状态
     if (url.startsWith('/api/status/')) {
-      const assistantId = url.split('/').pop() || '';
-      const status = this.detector.getStatus(assistantId);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(status || { error: 'not found' }));
+      this.requireAuth(req, res, () => {
+        const assistantId = url.split('/').pop() || '';
+        const status = this.detector.getStatus(assistantId);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(status || { error: 'not found' }));
+      });
       return;
     }
 
     // API: 获取用量快照
     if (url === '/api/usage') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(this.usageMonitor ? this.usageMonitor.snapshot() : {}));
+      this.requireAuth(req, res, () => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(this.usageMonitor ? this.usageMonitor.snapshot() : {}));
+      });
       return;
     }
 
     // API: 手动设置状态 (POST /api/status/:id)
     if (req.method === 'POST' && url.startsWith('/api/status/')) {
-      const assistantId = url.split('/').pop() || '';
-      let body = '';
-      req.on('data', chunk => body += chunk);
-      req.on('end', () => {
-        try {
-          const { status, details } = JSON.parse(body) as { status: string; details?: Record<string, unknown> };
-          const success = this.detector.setManualStatus(assistantId, status, details || {});
-          res.writeHead(success ? 200 : 404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success, assistantId, status }));
-        } catch {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'invalid body' }));
-        }
+      this.requireAuth(req, res, () => {
+        const assistantId = url.split('/').pop() || '';
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const { status, details } = JSON.parse(body) as { status: string; details?: Record<string, unknown> };
+            const success = this.detector.setManualStatus(assistantId, status, details || {});
+            res.writeHead(success ? 200 : 404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success, assistantId, status }));
+          } catch {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'invalid body' }));
+          }
+        });
       });
       return;
     }
 
     // API: Claude Code hooks 事件入口
     if (req.method === 'POST' && url === '/api/hooks/claude') {
-      this.handleHookEvent(req, res);
+      this.requireAuth(req, res, () => {
+        this.handleHookEvent(req, res);
+      });
       return;
     }
 
     // 静态文件服务（来自 Vite 构建产物 dist/renderer）
+    // 静态文件仅允许本机访问；LAN 客户端不需要桌面 UI
+    if (!this.isLocalRequest(req)) {
+      res.writeHead(403);
+      res.end('Forbidden');
+      return;
+    }
+
     const STATIC_ROOT = path.join(__dirname, '..', 'renderer');
     let filePath = path.join(STATIC_ROOT, url === '/' ? 'index.html' : url);
 
@@ -245,6 +313,17 @@ export class StatusServer {
     this.detector.stop();
     if (this.wss) this.wss.close();
     if (this.httpServer) this.httpServer.close();
+  }
+
+  restart(): void {
+    console.log('[Server] Restarting due to LAN mode change...');
+    this.stop();
+    // 给 close 一点异步时间
+    setTimeout(() => this.start(), 100);
+  }
+
+  isLanEnabled(): boolean {
+    return this.configStore?.get().lanMode?.enabled ?? false;
   }
 
   // 处理 Claude Code hook POST: 校验、按 config gating，再 broadcast

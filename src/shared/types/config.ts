@@ -43,6 +43,11 @@ export interface UsageThresholds {
 
 export const DEFAULT_USAGE_THRESHOLDS: UsageThresholds = { warn: 50, danger: 80 };
 
+export interface LanModeConfig {
+  enabled: boolean;
+  apiKey: string;
+}
+
 export interface AppConfig {
   kimi: ProviderConfig;
   minimax: ProviderConfig;
@@ -53,9 +58,10 @@ export interface AppConfig {
   hooks: HooksConfig;
   floatingBall: FloatingBallConfig;
   thresholds: UsageThresholds;
+  lanMode: LanModeConfig;
 }
 
-export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'window' | 'proxy' | 'floatingBall' | 'thresholds'>> & {
+export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'window' | 'proxy' | 'floatingBall' | 'thresholds' | 'lanMode'>> & {
   kimi?: Partial<ProviderConfig>;
   minimax?: Partial<ProviderConfig>;
   copilot?: Partial<ProviderConfig>;
@@ -67,4 +73,5 @@ export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax'
   }>;
   floatingBall?: Partial<FloatingBallConfig>;
   thresholds?: Partial<UsageThresholds>;
+  lanMode?: Partial<LanModeConfig>;
 };

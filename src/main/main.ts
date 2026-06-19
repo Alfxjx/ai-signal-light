@@ -2,12 +2,14 @@ import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen } from 'el
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import QRCode from 'qrcode';
 import { StatusServer } from './server';
 import { ConfigStore, VALID_INTERVALS, HOOK_EVENTS } from './config';
 import { UsageMonitor } from './usage-monitor';
 import { WS_PORT } from '../shared/constants';
 import { IPC_CHANNELS } from '../shared/types/ipc';
 import type { HooksInstallResult, HooksUninstallResult } from '../shared/types/ipc';
+import { buildQrPayload, encodeQrPayload, generateApiKey, getLanIp } from './pairing';
 
 // 统一 dev 与打包后的 userData 目录名，并刻意区分二者。
 // - dev 模式 (electron dist/main/main.js --dev) 用 "AI状态监控-dev" → %APPDATA%/AI状态监控-dev/
@@ -21,6 +23,7 @@ app.setName(_isDevForName ? 'AI状态监控-dev' : 'AI状态监控');
 let mainWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let floatingBallWindow: BrowserWindow | null = null;
+let qrWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let server: StatusServer | null = null;
 let configStore: ConfigStore | null = null;
@@ -204,6 +207,18 @@ function buildTrayMenu(): Electron.Menu {
       }
     },
     { type: 'separator' },
+    {
+      label: 'LAN 模式（手机同步）',
+      type: 'checkbox',
+      checked: cfg.lanMode?.enabled || false,
+      click: (item: Electron.MenuItem) => toggleLanMode(item.checked)
+    },
+    {
+      label: '显示手机配对二维码',
+      enabled: true,
+      click: () => openQrWindow()
+    },
+    { type: 'separator' },
     { label: '设置 Token…', click: () => openSettingsWindow() },
     { label: `刷新周期 (${cfg.intervalMinutes} 分钟)`, submenu: intervalSubmenu },
     { label: '立即刷新', click: () => usageMonitor && usageMonitor.checkAll() },
@@ -221,6 +236,85 @@ function buildTrayMenu(): Electron.Menu {
 function rebuildTray(): void {
   if (!tray) return;
   tray.setContextMenu(buildTrayMenu());
+}
+
+/** 切换 LAN 模式；首次开启时若不存在 apiKey 则自动生成 */
+function toggleLanMode(enabled: boolean): void {
+  if (!configStore) return;
+  const cfg = configStore.get();
+  let apiKey = cfg.lanMode?.apiKey || '';
+  if (enabled && !apiKey) {
+    apiKey = generateApiKey();
+  }
+  configStore.update({ lanMode: { enabled, apiKey } });
+  if (server) server.restart();
+  rebuildTray();
+}
+
+/** 打开二维码窗口，展示手机配对二维码 */
+async function openQrWindow(): Promise<void> {
+  if (!configStore) return;
+  const cfg = configStore.get();
+  if (!cfg.lanMode?.enabled) {
+    // 未开启 LAN 模式时自动开启并生成 key
+    toggleLanMode(true);
+  }
+  const freshCfg = configStore.get();
+  const apiKey = freshCfg.lanMode?.apiKey || generateApiKey();
+  if (!freshCfg.lanMode?.apiKey) {
+    configStore.update({ lanMode: { enabled: true, apiKey } });
+  }
+
+  const payload = buildQrPayload(freshCfg, apiKey);
+  const payloadString = encodeQrPayload(payload);
+  const dataUrl = await QRCode.toDataURL(payloadString, { width: 280, margin: 2 });
+
+  if (qrWindow && !qrWindow.isDestroyed()) {
+    qrWindow.focus();
+    return;
+  }
+
+  qrWindow = new BrowserWindow({
+    width: 360,
+    height: 420,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    alwaysOnTop: true,
+    title: '手机配对二维码',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  });
+
+  const host = payload.host;
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #fff; text-align: center; }
+        h2 { margin: 0 0 8px; font-size: 18px; }
+        .hint { color: #666; font-size: 13px; margin-bottom: 16px; }
+        .warning { color: #d32f2f; font-size: 12px; margin-top: 12px; }
+        img { width: 280px; height: 280px; border: 1px solid #eee; border-radius: 8px; }
+        .addr { color: #888; font-size: 12px; margin-top: 8px; }
+      </style>
+    </head>
+    <body>
+      <h2>AI 状态监控 · 手机配对</h2>
+      <div class="hint">使用手机 App 扫描下方二维码导入配置</div>
+      <img src="${dataUrl}" alt="配对二维码">
+      <div class="addr">服务器地址：${host}:${WS_PORT}</div>
+      <div class="warning">⚠ 二维码包含明文 Token，请勿截图分享或让他人拍照</div>
+    </body>
+    </html>
+  `;
+
+  qrWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+  qrWindow.on('closed', () => { qrWindow = null; });
 }
 
 // 打开设置窗口（已存在则聚焦）
@@ -402,6 +496,15 @@ app.whenReady().then(() => {
   server = new StatusServer(WS_PORT, { configStore, usageMonitor });
   server.start();
 
+  // 监听 LAN 模式变化，自动重启服务器以切换绑定地址
+  configStore.onChange((cfg) => {
+    const currentLan = server?.isLanEnabled();
+    if (currentLan !== cfg.lanMode?.enabled) {
+      console.log('[main] LAN mode changed, restarting server...');
+      server?.restart();
+    }
+  });
+
   // 4. 启动用量轮询
   usageMonitor.start();
 
@@ -464,7 +567,8 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, async () => {
       endpoint: { autoInstalled: !!cfg.hooks.endpoint.autoInstalled }
     },
     floatingBall: { enabled: !!cfg.floatingBall.enabled },
-    thresholds: { ...cfg.thresholds }
+    thresholds: { ...cfg.thresholds },
+    lanMode: { enabled: !!cfg.lanMode?.enabled, apiKey: cfg.lanMode?.apiKey || '' }
   };
 });
 
@@ -513,6 +617,16 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_SAVE, async (_event, partial: Record<string
     delete (next.proxy as Record<string, unknown>).urlChanged;
   }
 
+  // LAN 模式：首次开启时自动生成 apiKey
+  if (next.lanMode && typeof next.lanMode === 'object') {
+    const lm = next.lanMode as Record<string, unknown>;
+    if (lm.enabled && !current.lanMode?.apiKey) {
+      lm.apiKey = generateApiKey();
+    } else if (lm.enabled && typeof lm.apiKey !== 'string') {
+      lm.apiKey = current.lanMode?.apiKey || generateApiKey();
+    }
+  }
+
   configStore.update(next as Parameters<ConfigStore['update']>[0]);
   rebuildTray();
   if (usageMonitor) usageMonitor.checkAll();
@@ -529,6 +643,10 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_CLOSE, async () => {
 
 ipcMain.handle(IPC_CHANNELS.SETTINGS_OPEN, async () => {
   openSettingsWindow();
+});
+
+ipcMain.handle(IPC_CHANNELS.QR_OPEN, async () => {
+  await openQrWindow();
 });
 
 // 悬浮球：显示/隐藏（托盘和 preload 都走这里）

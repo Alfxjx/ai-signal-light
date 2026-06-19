@@ -16,6 +16,7 @@ export interface SettingsSavePayload {
   hooks?: { enabled: { Notification: boolean; Stop: boolean; PreToolUse: boolean } };
   floatingBall?: { enabled: boolean };
   thresholds?: UsageThresholds;
+  lanMode?: { enabled: boolean; apiKey?: string };
 }
 
 export interface HooksSnippetInfo {
@@ -62,6 +63,7 @@ export interface ElectronAPI {
   getHooksSnippet: (enabledOverride?: Partial<{ Notification: boolean; Stop: boolean; PreToolUse: boolean }>) => Promise<HooksSnippetInfo | null>;
   installHooks: () => Promise<HooksInstallResult>;
   uninstallHooks: () => Promise<HooksUninstallResult>;
+  openQrWindow: () => Promise<void>;
   floatingBall: {
     toggle: () => Promise<void>;
     openMain: () => Promise<void>;
@@ -83,6 +85,7 @@ export const IPC_CHANNELS = {
   HOOKS_GET_SNIPPET: 'hooks:get-snippet',
   HOOKS_INSTALL: 'hooks:install',
   HOOKS_UNINSTALL: 'hooks:uninstall',
+  QR_OPEN: 'qr:open',
   FLOATING_BALL_TOGGLE: 'floating-ball:toggle',
   FLOATING_BALL_OPEN_MAIN: 'floating-ball:open-main',
   FLOATING_BALL_GET_STATE: 'floating-ball:get-state',

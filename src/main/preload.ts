@@ -13,6 +13,7 @@ const IPC_CHANNELS = {
   HOOKS_GET_SNIPPET: 'hooks:get-snippet',
   HOOKS_INSTALL: 'hooks:install',
   HOOKS_UNINSTALL: 'hooks:uninstall',
+  QR_OPEN: 'qr:open',
   FLOATING_BALL_TOGGLE: 'floating-ball:toggle',
   FLOATING_BALL_OPEN_MAIN: 'floating-ball:open-main',
   FLOATING_BALL_GET_STATE: 'floating-ball:get-state',
@@ -44,6 +45,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke(IPC_CHANNELS.HOOKS_GET_SNIPPET, enabledOverride),
   installHooks: () => ipcRenderer.invoke(IPC_CHANNELS.HOOKS_INSTALL),
   uninstallHooks: () => ipcRenderer.invoke(IPC_CHANNELS.HOOKS_UNINSTALL),
+
+  // 手机配对二维码
+  openQrWindow: () => ipcRenderer.invoke(IPC_CHANNELS.QR_OPEN),
 
   // 悬浮球
   floatingBall: {

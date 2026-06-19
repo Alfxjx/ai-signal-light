@@ -21,7 +21,8 @@ const DEFAULTS: AppConfig = {
     endpoint: { autoInstalled: false }
   },
   floatingBall: { enabled: false, x: null, y: null, isVisible: false },
-  thresholds: { ...DEFAULT_USAGE_THRESHOLDS }
+  thresholds: { ...DEFAULT_USAGE_THRESHOLDS },
+  lanMode: { enabled: false, apiKey: '' }
 };
 
 export const VALID_INTERVALS = [5, 10, 15, 30, 60] as const;
@@ -79,7 +80,11 @@ export class ConfigStore {
           : DEFAULTS.intervalMinutes,
         thresholds: isValidThresholds(parsed.thresholds)
           ? { ...DEFAULTS.thresholds, ...parsed.thresholds }
-          : { ...DEFAULTS.thresholds }
+          : { ...DEFAULTS.thresholds },
+        lanMode: {
+          enabled: typeof parsed.lanMode?.enabled === 'boolean' ? parsed.lanMode.enabled : DEFAULTS.lanMode.enabled,
+          apiKey: typeof parsed.lanMode?.apiKey === 'string' ? parsed.lanMode.apiKey : DEFAULTS.lanMode.apiKey
+        }
       };
     } catch (e) {
       console.warn('[Config] load failed, using defaults:', (e as Error).message);
@@ -145,6 +150,10 @@ export class ConfigStore {
       if (typeof t.danger === 'number') next.danger = t.danger;
       if (isValidThresholds(next)) this.data.thresholds = next;
       // 否则静默忽略非法 partial —— 设置 UI 已防住，这里是兜底
+    }
+    if (partial.lanMode && typeof partial.lanMode === 'object') {
+      if (typeof partial.lanMode.enabled === 'boolean') this.data.lanMode.enabled = partial.lanMode.enabled;
+      if (typeof partial.lanMode.apiKey === 'string') this.data.lanMode.apiKey = partial.lanMode.apiKey;
     }
 
     this._save();
