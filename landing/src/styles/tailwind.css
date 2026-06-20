@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .glass-panel {
+    @apply bg-glass-bg backdrop-blur-glass border border-glass-border rounded-2xl;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  .glass-card {
+    @apply bg-white/[0.04] border border-white/[0.05] rounded-xl;
+    transition: all 0.3s ease;
+  }
+
+  .glass-card:hover {
+    @apply bg-white/[0.06] border-white/[0.10] -translate-y-1;
+  }
+
+  .section-reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+
+  .section-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background: radial-gradient(ellipse at top, rgba(30, 58, 95, 0.25), transparent 60%),
+              radial-gradient(ellipse at bottom right, rgba(20, 83, 45, 0.15), transparent 50%),
+              #0a0a12;
+}

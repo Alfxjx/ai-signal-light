@@ -22,6 +22,11 @@
 - 范围：原生 Android 版 Phase 3：LAN WebSocket 同步 Claude 项目状态、Room 缓存、ClaudeTab UI
 - 关联：`android-app/data/remote/DesktopSyncClient.kt`、`android-app/ui/home/ClaudeTab.kt`、`android-app/data/local/*`
 
+## [landing-page](../.vibe-harness/plans/landing-page.md) | [history](history/landing-page.md)
+- 时间：2026-06-20
+- 范围：新增公网营销落地页，Vite + Vue 3 + Tailwind CSS，响应式布局，GitHub Pages 自动部署
+- 关联：`landing/**/*`、`.github/workflows/deploy-landing.yml`
+
 ## [android-native-app-phase4](../.claude/plans/app-app-hazy-starfish.md) | [history](history/android-phase4-notifications-lifecycle.md)
 - 时间：2026-06-19
 - 范围：原生 Android 版 Phase 4：用量阈值通知、桌面同步连接状态展示、ProcessLifecycleOwner 前台/后台优化
