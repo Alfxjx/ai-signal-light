@@ -1,5 +1,6 @@
 package com.aisignallight.data.remote
 
+import com.aisignallight.domain.model.AppConfig
 import com.aisignallight.domain.model.AssistantStatus
 import com.aisignallight.domain.model.ClaudeHookPayload
 import com.aisignallight.domain.model.PendingHook
@@ -9,17 +10,21 @@ import com.aisignallight.domain.repository.ConnectionState
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocket
+import io.ktor.client.request.header
 import io.ktor.http.HttpHeaders
+import io.ktor.http.URLProtocol
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
-import kotlinx.coroutines.CancellationException
+import io.ktor.websocket.send
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -30,17 +35,22 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import io.ktor.client.request.header
-import io.ktor.http.URLProtocol
-import io.ktor.http.encodedPath
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -62,6 +72,14 @@ class DesktopSyncClient @Inject constructor(
 
     private var scope: CoroutineScope? = null
 
+    // 出站发送互斥：Ktor 的 WebSocketSession 不允许多个并发 send
+    private val sendMutex = Mutex()
+    @Volatile
+    private var currentSession: DefaultClientWebSocketSession? = null
+
+    // requestId → 等待响应的 CompletableDeferred（值为响应里 config 字段的 JsonElement）
+    private val pending = ConcurrentHashMap<String, CompletableDeferred<JsonElement>>()
+
     fun connect() {
         if (scope?.isActive == true) return
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob()).also { start(it) }
@@ -70,7 +88,58 @@ class DesktopSyncClient @Inject constructor(
     fun disconnect() {
         scope?.cancel()
         scope = null
+        currentSession = null
+        failAllPending(IllegalStateException("disconnected"))
         _connectionState.value = ConnectionState(isConnected = false)
+    }
+
+    /**
+     * 通过已建立的 WS 反向拉取桌面端 AppConfig。必须在 `connect()` 之后调用，
+     * 且桌面端 LAN 模式已开启。失败/超时不会重试，由调用方决定。
+     */
+    suspend fun fetchConfig(timeoutMs: Long = 10_000L): Result<AppConfig> {
+        val requestId = "getConfig-${UUID.randomUUID()}"
+        val deferred = CompletableDeferred<JsonElement>()
+        pending[requestId] = deferred
+        return try {
+            sendFrame(buildJsonObject {
+                put("type", "getConfig")
+                put("requestId", requestId)
+            })
+            val configElement = withTimeout(timeoutMs) { deferred.await() }
+            val config = json.decodeFromJsonElement(AppConfig.serializer(), configElement)
+            Result.success(config)
+        } catch (e: TimeoutCancellationException) {
+            pending.remove(requestId)
+            Result.failure(e)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            pending.remove(requestId)
+            throw e
+        } catch (e: Exception) {
+            pending.remove(requestId)
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun sendFrame(obj: JsonObject) {
+        val session = currentSession ?: error("WS not connected")
+        sendMutex.withLock {
+            session.send(Frame.Text(json.encodeToString(JsonObject.serializer(), obj)))
+        }
+    }
+
+    private fun completePending(requestId: String?, element: JsonElement?) {
+        if (requestId == null) return
+        val deferred = pending.remove(requestId) ?: return
+        if (element != null) deferred.complete(element)
+        else deferred.completeExceptionally(IllegalStateException("response missing config"))
+    }
+
+    private fun failAllPending(cause: Throwable) {
+        val ids = pending.keys.toList()
+        ids.forEach { id ->
+            pending.remove(id)?.completeExceptionally(cause)
+        }
     }
 
     private fun start(scope: CoroutineScope) {
@@ -91,7 +160,7 @@ class DesktopSyncClient @Inject constructor(
                 try {
                     runSession(conn.host, conn.port, conn.apiKey)
                     attempt = 0
-                } catch (e: CancellationException) {
+                } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     val error = classifyError(e)
@@ -148,11 +217,17 @@ class DesktopSyncClient @Inject constructor(
                     header(HttpHeaders.Authorization, "Bearer $apiKey")
                 }
             ) {
+                currentSession = this
                 _connectionState.value = _connectionState.value.copy(isConnected = true, error = null)
-                for (frame in incoming) {
-                    if (frame is Frame.Text) {
-                        handleMessage(frame.readText())
+                try {
+                    for (frame in incoming) {
+                        if (frame is Frame.Text) {
+                            handleMessage(frame.readText())
+                        }
                     }
+                } finally {
+                    currentSession = null
+                    failAllPending(IllegalStateException("WS session ended"))
                 }
             }
         } finally {
@@ -170,6 +245,11 @@ class DesktopSyncClient @Inject constructor(
                 "statusChange" -> parseStatusChange(obj)
                 "pendingChanged" -> parsePendingChanged(obj)
                 "claudeHook" -> parseClaudeHook(obj)
+                "configSnapshot" -> {
+                    // 响应 getConfig 请求；requestId 必须匹配，config 字段必须存在
+                    val requestId = obj["requestId"]?.jsonPrimitive?.contentOrNull
+                    completePending(requestId, obj["config"])
+                }
                 "usageInit", "usageUpdate", "thresholdsChanged", "floatingBallState" -> {
                     // 手机端独立轮询用量，忽略这些推送
                 }

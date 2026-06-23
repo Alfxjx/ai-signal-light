@@ -7,7 +7,8 @@ import { WS_PORT } from '../shared/constants';
 import { normalizeCwd } from '../shared/utils/cwd';
 import type { ConfigStore } from './config';
 import type { UsageMonitor } from './usage-monitor';
-import type { WsMessage, PendingHook } from '../shared/types/websocket';
+import type { WsMessage, ClientWsMessage, PendingHook } from '../shared/types/websocket';
+import { toMobileConfig } from './pairing';
 
 interface ServerOptions {
   configStore?: ConfigStore | null;
@@ -92,11 +93,25 @@ export class StatusServer {
 
       ws.on('message', (raw: WebSocket.RawData) => {
         try {
-          const msg = JSON.parse(raw.toString()) as { type?: string };
+          const msg = JSON.parse(raw.toString()) as Partial<ClientWsMessage>;
           if (msg.type === 'refresh') {
             console.log('[Server] user requested refresh');
             this.detector.checkAll();
             if (this.usageMonitor) this.usageMonitor.checkAll();
+          } else if (msg.type === 'getConfig') {
+            // QR 配对后手机端反向拉取配置；连接已在 verifyClient 阶段鉴权通过
+            const requestId = msg.requestId;
+            if (!requestId) return;
+            if (!this.configStore) {
+              console.warn('[Server] getConfig ignored: no configStore');
+              return;
+            }
+            const mobileConfig = toMobileConfig(this.configStore.get());
+            ws.send(JSON.stringify({
+              type: 'configSnapshot',
+              requestId,
+              config: mobileConfig
+            } as WsMessage));
           }
         } catch (err) {
           console.warn('[Server] WS message handler error:', err);

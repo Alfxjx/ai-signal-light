@@ -1,6 +1,6 @@
 import type { DetectorAllStatus } from './detector';
 import type { UsageSnapshot, UsageUpdatePayload } from './usage';
-import type { UsageThresholds } from './config';
+import type { MobileAppConfig, UsageThresholds } from './config';
 
 export interface ClaudeHookPayload {
   event: 'Notification' | 'Stop' | 'PreToolUse';
@@ -26,4 +26,10 @@ export type WsMessage =
   | (ClaudeHookPayload & { type: 'claudeHook' })
   | { type: 'pendingChanged'; byCwd: Record<string, PendingHook> }
   | { type: 'floatingBallState'; visible: boolean }
-  | { type: 'thresholdsChanged'; thresholds: UsageThresholds };
+  | { type: 'thresholdsChanged'; thresholds: UsageThresholds }
+  | { type: 'configSnapshot'; requestId: string; config: MobileAppConfig };
+
+/** 客户端 → 服务端的 WebSocket 请求（手机端扫码后用 getConfig 拉取配置） */
+export type ClientWsMessage =
+  | { type: 'refresh' }
+  | { type: 'getConfig'; requestId: string };

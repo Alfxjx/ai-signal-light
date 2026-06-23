@@ -1,12 +1,10 @@
 package com.aisignallight.data.local
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.aisignallight.domain.model.AppConfig
-import com.aisignallight.domain.model.QrPayload
 import com.aisignallight.domain.repository.ConfigRepository
 import com.aisignallight.domain.repository.DesktopConnection
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -77,11 +75,6 @@ class SecureConfigStore @Inject constructor(
     }
 
     override suspend fun getDesktopConnection(): DesktopConnection? = loadConnection()
-
-    override suspend fun saveQrPayload(payload: QrPayload) {
-        saveConfig(payload.config)
-        saveDesktopConnection(payload.host, payload.port, payload.apiKey)
-    }
 
     private fun loadConfig(): AppConfig {
         val raw = prefs.getString(KEY_CONFIG, null) ?: return AppConfig()

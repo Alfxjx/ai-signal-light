@@ -30,11 +30,14 @@ data class AppConfig(
     val thresholds: UsageThresholds = UsageThresholds()
 )
 
+/**
+ * QR 码内只携带最小配对信息。完整配置在扫码后通过 WebSocket 反向拉取
+ * （见 DesktopSyncClient.fetchConfig + 服务端 getConfig 处理器）。
+ */
 @Serializable
 data class QrPayload(
     val v: Int = 1,
     val host: String,
     val port: Int,
-    val apiKey: String? = null,
-    val config: AppConfig
+    val apiKey: String = ""
 )

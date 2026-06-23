@@ -61,6 +61,19 @@ export interface AppConfig {
   lanMode: LanModeConfig;
 }
 
+/**
+ * 移动端订阅的精简配置：去除 window/hooks/floatingBall/lanMode 等桌面专属字段，
+ * 作为 QR 配对后通过 WebSocket 反向拉取的契约。
+ */
+export interface MobileAppConfig {
+  kimi: ProviderConfig;
+  minimax: ProviderConfig;
+  copilot: ProviderConfig;
+  proxy: { url: string };
+  intervalMinutes: number;
+  thresholds: UsageThresholds;
+}
+
 export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'window' | 'proxy' | 'floatingBall' | 'thresholds' | 'lanMode'>> & {
   kimi?: Partial<ProviderConfig>;
   minimax?: Partial<ProviderConfig>;
