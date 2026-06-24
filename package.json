@@ -13,7 +13,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "release:dry-run": "commit-and-tag-version --dry-run",
-    "release": "commit-and-tag-version"
+    "release": "commit-and-tag-version",
+    "landing:dev": "npm run dev --prefix landing",
+    "landing:build": "npm run build --prefix landing",
+    "landing:preview": "npm run preview --prefix landing"
   },
   "keywords": [
     "ai",
