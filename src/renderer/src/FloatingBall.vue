@@ -76,10 +76,10 @@ function onClickBar() {
       </svg>
     </div>
 
-    <!-- 顶部：通知指示灯 + 项目名 -->
+    <!-- 顶部：通知指示灯 -->
     <div class="fb-header">
       <div class="fb-dot" :class="{ 'fb-dot--active': pendingCount > 0 }"></div>
-      <div class="fb-name" :class="{ 'fb-name--idle': pendingCount === 0 }">{{ projectName }}</div>
+      <!-- <div class="fb-name" :class="{ 'fb-name--idle': pendingCount === 0 }">{{ projectName }}</div> -->
     </div>
 
     <!-- 模型用量：纵向堆叠（disabled 不画整行） -->
@@ -107,7 +107,7 @@ function onClickBar() {
           <span class="fb-bar-pct">{{ minimaxFiveHour.percent }}%</span>
         </div>
         <div class="fb-reset" v-if="minimaxFiveHour.resetText">{{ minimaxFiveHour.resetText }}</div>
-        <div class="fb-bar-row fb-bar-row--secondary" v-if="minimaxWeekly.percent > 0 || minimaxWeekly.resetText">
+        <!-- <div class="fb-bar-row fb-bar-row--secondary" v-if="minimaxWeekly.percent > 0 || minimaxWeekly.resetText">
           <span class="fb-bar-label">W</span>
           <div class="fb-bar">
             <div class="fb-bar-fill fb-bar-fill--muted"
@@ -116,7 +116,7 @@ function onClickBar() {
           </div>
           <span class="fb-bar-pct">{{ minimaxWeekly.percent }}%</span>
         </div>
-        <div class="fb-reset" v-if="minimaxWeekly.resetText">{{ minimaxWeekly.resetText }}</div>
+        <div class="fb-reset" v-if="minimaxWeekly.resetText">{{ minimaxWeekly.resetText }}</div> -->
       </div>
       <div class="fb-row" v-if="copilotVisible">
         <div class="fb-bar-row">
