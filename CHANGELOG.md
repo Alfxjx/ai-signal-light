@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.4.0](https://github.com/Alfxjx/ai-signal-light/compare/v1.3.0...v1.4.0) (2026-06-24)
+
+
+### ✨ 新功能
+
+* add responsive marketing landing page with GitHub Pages deployment ([2d8026a](https://github.com/Alfxjx/ai-signal-light/commit/2d8026a56f4e44b1b5233e26d1d5fa66309d683c))
+* make UsageRepository.refresh return snapshot for notification worker ([1e6d60f](https://github.com/Alfxjx/ai-signal-light/commit/1e6d60f544f41b558f551ca3ba953f43daed2f4c))
+* Phase 2 - desktop LAN mode, QR pairing, and Android QR scan import ([2f953da](https://github.com/Alfxjx/ai-signal-light/commit/2f953daad2c59e70944702538117eeb3f67ddf9c))
+* Phase 3 - Android LAN WebSocket sync for Claude project status ([37919a4](https://github.com/Alfxjx/ai-signal-light/commit/37919a467809c5b2134f71a6c87f3edf715b5a09))
+* Phase 4 - Android threshold notifications, sync status, and lifecycle optimization ([de2cdd2](https://github.com/Alfxjx/ai-signal-light/commit/de2cdd2c40a7c3c06198f049693b4304217d8fe1))
+
+
+### 🐛 修复
+
+* 修复二维码太大导致的不显示问题 ([84e4737](https://github.com/Alfxjx/ai-signal-light/commit/84e47376c1b3a6d683eedb02043587ab0c9d4b60))
+* 悬浮球样式优化 ([41ff17f](https://github.com/Alfxjx/ai-signal-light/commit/41ff17fddbe054c798eac80a6d4b1f3efa993aa1))
+
 ## [1.3.0](https://github.com/Alfxjx/ai-signal-light/compare/v1.2.0...v1.3.0) (2026-06-18)
 
 
