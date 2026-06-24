@@ -12,6 +12,11 @@
 - 范围：修复 QR 容量超限；QR 只携带 host/port/apiKey，手机端扫码后走 WS 反向拉取精简 `MobileAppConfig`
 - 关联：`src/shared/types/{config,websocket}.ts`、`src/main/{pairing,server}.ts`、`android-app/.../{domain/model,data/remote,data/local,ui/scan}/*`
 
+## [floating-ball-dismiss-indicator](plans/floating-ball-dismiss-indicator.md) | [history](history/floating-ball-dismiss-indicator.md)
+- 时间：2026-06-24
+- 范围：悬浮球顶部通知指示灯亮起时支持点击灭灯，复用 notifyCleared IPC 通道清空所有 pending cwd
+- 关联：`src/renderer/src/FloatingBall.vue`、`src/renderer/src/styles/floating-ball.css`
+
 ## [android-native-app](../.claude/plans/app-app-hazy-starfish.md) | [history](history/android-phase1-usage-display.md)
 - 时间：2026-06-19
 - 范围：原生 Android 版 AI 状态监控 Phase 1：项目骨架、用量显示、手动配置、后台轮询

@@ -7,7 +7,6 @@ import { useUsageState } from './composables/useUsageState';
 const {
   kimiFiveHour,
   minimaxFiveHour,
-  minimaxWeekly,
   copilotSlot,
   isProviderVisible,
   pendingByCwd
@@ -19,16 +18,16 @@ const copilotVisible = computed<boolean>(() => isProviderVisible('copilot'));
 
 const pendingCount = computed<number>(() => Object.keys(pendingByCwd).length);
 
-function basenameOf(p: string): string {
-  return p.split(/[\\/]/).filter(Boolean).pop() || p;
-}
+// function basenameOf(p: string): string {
+//   return p.split(/[\\/]/).filter(Boolean).pop() || p;
+// }
 
-const projectName = computed<string>(() => {
-  const keys = Object.keys(pendingByCwd);
-  if (keys.length === 0) return '空闲';
-  if (keys.length === 1) return basenameOf(keys[0]);
-  return `${keys.length} 项待处理`;
-});
+// const projectName = computed<string>(() => {
+//   const keys = Object.keys(pendingByCwd);
+//   if (keys.length === 0) return '空闲';
+//   if (keys.length === 1) return basenameOf(keys[0]);
+//   return `${keys.length} 项待处理`;
+// });
 
 // ===== 短按 vs 拖动 判定 =====
 const CLICK_DISTANCE = 4;   // px
@@ -63,6 +62,44 @@ function onClickBar() {
     console.log('[FloatingBar] click → open main (mock)');
   }
 }
+
+// ===== 指示灯点击灭灯（仅亮灯时可点，复用同一套短按/拖动阈值） =====
+let dotDownX = 0;
+let dotDownY = 0;
+let dotDownTs = 0;
+let dotDownValid = false;
+
+function onDotMouseDown(e: MouseEvent) {
+  dotDownX = e.clientX;
+  dotDownY = e.clientY;
+  dotDownTs = Date.now();
+  dotDownValid = true;
+}
+
+function onDotMouseUp(e: MouseEvent) {
+  if (!dotDownValid || pendingCount.value === 0) {
+    dotDownValid = false;
+    return;
+  }
+  dotDownValid = false;
+  const dx = Math.abs(e.clientX - dotDownX);
+  const dy = Math.abs(e.clientY - dotDownY);
+  const dt = Date.now() - dotDownTs;
+  if (dx > CLICK_DISTANCE || dy > CLICK_DISTANCE || dt > CLICK_DURATION) return;
+  onDotClick();
+}
+
+function onDotClick() {
+  const keys = Object.keys(pendingByCwd);
+  if (keys.length === 0) return;
+  if (window.electronAPI?.floatingBall) {
+    for (const k of keys) {
+      window.electronAPI.floatingBall.notifyCleared(k);
+    }
+  } else {
+    console.log('[FloatingBar] dot click → clear pending (mock)', keys);
+  }
+}
 </script>
 
 <template>
@@ -76,9 +113,13 @@ function onClickBar() {
       </svg>
     </div>
 
-    <!-- 顶部：通知指示灯 -->
+    <!-- 顶部：通知指示灯（亮灯时点击可灭灯） -->
     <div class="fb-header">
-      <div class="fb-dot" :class="{ 'fb-dot--active': pendingCount > 0 }"></div>
+      <div class="fb-dot"
+           :class="{ 'fb-dot--active': pendingCount > 0, 'fb-dot--clickable': pendingCount > 0 }"
+           :title="pendingCount > 0 ? '点击熄灭指示灯' : ''"
+           @mousedown.stop="onDotMouseDown"
+           @mouseup.stop="onDotMouseUp"></div>
       <!-- <div class="fb-name" :class="{ 'fb-name--idle': pendingCount === 0 }">{{ projectName }}</div> -->
     </div>
 

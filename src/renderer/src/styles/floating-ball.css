@@ -71,6 +71,10 @@ html, body {
   animation: fb-pulse 1.6s ease-in-out infinite;
 }
 
+.fb-dot--clickable {
+  cursor: pointer;
+}
+
 @keyframes fb-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
