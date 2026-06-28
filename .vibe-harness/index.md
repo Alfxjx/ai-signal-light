@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [android-launcher-icon-dark-mode](plans/android-launcher-icon-dark-mode.md) | [history](history/android-launcher-icon-dark-mode.md)
+- 时间：2026-06-28
+- 范围：Android 启动图标背景从亮紫色改为深蓝灰，适配暗色模式
+- 关联：`android-app/app/src/main/res/drawable/ic_launcher_background.xml`、`android-app/app/src/main/res/values/colors.xml`
+
 ## [qr-lan-fetch-config](plans/qr-lan-fetch-config.md) | [history](history/qr-lan-fetch-config.md)
 - 时间：2026-06-23
 - 范围：修复 QR 容量超限；QR 只携带 host/port/apiKey，手机端扫码后走 WS 反向拉取精简 `MobileAppConfig`
