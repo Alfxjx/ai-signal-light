@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [android-theme-switching](plans/android-theme-switching.md) | [history](history/android-theme-switching.md)
+- 时间：2026-06-28
+- 范围：Android App 新增浅色/深色/跟随系统主题切换，并在设置页提供 SegmentedButton 选择器
+- 关联：`android-app/app/src/main/java/com/aisignallight/ui/theme/Theme.kt`、`android-app/app/src/main/java/com/aisignallight/MainActivity.kt`、`android-app/app/src/main/java/com/aisignallight/ui/settings/SettingsScreen.kt`
+
 ## [android-launcher-icon-dark-mode](plans/android-launcher-icon-dark-mode.md) | [history](history/android-launcher-icon-dark-mode.md)
 - 时间：2026-06-28
 - 范围：Android 启动图标背景从亮紫色改为深蓝灰，适配暗色模式

@@ -1,10 +1,12 @@
 package com.aisignallight.ui.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import com.aisignallight.domain.model.ThemeMode
 
 private val LightColors = lightColorScheme(
     primary = Color(0xFF6200EE),
@@ -28,9 +30,14 @@ private val DarkColors = darkColorScheme(
 
 @Composable
 fun AISignalLightTheme(
-    darkTheme: Boolean = false,
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
     content: @Composable () -> Unit
 ) {
+    val darkTheme = when (themeMode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    }
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColors else LightColors,
         typography = Typography,

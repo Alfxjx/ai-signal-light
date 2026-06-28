@@ -40,9 +40,45 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import com.aisignallight.domain.model.ProviderConfig
+import com.aisignallight.domain.model.ThemeMode
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ThemeSelector(
+    selected: ThemeMode,
+    onSelect: (ThemeMode) -> Unit
+) {
+    val options = listOf(ThemeMode.LIGHT, ThemeMode.DARK, ThemeMode.SYSTEM)
+    val labels = mapOf(
+        ThemeMode.LIGHT to "浅色",
+        ThemeMode.DARK to "深色",
+        ThemeMode.SYSTEM to "跟随系统"
+    )
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(text = "主题", style = MaterialTheme.typography.titleMedium)
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+        ) {
+            options.forEachIndexed { index, mode ->
+                SegmentedButton(
+                    selected = selected == mode,
+                    onClick = { onSelect(mode) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size)
+                ) {
+                    Text(labels[mode] ?: mode.name)
+                }
+            }
+        }
+    }
+}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -73,6 +109,11 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            ThemeSelector(
+                selected = uiState.themeMode,
+                onSelect = { viewModel.updateTheme(it) }
+            )
+
             ProviderSection(
                 title = "Kimi",
                 config = uiState.kimi,
