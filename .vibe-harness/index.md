@@ -11,6 +11,15 @@
 - 时间：2026-07-20
 - 范围：Kimi 改内嵌登录窗口抓 token、Copilot 改 Device Flow OAuth、新增 DeepSeek（余额）与 Codex（读 ~/.codex/auth.json）provider
 - 关联：`src/main/{kimi-login,copilot-auth,codex-credentials,usage-monitor,main,config,server,preload}.ts`、`src/shared/types/{usage,config,ipc}.ts`、`src/renderer/src/{Settings.vue,components/UsageCard.vue,FloatingBall.vue,App.vue,composables/useUsageState.ts,types/messages.ts}`
+## [android-theme-switching](plans/android-theme-switching.md) | [history](history/android-theme-switching.md)
+- 时间：2026-06-28
+- 范围：Android App 新增浅色/深色/跟随系统主题切换，并在设置页提供 SegmentedButton 选择器
+- 关联：`android-app/app/src/main/java/com/aisignallight/ui/theme/Theme.kt`、`android-app/app/src/main/java/com/aisignallight/MainActivity.kt`、`android-app/app/src/main/java/com/aisignallight/ui/settings/SettingsScreen.kt`
+
+## [android-launcher-icon-dark-mode](plans/android-launcher-icon-dark-mode.md) | [history](history/android-launcher-icon-dark-mode.md)
+- 时间：2026-06-28
+- 范围：Android 启动图标背景从亮紫色改为深蓝灰，适配暗色模式
+- 关联：`android-app/app/src/main/res/drawable/ic_launcher_background.xml`、`android-app/app/src/main/res/values/colors.xml`
 
 ## [qr-lan-fetch-config](plans/qr-lan-fetch-config.md) | [history](history/qr-lan-fetch-config.md)
 - 时间：2026-06-23

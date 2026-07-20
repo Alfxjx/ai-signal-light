@@ -28,6 +28,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:configChanges="uiMode|orientation|screenSize|smallestScreenSize"
             android:theme="@style/Theme.AISignalLight">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

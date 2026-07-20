@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.aisignallight.domain.model.AppConfig
 import com.aisignallight.domain.model.ProviderConfig
 import com.aisignallight.domain.model.ProxyConfig
+import com.aisignallight.domain.model.ThemeMode
 import com.aisignallight.domain.model.UsageThresholds
 import com.aisignallight.domain.repository.ConfigRepository
 import com.aisignallight.worker.UsagePollingWorker
@@ -36,7 +37,8 @@ class SettingsViewModel @Inject constructor(
                 proxyUrl = config.proxy.url,
                 intervalMinutes = config.intervalMinutes,
                 warnThreshold = config.thresholds.warn,
-                dangerThreshold = config.thresholds.danger
+                dangerThreshold = config.thresholds.danger,
+                themeMode = config.themeMode
             )
         }
     }
@@ -65,6 +67,13 @@ class SettingsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(warnThreshold = warn, dangerThreshold = danger)
     }
 
+    fun updateTheme(mode: ThemeMode) {
+        _uiState.value = _uiState.value.copy(themeMode = mode)
+        viewModelScope.launch {
+            configRepository.saveThemeMode(mode)
+        }
+    }
+
     suspend fun save(): Boolean {
         val state = _uiState.value
         if (state.warnThreshold >= state.dangerThreshold) return false
@@ -76,7 +85,8 @@ class SettingsViewModel @Inject constructor(
             copilot = state.copilot,
             proxy = ProxyConfig(url = state.proxyUrl),
             intervalMinutes = state.intervalMinutes,
-            thresholds = UsageThresholds(warn = state.warnThreshold, danger = state.dangerThreshold)
+            thresholds = UsageThresholds(warn = state.warnThreshold, danger = state.dangerThreshold),
+            themeMode = state.themeMode
         )
         configRepository.saveConfig(config)
         UsagePollingWorker.enqueue(context, config.intervalMinutes)
@@ -95,5 +105,6 @@ data class SettingsUiState(
     val proxyUrl: String = "",
     val intervalMinutes: Int = 10,
     val warnThreshold: Int = 50,
-    val dangerThreshold: Int = 80
+    val dangerThreshold: Int = 80,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM
 )

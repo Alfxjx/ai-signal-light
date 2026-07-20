@@ -5,6 +5,7 @@ import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.aisignallight.domain.model.AppConfig
+import com.aisignallight.domain.model.ThemeMode
 import com.aisignallight.domain.repository.ConfigRepository
 import com.aisignallight.domain.repository.DesktopConnection
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -63,6 +64,11 @@ class SecureConfigStore @Inject constructor(
         }
         _configFlow.value = AppConfig()
         _connectionFlow.value = null
+    }
+
+    override suspend fun saveThemeMode(mode: ThemeMode) {
+        val current = loadConfig()
+        saveConfig(current.copy(themeMode = mode))
     }
 
     override suspend fun saveDesktopConnection(host: String, port: Int, apiKey: String?) {

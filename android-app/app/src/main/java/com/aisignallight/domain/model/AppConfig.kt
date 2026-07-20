@@ -21,13 +21,21 @@ data class ProxyConfig(
 )
 
 @Serializable
+enum class ThemeMode {
+    LIGHT,
+    DARK,
+    SYSTEM
+}
+
+@Serializable
 data class AppConfig(
     val kimi: ProviderConfig = ProviderConfig(),
     val minimax: ProviderConfig = ProviderConfig(),
     val copilot: ProviderConfig = ProviderConfig(),
     val proxy: ProxyConfig = ProxyConfig(),
     val intervalMinutes: Int = 10,
-    val thresholds: UsageThresholds = UsageThresholds()
+    val thresholds: UsageThresholds = UsageThresholds(),
+    val themeMode: ThemeMode = ThemeMode.SYSTEM
 )
 
 /**

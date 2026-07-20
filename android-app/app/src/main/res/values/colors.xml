@@ -6,6 +6,7 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="launcher_background">#FF1A1A2E</color>
 
     <!-- Status colors matching desktop semantics -->
     <color name="fresh">#4CAF50</color>
