@@ -80,11 +80,15 @@ export class StatusServer {
             kimi:    this.usageMonitor.state.kimi,
             minimax: this.usageMonitor.state.minimax,
             copilot: this.usageMonitor.state.copilot,
+            deepseek: this.usageMonitor.state.deepseek,
+            codex:   this.usageMonitor.state.codex,
             enabled: cfg ? {
               kimi:    cfg.kimi.enabled,
               minimax: cfg.minimax.enabled,
-              copilot: cfg.copilot.enabled
-            } : { kimi: true, minimax: true, copilot: true },
+              copilot: cfg.copilot.enabled,
+              deepseek: cfg.deepseek.enabled,
+              codex:   cfg.codex.enabled
+            } : { kimi: true, minimax: true, copilot: true, deepseek: true, codex: true },
             intervalMinutes: cfg ? cfg.intervalMinutes : 10,
             thresholds:      cfg ? cfg.thresholds      : { warn: 50, danger: 80 }
           }

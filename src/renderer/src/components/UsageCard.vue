@@ -6,6 +6,9 @@ import type {
   KimiUsageData,
   MinimaxUsageData,
   CopilotUsageData,
+  DeepseekUsageData,
+  CodexUsageData,
+  CodexWindowData,
   UsageMetric,
 } from '../types/messages';
 import { formatAge, formatResetTime, barClass } from '../utils/time';
@@ -64,7 +67,7 @@ function kimiData(key: keyof KimiUsageData): UsageMetric | null {
 function kimiText(key: keyof KimiUsageData): string {
   const d = kimiData(key);
   if (!d || !d.limit) return '—';
-  return `${d.percent}%`;
+  return `${d.percent.toFixed(2)}%`;
 }
 
 function kimiPercent(key: keyof KimiUsageData): number {
@@ -120,12 +123,53 @@ const copilotResetDateText = computed<string>(() => {
   // "2026-07-01" → "07-01"
   return d.length >= 10 ? d.slice(5, 10) : d;
 });
+
+// ---- DeepSeek 专用 ----
+const deepseekData = computed<DeepseekUsageData | null>(() => {
+  return (props.usage.deepseek?.data as DeepseekUsageData | undefined) ?? null;
+});
+
+const deepseekBalanceText = computed<string>(() => {
+  const d = deepseekData.value;
+  if (!d) return '—';
+  const symbol = d.currency === 'CNY' ? '¥' : d.currency === 'USD' ? '$' : (d.currency ? d.currency + ' ' : '');
+  return `${symbol}${d.totalBalance.toFixed(2)}`;
+});
+
+const deepseekGrantedText = computed<string>(() => {
+  const d = deepseekData.value;
+  if (!d || !d.grantedBalance) return '';
+  return `含赠送 ${d.grantedBalance.toFixed(2)}`;
+});
+
+// ---- Codex 专用 ----
+const codexData = computed<CodexUsageData | null>(() => {
+  return (props.usage.codex?.data as CodexUsageData | undefined) ?? null;
+});
+
+function codexWindowLabel(seconds: number): string {
+  if (seconds <= 5 * 3600 + 60) return '5h';
+  if (seconds <= 24 * 3600 + 60) return 'day';
+  return 'week';
+}
+
+function codexWindowPercent(w: CodexWindowData | null): number {
+  if (!w) return 0;
+  return Math.max(0, Math.min(100, w.usedPercent ?? 0));
+}
+
+function codexWindowText(w: CodexWindowData | null): string {
+  if (!w) return '—';
+  return `${codexWindowPercent(w)}%`;
+}
 // ---- 卡片头 / 底部 ----
 const usageLastTs = computed<number | null>(() => {
   const ks = ([
     props.usage.kimi?.lastUpdated,
     props.usage.minimax?.lastUpdated,
     props.usage.copilot?.lastUpdated,
+    props.usage.deepseek?.lastUpdated,
+    props.usage.codex?.lastUpdated,
   ].filter((v): v is string => typeof v === 'string')
     .map((v) => new Date(v).getTime())
     .filter((t) => !Number.isNaN(t))) as number[];
@@ -137,7 +181,9 @@ const allNoToken = computed<boolean>(() => {
   const kimiNoToken = props.usage.kimi?.error === 'no_token';
   const miniNoToken = props.usage.minimax?.error === 'no_token';
   const copilotNoToken = props.usage.copilot?.error === 'no_token';
-  return kimiNoToken && miniNoToken && copilotNoToken;
+  const deepseekNoToken = props.usage.deepseek?.error === 'no_token';
+  const codexNoToken = props.usage.codex?.error === 'no_token';
+  return kimiNoToken && miniNoToken && copilotNoToken && deepseekNoToken && codexNoToken;
 });
 </script>
 
@@ -245,6 +291,65 @@ const allNoToken = computed<boolean>(() => {
             <div class="usage-bar">
               <div class="usage-bar-fill" :style="{ width: minimaxWeeklyPercent + '%' }"
                 :class="barClass(minimaxWeeklyPercent, usage.thresholds)"></div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- DeepSeek -->
+      <div class="usage-row" v-if="!isProviderDisabled('deepseek')"
+        :data-disabled="String(isProviderDisabled('deepseek'))" data-provider="deepseek">
+        <div class="usage-row-header">
+          <span class="usage-name">DeepSeek</span>
+          <div class="usage-status-wrapper">
+            <span class="usage-status" :class="usageStatusClass('deepseek')"
+              :title="usage.deepseek?.error || usageStatusText('deepseek')"></span>
+          </div>
+        </div>
+        <div class="usage-bar-block" v-if="showUsageBars('deepseek')">
+          <div class="usage-bar-label">
+            <span>balance</span>
+            <span class="usage-bar-value">{{ deepseekBalanceText }}</span>
+          </div>
+          <div class="usage-bar-meta" v-if="deepseekGrantedText">{{ deepseekGrantedText }}</div>
+        </div>
+      </div>
+
+      <!-- Codex -->
+      <div class="usage-row" v-if="!isProviderDisabled('codex')"
+        :data-disabled="String(isProviderDisabled('codex'))" data-provider="codex">
+        <div class="usage-row-header">
+          <span class="usage-name">Codex<span v-if="codexData?.planType" class="usage-bar-meta"> {{ codexData.planType }}</span></span>
+          <div class="usage-status-wrapper">
+            <span class="usage-status" :class="usageStatusClass('codex')"
+              :title="usage.codex?.error || usageStatusText('codex')"></span>
+          </div>
+        </div>
+        <template v-if="showUsageBars('codex')">
+          <div class="usage-bar-block" v-if="codexData?.primary">
+            <div class="usage-bar-label">
+              <div class="usage-time">
+                <span>{{ codexWindowLabel(codexData.primary.windowSeconds) }}</span>
+                <div class="usage-bar-meta" v-if="codexData.primary.resetAt">{{ formatResetTime(codexData.primary.resetAt * 1000) }}</div>
+              </div>
+              <span class="usage-bar-value">{{ codexWindowText(codexData.primary) }}</span>
+            </div>
+            <div class="usage-bar">
+              <div class="usage-bar-fill" :style="{ width: codexWindowPercent(codexData.primary) + '%' }"
+                :class="barClass(codexWindowPercent(codexData.primary), usage.thresholds)"></div>
+            </div>
+          </div>
+          <div class="usage-bar-block" v-if="codexData?.secondary" data-hide-compact>
+            <div class="usage-bar-label">
+              <div class="usage-time">
+                <span>{{ codexWindowLabel(codexData.secondary.windowSeconds) }}</span>
+                <div class="usage-bar-meta" v-if="codexData.secondary.resetAt">{{ formatResetTime(codexData.secondary.resetAt * 1000) }}</div>
+              </div>
+              <span class="usage-bar-value">{{ codexWindowText(codexData.secondary) }}</span>
+            </div>
+            <div class="usage-bar">
+              <div class="usage-bar-fill" :style="{ width: codexWindowPercent(codexData.secondary) + '%' }"
+                :class="barClass(codexWindowPercent(codexData.secondary), usage.thresholds)"></div>
             </div>
           </div>
         </template>

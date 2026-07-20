@@ -12,6 +12,7 @@ import type {
   KimiUsageData,
   MinimaxUsageData,
   CopilotUsageData,
+  CodexUsageData,
 } from '../types/messages';
 import { DEFAULT_USAGE_THRESHOLDS } from '../types/messages';
 
@@ -33,6 +34,8 @@ export function useUsageState() {
   const kimi = ref<UsageProviderState | null>(null);
   const minimax = ref<UsageProviderState | null>(null);
   const copilot = ref<UsageProviderState | null>(null);
+  const deepseek = ref<UsageProviderState | null>(null);
+  const codex = ref<UsageProviderState | null>(null);
   const enabled = reactive<Record<string, boolean>>({});
   const pendingByCwd = reactive<Record<string, PendingHook>>({});
   const thresholds = reactive<{ warn: number; danger: number }>({ ...DEFAULT_USAGE_THRESHOLDS });
@@ -47,6 +50,8 @@ export function useUsageState() {
         if (msg.data.usage.kimi)    kimi.value    = msg.data.usage.kimi;
         if (msg.data.usage.minimax) minimax.value = msg.data.usage.minimax;
         if (msg.data.usage.copilot) copilot.value = msg.data.usage.copilot;
+        if (msg.data.usage.deepseek) deepseek.value = msg.data.usage.deepseek;
+        if (msg.data.usage.codex)    codex.value    = msg.data.usage.codex;
         const en = msg.data.usage.enabled;
         if (en) {
           for (const k of Object.keys(en)) enabled[k] = !!en[k];
@@ -61,6 +66,8 @@ export function useUsageState() {
       if (msg.data.kimi)    kimi.value    = msg.data.kimi;
       if (msg.data.minimax) minimax.value = msg.data.minimax;
       if (msg.data.copilot) copilot.value = msg.data.copilot;
+      if (msg.data.deepseek) deepseek.value = msg.data.deepseek;
+      if (msg.data.codex)    codex.value    = msg.data.codex;
       const en = (msg.data as { enabled?: Record<string, boolean> }).enabled;
       if (en) for (const k of Object.keys(en)) enabled[k] = !!en[k];
       const t = (msg.data as { thresholds?: { warn: number; danger: number } }).thresholds;
@@ -76,6 +83,8 @@ export function useUsageState() {
       if (msg.provider === 'kimi')    kimi.value    = { ...(kimi.value    || {} as UsageProviderState), ...update };
       if (msg.provider === 'minimax') minimax.value = { ...(minimax.value || {} as UsageProviderState), ...update };
       if (msg.provider === 'copilot') copilot.value = { ...(copilot.value || {} as UsageProviderState), ...update };
+      if (msg.provider === 'deepseek') deepseek.value = { ...(deepseek.value || {} as UsageProviderState), ...update };
+      if (msg.provider === 'codex')    codex.value    = { ...(codex.value    || {} as UsageProviderState), ...update };
     } else if (msg.type === 'pendingChanged') {
       for (const k of Object.keys(pendingByCwd)) delete pendingByCwd[k];
       Object.assign(pendingByCwd, msg.byCwd);
@@ -192,9 +201,28 @@ export function useUsageState() {
     };
   });
 
-  const isProviderVisible = (id: 'kimi' | 'minimax' | 'copilot') => {
+  const codexSlot = computed<FiveHourSlot>(() => {
+    const state = codex.value;
+    const data = state?.data as CodexUsageData | undefined;
+    const win = data?.primary ?? data?.secondary ?? null;
+    if (!state || state.error || !win) {
+      return { percent: 0, resetTime: null, resetText: '', level: 'muted' };
+    }
+    const percent = Math.max(0, Math.min(100, win.usedPercent ?? 0));
+    const resetMs = win.resetAt ? win.resetAt * 1000 : null;
+    return {
+      percent,
+      resetTime: resetMs,
+      resetText: formatReset(resetMs, now.value),
+      level: barLevel(percent, thresholds)
+    };
+  });
+
+  const isProviderVisible = (id: 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex') => {
     const err = id === 'kimi' ? kimi.value?.error
               : id === 'minimax' ? minimax.value?.error
+              : id === 'deepseek' ? deepseek.value?.error
+              : id === 'codex' ? codex.value?.error
               : copilot.value?.error;
     return err !== 'no_token' && err !== 'disabled';
   };
@@ -207,6 +235,7 @@ export function useUsageState() {
     minimaxFiveHour,
     minimaxWeekly,
     copilotSlot,
+    codexSlot,
     isProviderVisible,
     pendingCount,
     pendingByCwd

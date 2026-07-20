@@ -23,6 +23,8 @@ const usage = reactive<UsageState>({
   kimi: null,
   minimax: null,
   copilot: null,
+  deepseek: null,
+  codex: null,
   enabled: {},
   thresholds: { ...DEFAULT_USAGE_THRESHOLDS },
 });
@@ -118,6 +120,8 @@ function handleUsageInit(payload: UsageInitPayload) {
   usage.kimi = payload.kimi ?? null;
   usage.minimax = payload.minimax ?? null;
   usage.copilot = payload.copilot ?? null;
+  usage.deepseek = payload.deepseek ?? null;
+  usage.codex = payload.codex ?? null;
   usage.enabled = payload.enabled ?? {};
   if (payload.thresholds) {
     usage.thresholds = {

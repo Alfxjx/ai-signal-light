@@ -1,11 +1,14 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import QRCode from 'qrcode';
 import { StatusServer } from './server';
 import { ConfigStore, VALID_INTERVALS, HOOK_EVENTS } from './config';
-import { UsageMonitor } from './usage-monitor';
+import { UsageMonitor, parseProxyUrl } from './usage-monitor';
+import { openKimiLoginWindow, closeKimiLoginWindow, decodeJwtExp } from './kimi-login';
+import { startDeviceFlow, pollDeviceFlow, isCopilotOAuthToken } from './copilot-auth';
+import { codexAuthAvailable } from './codex-credentials';
 import { WS_PORT } from '../shared/constants';
 import { IPC_CHANNELS } from '../shared/types/ipc';
 import type { HooksInstallResult, HooksUninstallResult } from '../shared/types/ipc';
@@ -28,6 +31,7 @@ let tray: Tray | null = null;
 let server: StatusServer | null = null;
 let configStore: ConfigStore | null = null;
 let usageMonitor: UsageMonitor | null = null;
+let copilotDeviceCancelled = false;
 let isQuitting = false;
 
 // 判断是否为开发模式
@@ -556,12 +560,18 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, async () => {
     kimi:    { token: cfg.kimi.token    ? maskToken(cfg.kimi.token)    : '', enabled: cfg.kimi.enabled,    useProxy: cfg.kimi.useProxy },
     minimax: { token: cfg.minimax.token ? maskToken(cfg.minimax.token) : '', enabled: cfg.minimax.enabled, useProxy: cfg.minimax.useProxy },
     copilot: { token: cfg.copilot.token ? maskToken(cfg.copilot.token) : '', enabled: cfg.copilot.enabled, useProxy: cfg.copilot.useProxy },
+    deepseek: { token: cfg.deepseek.token ? maskToken(cfg.deepseek.token) : '', enabled: cfg.deepseek.enabled, useProxy: cfg.deepseek.useProxy },
+    codex:   { enabled: cfg.codex.enabled, useProxy: cfg.codex.useProxy },
     proxy: { url: cfg.proxy?.url || '' },
     intervalMinutes: cfg.intervalMinutes,
     hasKimiToken:    !!cfg.kimi.token,
     hasMiniMaxToken: !!cfg.minimax.token,
     hasCopilotToken: !!cfg.copilot.token,
     hasProxy:        !!(cfg.proxy?.url),
+    kimiTokenExp: cfg.kimi.token ? decodeJwtExp(cfg.kimi.token) : null,
+    copilotOAuth: isCopilotOAuthToken(cfg.copilot.token || ''),
+    hasDeepseekToken: !!cfg.deepseek.token,
+    codexAutoAvailable: codexAuthAvailable(),
     hooks: {
       enabled: { ...cfg.hooks.enabled },
       endpoint: { autoInstalled: !!cfg.hooks.endpoint.autoInstalled }
@@ -606,6 +616,15 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_SAVE, async (_event, partial: Record<string
     }
     delete (next.copilot as Record<string, unknown>).tokenChanged;
   }
+  if (next.deepseek && typeof next.deepseek === 'object') {
+    const deepseek = next.deepseek as Record<string, unknown>;
+    if (deepseek.tokenChanged) {
+      next.deepseek = { ...deepseek, token: (deepseek.token as string) || '' };
+    } else {
+      next.deepseek = { ...deepseek, token: current.deepseek.token };
+    }
+    delete (next.deepseek as Record<string, unknown>).tokenChanged;
+  }
   // proxy 使用同样的变更协议
   if (next.proxy && typeof next.proxy === 'object') {
     const proxy = next.proxy as Record<string, unknown>;
@@ -633,6 +652,73 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_SAVE, async (_event, partial: Record<string
   // 悬浮球开关同步：启用即开窗口；关闭即隐藏
   syncFloatingBallFromConfig();
   return { success: true };
+});
+
+function sendKimiLoginResult(r: { success: boolean; tokenExp?: number | null; error?: string }): void {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.webContents.send(IPC_CHANNELS.KIMI_LOGIN_RESULT, r);
+  }
+}
+
+// Kimi 内嵌登录：打开 kimi.com，webRequest 拦截 apiv2 的 Authorization 头抓 token
+ipcMain.handle(IPC_CHANNELS.KIMI_LOGIN_START, async () => {
+  if (!configStore) return { success: false, error: 'no config' };
+  let captured = false;
+  openKimiLoginWindow(settingsWindow, (token) => {
+    const exp = decodeJwtExp(token);
+    // 忽略过期/非法 token，等网页端刷新后的下一个
+    if (!exp || exp * 1000 <= Date.now()) return;
+    captured = true;
+    const current = configStore!.get().kimi.token;
+    const currentExp = current ? decodeJwtExp(current) : null;
+    if (token !== current && (!currentExp || exp > currentExp)) {
+      configStore!.update({ kimi: { token } });
+      rebuildTray();
+      if (usageMonitor) usageMonitor.checkAll();
+    }
+    sendKimiLoginResult({ success: true, tokenExp: exp });
+    closeKimiLoginWindow();
+  }, () => {
+    if (!captured) sendKimiLoginResult({ success: false, error: '窗口已关闭，未获取到 Token' });
+  });
+  return { success: true };
+});
+
+function sendCopilotDeviceResult(r: { success: boolean; error?: string }): void {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.webContents.send(IPC_CHANNELS.COPILOT_DEVICE_RESULT, r);
+  }
+}
+
+ipcMain.handle(IPC_CHANNELS.COPILOT_DEVICE_START, async () => {
+  if (!configStore) return { success: false, error: 'no config' };
+  try {
+    copilotDeviceCancelled = false;
+    const proxy = parseProxyUrl(configStore.get().proxy?.url || '');
+    const info = await startDeviceFlow(proxy);
+    // 自动打开浏览器授权页
+    shell.openExternal(info.verificationUri).catch(() => {});
+    // 后台轮询，完成后写配置并通知设置窗口
+    pollDeviceFlow(info, proxy, () => copilotDeviceCancelled)
+      .then((token) => {
+        configStore!.update({ copilot: { token } });
+        if (usageMonitor) usageMonitor.checkAll();
+        rebuildTray();
+        sendCopilotDeviceResult({ success: true });
+      })
+      .catch((e: Error) => {
+        if (e.message !== 'cancelled') {
+          sendCopilotDeviceResult({ success: false, error: e.message });
+        }
+      });
+    return { success: true, userCode: info.userCode, verificationUri: info.verificationUri };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.COPILOT_DEVICE_CANCEL, async () => {
+  copilotDeviceCancelled = true;
 });
 
 ipcMain.handle(IPC_CHANNELS.SETTINGS_CLOSE, async () => {

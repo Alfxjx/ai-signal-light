@@ -26,6 +26,54 @@ function makeProvider(): ProviderState {
 const kimi = reactive<ProviderState>(makeProvider());
 const minimax = reactive<ProviderState>(makeProvider());
 const copilot = reactive<ProviderState>(makeProvider());
+const deepseek = reactive<ProviderState>(makeProvider());
+const codexEnabled = ref<boolean>(false);
+const codexUseProxy = ref<boolean>(false);
+const codexAutoAvailable = ref<boolean>(false);
+const kimiTokenExp = ref<number | null>(null);
+const kimiLoginStatus = ref<string>('');
+
+const kimiTokenExpText = computed<string>(() => {
+  if (!kimiTokenExp.value) return '';
+  const d = new Date(kimiTokenExp.value * 1000);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+});
+
+async function startKimiLogin() {
+  if (!window.electronAPI) return;
+  kimiLoginStatus.value = '';
+  const r = await window.electronAPI.kimiStartLogin();
+  if (!r.success) {
+    kimiLoginStatus.value = '发起失败: ' + (r.error || '未知错误');
+  }
+}
+const copilotOAuth = ref<boolean>(false);
+const deviceFlowBusy = ref<boolean>(false);
+const deviceUserCode = ref<string>('');
+const deviceStatus = ref<string>('');
+
+async function startCopilotDeviceFlow() {
+  if (!window.electronAPI) return;
+  deviceFlowBusy.value = true;
+  deviceStatus.value = '';
+  deviceUserCode.value = '';
+  const r = await window.electronAPI.copilotStartDeviceFlow();
+  if (r.success && r.userCode) {
+    deviceUserCode.value = r.userCode;
+    deviceStatus.value = '已在浏览器打开授权页，请输入上方验证码';
+  } else {
+    deviceFlowBusy.value = false;
+    deviceStatus.value = '发起失败: ' + (r.error || '未知错误');
+  }
+}
+
+async function cancelCopilotDeviceFlow() {
+  if (!window.electronAPI) return;
+  await window.electronAPI.copilotCancelDeviceFlow();
+  deviceFlowBusy.value = false;
+  deviceUserCode.value = '';
+  deviceStatus.value = '已取消';
+}
 const proxyUrl = ref<string>('');
 const proxyUrlChanged = ref<boolean>(false);
 const hasProxy = ref<boolean>(false);
@@ -153,6 +201,7 @@ onMounted(async () => {
   kimi.useProxy = !!cfg.kimi.useProxy;
   kimi.token = cfg.hasKimiToken ? (cfg.kimi.token || '') : '';
   kimi.hasToken = !!cfg.hasKimiToken;
+  kimiTokenExp.value = cfg.kimiTokenExp ?? null;
 
   minimax.enabled = !!cfg.minimax.enabled;
   minimax.useProxy = !!cfg.minimax.useProxy;
@@ -163,6 +212,16 @@ onMounted(async () => {
   copilot.useProxy = !!cfg.copilot.useProxy;
   copilot.token = cfg.hasCopilotToken ? (cfg.copilot.token || '') : '';
   copilot.hasToken = !!cfg.hasCopilotToken;
+  copilotOAuth.value = !!cfg.copilotOAuth;
+
+  deepseek.enabled = !!cfg.deepseek.enabled;
+  deepseek.useProxy = !!cfg.deepseek.useProxy;
+  deepseek.token = cfg.hasDeepseekToken ? (cfg.deepseek.token || '') : '';
+  deepseek.hasToken = !!cfg.hasDeepseekToken;
+
+  codexEnabled.value = !!cfg.codex?.enabled;
+  codexUseProxy.value = !!cfg.codex?.useProxy;
+  codexAutoAvailable.value = !!cfg.codexAutoAvailable;
 
   proxyUrl.value = cfg.hasProxy ? (cfg.proxy?.url || '') : '';
   hasProxy.value = !!cfg.hasProxy;
@@ -182,6 +241,28 @@ onMounted(async () => {
     dangerThreshold.value = cfg.thresholds.danger;
   }
   await refreshHelperPath();
+
+  window.electronAPI.onKimiLoginResult((r) => {
+    if (r.success) {
+      kimi.hasToken = true;
+      kimiTokenExp.value = r.tokenExp ?? null;
+      kimiLoginStatus.value = '已获取 Token，保存后生效';
+    } else {
+      kimiLoginStatus.value = r.error || '未获取到 Token';
+    }
+  });
+
+  window.electronAPI.onCopilotDeviceResult((r) => {
+    deviceFlowBusy.value = false;
+    deviceUserCode.value = '';
+    if (r.success) {
+      copilotOAuth.value = true;
+      copilot.hasToken = true;
+      deviceStatus.value = '已连接 GitHub 账号，保存后生效';
+    } else {
+      deviceStatus.value = '授权失败: ' + (r.error || '未知错误');
+    }
+  });
 });
 
 async function onSave() {
@@ -208,6 +289,13 @@ async function onSave() {
         enabled: copilot.enabled,
         useProxy: copilot.useProxy,
       },
+      deepseek: {
+        token: deepseek.token.trim(),
+        tokenChanged: deepseek.tokenChanged,
+        enabled: deepseek.enabled,
+        useProxy: deepseek.useProxy,
+      },
+      codex: { enabled: codexEnabled.value, useProxy: codexUseProxy.value },
       proxy: {
         url: proxyUrl.value.trim(),
         urlChanged: proxyUrlChanged.value,
@@ -304,6 +392,16 @@ async function openQrCode() {
               {{ kimi.showToken ? '🔒' : '👁' }}
             </button>
           </div>
+          <div class="settings-row" style="margin-top: 4px;">
+            <button type="button" class="btn-secondary" @click="startKimiLogin">登录 Kimi 账号自动获取</button>
+            <span v-if="kimiLoginStatus" class="settings-hint">{{ kimiLoginStatus }}</span>
+          </div>
+          <div class="settings-hint" v-if="kimiTokenExpText">
+            当前 Token 有效期至 {{ kimiTokenExpText }}；过期后点上方按钮重新获取（通常无需重新登录）。
+          </div>
+          <div class="settings-hint" v-else-if="!kimi.hasToken">
+            点上方按钮登录 kimi.com 自动获取 Token，也可手动粘贴。
+          </div>
         </div>
       </div>
 
@@ -358,7 +456,21 @@ async function openQrCode() {
           </label>
         </div>
         <div class="settings-field">
-          <label class="settings-label" for="copilotToken">Cookie</label>
+          <label class="settings-label">GitHub 账号授权（推荐）</label>
+          <div class="settings-row">
+            <button type="button" class="btn-secondary" :disabled="deviceFlowBusy" @click="startCopilotDeviceFlow">
+              {{ deviceFlowBusy ? '等待授权中...' : (copilotOAuth ? '重新连接 GitHub' : '连接 GitHub') }}
+            </button>
+            <button type="button" class="btn-secondary" v-if="deviceFlowBusy" @click="cancelCopilotDeviceFlow">取消</button>
+          </div>
+          <div class="settings-hint" v-if="deviceUserCode" style="font-size: 16px; letter-spacing: 2px;">
+            验证码：<strong>{{ deviceUserCode }}</strong>
+          </div>
+          <div class="settings-hint" v-if="deviceStatus">{{ deviceStatus }}</div>
+          <div class="settings-hint" v-else-if="copilotOAuth">已通过 GitHub OAuth 连接（保存后覆盖旧 Cookie）。</div>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="copilotToken">Cookie（备选，优先使用上方授权）</label>
           <div class="settings-input-wrap">
             <input
               :type="copilot.showToken ? 'text' : 'password'"
@@ -374,6 +486,62 @@ async function openQrCode() {
               {{ copilot.showToken ? '🔒' : '👁' }}
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- DeepSeek -->
+      <div class="settings-section" data-provider="deepseek">
+        <div class="settings-section-header">
+          <span class="settings-section-title">DeepSeek</span>
+          <label class="settings-toggle">
+            <input type="checkbox" v-model="deepseek.enabled">
+            <span class="settings-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <label class="settings-toggle-label">
+            <input type="checkbox" v-model="deepseek.useProxy">
+            <span>使用代理</span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="deepseekToken">API Key</label>
+          <div class="settings-input-wrap">
+            <input
+              :type="deepseek.showToken ? 'text' : 'password'"
+              id="deepseekToken"
+              class="settings-input"
+              v-model="deepseek.token"
+              :placeholder="deepseek.hasToken ? '留空保持原值' : '粘贴 platform.deepseek.com 的 API Key'"
+              autocomplete="off"
+              spellcheck="false"
+              @input="deepseek.tokenChanged = true"
+            >
+            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="deepseek.showToken = !deepseek.showToken">
+              {{ deepseek.showToken ? '🔒' : '👁' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Codex -->
+      <div class="settings-section" data-provider="codex">
+        <div class="settings-section-header">
+          <span class="settings-section-title">Codex</span>
+          <label class="settings-toggle">
+            <input type="checkbox" v-model="codexEnabled">
+            <span class="settings-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <label class="settings-toggle-label">
+            <input type="checkbox" v-model="codexUseProxy">
+            <span>使用代理</span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <div class="settings-hint" v-if="codexAutoAvailable">已检测到本机 Codex CLI 登录（~/.codex/auth.json），自动读取，无需配置。</div>
+          <div class="settings-hint" v-else>未检测到本机 Codex CLI 登录。请先安装并登录 Codex CLI（~/.codex/auth.json）。</div>
         </div>
       </div>
 

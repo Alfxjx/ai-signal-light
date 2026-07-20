@@ -13,6 +13,8 @@ const DEFAULTS: AppConfig = {
   kimi:    { token: '', enabled: true, useProxy: false },
   minimax: { token: '', enabled: true, useProxy: false },
   copilot: { token: '', enabled: true, useProxy: false },
+  deepseek: { token: '', enabled: true, useProxy: false },
+  codex:   { token: '', enabled: true, useProxy: false },
   proxy: { url: '' },
   intervalMinutes: 10,
   window: { width: 240, height: 550, x: null, y: null, isCompact: true },
@@ -68,6 +70,8 @@ export class ConfigStore {
         kimi:    { ...DEFAULTS.kimi,    ...(parsed.kimi    || {}) },
         minimax: { ...DEFAULTS.minimax, ...(parsed.minimax || {}) },
         copilot: { ...DEFAULTS.copilot, ...(parsed.copilot || {}) },
+        deepseek: { ...DEFAULTS.deepseek, ...(parsed.deepseek || {}) },
+        codex:   { ...DEFAULTS.codex,   ...(parsed.codex   || {}) },
         proxy:   { ...DEFAULTS.proxy,   ...(parsed.proxy   || {}) },
         window:  { ...DEFAULTS.window,  ...(parsed.window  || {}) },
         hooks: {
@@ -109,6 +113,12 @@ export class ConfigStore {
     }
     if (partial.copilot && typeof partial.copilot === 'object') {
       this.data.copilot = { ...this.data.copilot, ...partial.copilot };
+    }
+    if (partial.deepseek && typeof partial.deepseek === 'object') {
+      this.data.deepseek = { ...this.data.deepseek, ...partial.deepseek };
+    }
+    if (partial.codex && typeof partial.codex === 'object') {
+      this.data.codex = { ...this.data.codex, ...partial.codex };
     }
     if (partial.proxy && typeof partial.proxy === 'object') {
       this.data.proxy = { ...this.data.proxy, ...partial.proxy };

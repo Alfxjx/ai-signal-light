@@ -14,6 +14,11 @@ const IPC_CHANNELS = {
   HOOKS_INSTALL: 'hooks:install',
   HOOKS_UNINSTALL: 'hooks:uninstall',
   QR_OPEN: 'qr:open',
+  COPILOT_DEVICE_START: 'copilot:device-start',
+  COPILOT_DEVICE_CANCEL: 'copilot:device-cancel',
+  COPILOT_DEVICE_RESULT: 'copilot:device-result',
+  KIMI_LOGIN_START: 'kimi:login-start',
+  KIMI_LOGIN_RESULT: 'kimi:login-result',
   FLOATING_BALL_TOGGLE: 'floating-ball:toggle',
   FLOATING_BALL_OPEN_MAIN: 'floating-ball:open-main',
   FLOATING_BALL_GET_STATE: 'floating-ball:get-state',
@@ -48,6 +53,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 手机配对二维码
   openQrWindow: () => ipcRenderer.invoke(IPC_CHANNELS.QR_OPEN),
+
+  // Copilot Device Flow 授权
+  copilotStartDeviceFlow: () => ipcRenderer.invoke(IPC_CHANNELS.COPILOT_DEVICE_START),
+  copilotCancelDeviceFlow: () => ipcRenderer.invoke(IPC_CHANNELS.COPILOT_DEVICE_CANCEL),
+  onCopilotDeviceResult: (cb: (r: { success: boolean; error?: string }) => void) =>
+    ipcRenderer.on(IPC_CHANNELS.COPILOT_DEVICE_RESULT, (_e, r) => cb(r)),
+
+  // Kimi 内嵌登录窗口抓 token
+  kimiStartLogin: () => ipcRenderer.invoke(IPC_CHANNELS.KIMI_LOGIN_START),
+  onKimiLoginResult: (cb: (r: { success: boolean; tokenExp?: number | null; error?: string }) => void) =>
+    ipcRenderer.on(IPC_CHANNELS.KIMI_LOGIN_RESULT, (_e, r) => cb(r)),
 
   // 悬浮球
   floatingBall: {

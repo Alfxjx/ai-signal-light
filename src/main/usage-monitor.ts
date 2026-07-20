@@ -6,19 +6,27 @@
 
 import axios, { AxiosError, AxiosProxyConfig } from 'axios';
 import type { ConfigStore } from './config';
+import { CopilotSessionCache, fetchCopilotUser, isCopilotOAuthToken } from './copilot-auth';
+import { getCodexAuth } from './codex-credentials';
 import type {
   ProviderId,
+  UsageMetric,
   KimiUsageData,
   MinimaxUsageData,
   CopilotUsageData,
+  DeepseekUsageData,
+  CodexUsageData,
+  CodexWindowData,
   UsageUpdatePayload,
   UsageSnapshot,
   ProviderUsageData,
 } from '../shared/types/usage';
 
-const KIMI_API = 'https://www.kimi.com/apiv2/kimi.gateway.billing.v1.BillingService/GetUsages';
+const KIMI_API = 'https://www.kimi.com/apiv2/kimi.gateway.membership.v2.MembershipService/GetSubscriptionStats';
 const MINIMAX_API = 'https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains';
 const COPILOT_API = 'https://github.com/github-copilot/chat/entitlement';
+const DEEPSEEK_API = 'https://api.deepseek.com/user/balance';
+const CODEX_USAGE_API = 'https://chatgpt.com/backend-api/wham/usage';
 const REQUEST_TIMEOUT_MS = 8000;
 
 // 浏览器风格的 UA,避免被部分 API 当作 node 客户端拒绝
@@ -44,10 +52,13 @@ export class UsageMonitor {
   private interval: NodeJS.Timeout | null = null;
   private intervalMs: number;
   private _unsubscribe: (() => void) | null = null;
+  private copilotSession = new CopilotSessionCache();
   state: UsageSnapshot = {
     kimi:    { data: null, lastUpdated: null, error: null },
     minimax: { data: null, lastUpdated: null, error: null },
-    copilot: { data: null, lastUpdated: null, error: null }
+    copilot: { data: null, lastUpdated: null, error: null },
+    deepseek: { data: null, lastUpdated: null, error: null },
+    codex:   { data: null, lastUpdated: null, error: null }
   };
 
   constructor(configStore: ConfigStore) {
@@ -99,11 +110,18 @@ export class UsageMonitor {
     await Promise.all([
       this._safeRun('kimi',    this.fetchKimi.bind(this)),
       this._safeRun('minimax', this.fetchMiniMax.bind(this)),
-      this._safeRun('copilot', this.fetchCopilot.bind(this))
+      this._safeRun('copilot', this.fetchCopilot.bind(this)),
+      this._safeRun('deepseek', this.fetchDeepseek.bind(this)),
+      this._safeRun('codex',   this.fetchCodex.bind(this),
+        async (proxy) => (await getCodexAuth(proxy)) ? 'local' : null)
     ]);
   }
 
-  private async _safeRun(provider: ProviderId, fetcher: (token: string, proxy: AxiosProxyConfig | null) => Promise<ProviderUsageData>): Promise<void> {
+  private async _safeRun(
+    provider: ProviderId,
+    fetcher: (token: string, proxy: AxiosProxyConfig | null) => Promise<ProviderUsageData>,
+    resolveToken?: (proxy: AxiosProxyConfig | null) => Promise<string | null>
+  ): Promise<void> {
     const cfg = this.configStore.get()[provider];
     if (!cfg.enabled) {
       this.state[provider] = {
@@ -113,7 +131,16 @@ export class UsageMonitor {
       this._emit(provider);
       return;
     }
-    if (!cfg.token) {
+
+    const globalProxy = this.configStore.get().proxy?.url;
+    const proxyConfig = cfg.useProxy && globalProxy ? parseProxyUrl(globalProxy) : null;
+
+    // 手动 token 优先；为空时尝试自动来源（如 Codex 本地 CLI 凭证）
+    let token = cfg.token;
+    if (!token && resolveToken) {
+      token = (await resolveToken(proxyConfig)) || '';
+    }
+    if (!token) {
       this.state[provider] = {
         ...this.state[provider],
         error: 'no_token'
@@ -123,9 +150,7 @@ export class UsageMonitor {
     }
 
     try {
-      const globalProxy = this.configStore.get().proxy?.url;
-      const proxyConfig = cfg.useProxy && globalProxy ? parseProxyUrl(globalProxy) : null;
-      const data = await fetcher(cfg.token, proxyConfig);
+      const data = await fetcher(token, proxyConfig);
       this.state[provider] = {
         data,
         lastUpdated: new Date().toISOString(),
@@ -166,10 +191,11 @@ export class UsageMonitor {
         headers: {
           'Authorization': `Bearer ${token.trim()}`,
           'Content-Type': 'application/json',
+          'Connect-Protocol-Version': '1',
         }
       };
       if (proxyConfig) reqConfig.proxy = proxyConfig;
-      res = await http.post<unknown>(KIMI_API, { scope: ['FEATURE_CODING'] }, reqConfig);
+      res = await http.post<unknown>(KIMI_API, {}, reqConfig);
     } catch (e) {
       throw e; // 网络层/超时
     }
@@ -185,43 +211,9 @@ export class UsageMonitor {
       throw new Error('invalid response');
     }
 
-    // 解析 totalQuota
-    const total = (json.totalQuota as Record<string, unknown>) || {};
-    const totalData = {
-      limit: Number(total.limit) || 0,
-      used: Number(total.used) || 0,
-      remaining: Number(total.remaining) || 0,
-      percent: calcPercent(Number(total.used), Number(total.limit))
-    };
-
-    // 解析 FEATURE_CODING usages 数组
-    const usages = (json.usages as unknown[]) || [];
-    const usage = (usages[0] as Record<string, unknown>) || {};
-
-    // usages[0].detail        → 总/日配额 (resetTime 跨天)
-    // usages[0].limits[0]     → 5h 窗口 (duration=300min)
-    const dTotal = (usage.detail as Record<string, unknown>) || {};
-    const d5h = ((usage.limits as unknown[])?.[0] as Record<string, unknown>)?.detail as Record<string, unknown> || {};
-
-    const codingWeekly = {
-      limit:     Number(dTotal.limit)     || 0,
-      used:      Number(dTotal.used)      || 0,
-      remaining: Number(dTotal.remaining) || 0,
-      percent:   calcPercent(Number(dTotal.used), Number(dTotal.limit)),
-      resetTime: dTotal.resetTime ? String(dTotal.resetTime) : null
-    };
-
-    const codingFiveHour = {
-      limit:     Number(d5h.limit)     || 0,
-      used:      Number(d5h.used)      || 0,
-      remaining: Number(d5h.remaining) || 0,
-      percent:   calcPercent(Number(d5h.used), Number(d5h.limit)),
-      resetTime: d5h.resetTime ? String(d5h.resetTime) : null
-    };
-
-    console.log('[usage:kimi] fetched data:', JSON.stringify({ total: totalData, codingFiveHour, codingWeekly }));
-
-    return { total: totalData, codingFiveHour, codingWeekly };
+    const data = mapKimiSubscriptionStats(json);
+    console.log('[usage:kimi] fetched data:', JSON.stringify(data));
+    return data;
   }
 
   // ==================== MiniMax ====================
@@ -274,8 +266,20 @@ export class UsageMonitor {
 
   // ==================== Copilot ====================
 
-  // token 字段实际存的是从浏览器复制的整段 Cookie 串
-  private async fetchCopilot(cookie: string, proxyConfig: AxiosProxyConfig | null): Promise<CopilotUsageData> {
+  // token 字段兼容两种形态：gho_/ghu_ 开头的 GitHub OAuth token（device flow），否则是旧版浏览器 Cookie
+  private async fetchCopilot(token: string, proxyConfig: AxiosProxyConfig | null): Promise<CopilotUsageData> {
+    const trimmed = token.trim();
+    if (isCopilotOAuthToken(trimmed)) {
+      const sessionToken = await this.copilotSession.getSessionToken(trimmed, proxyConfig);
+      const data = await fetchCopilotUser(sessionToken, proxyConfig);
+      console.log('[usage:copilot] fetched data (oauth):', data);
+      return data;
+    }
+    return this.fetchCopilotByCookie(trimmed, proxyConfig);
+  }
+
+  // 旧路径：token 字段存的是从浏览器复制的整段 Cookie 串
+  private async fetchCopilotByCookie(cookie: string, proxyConfig: AxiosProxyConfig | null): Promise<CopilotUsageData> {
     let res;
     try {
       const reqConfig: { headers: Record<string, string>; proxy?: AxiosProxyConfig } = {
@@ -326,6 +330,48 @@ export class UsageMonitor {
     return result;
   }
 
+  // ==================== DeepSeek ====================
+
+  private async fetchDeepseek(token: string, proxyConfig: AxiosProxyConfig | null): Promise<DeepseekUsageData> {
+    const reqConfig: { headers: Record<string, string>; proxy?: AxiosProxyConfig } = {
+      headers: { 'Authorization': `Bearer ${token.trim()}` }
+    };
+    if (proxyConfig) reqConfig.proxy = proxyConfig;
+    const res = await http.get<unknown>(DEEPSEEK_API, reqConfig);
+    if (res.status >= 400) {
+      const body = typeof res.data === 'string' ? res.data : JSON.stringify(res.data || {});
+      console.error(`[usage:deepseek] HTTP ${res.status}\n  body: ${body.slice(0, 500)}`);
+      throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`);
+    }
+    const data = mapDeepseekBalance(res.data as Record<string, unknown>);
+    console.log('[usage:deepseek] fetched data:', data);
+    return data;
+  }
+
+  // ==================== Codex ====================
+
+  // token 参数为 resolveToken 的占位标记，实际凭证从 ~/.codex/auth.json 读取（含 account_id）
+  private async fetchCodex(_token: string, proxyConfig: AxiosProxyConfig | null): Promise<CodexUsageData> {
+    const auth = await getCodexAuth(proxyConfig);
+    if (!auth) throw new Error('local codex auth unavailable');
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${auth.accessToken}`,
+      'Accept': 'application/json',
+    };
+    if (auth.accountId) headers['ChatGPT-Account-Id'] = auth.accountId;
+    const reqConfig: { headers: Record<string, string>; proxy?: AxiosProxyConfig } = { headers };
+    if (proxyConfig) reqConfig.proxy = proxyConfig;
+    const res = await http.get<unknown>(CODEX_USAGE_API, reqConfig);
+    if (res.status >= 400) {
+      const body = typeof res.data === 'string' ? res.data : JSON.stringify(res.data || {});
+      console.error(`[usage:codex] HTTP ${res.status}\n  body: ${body.slice(0, 500)}`);
+      throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`);
+    }
+    const data = mapWhamUsage(res.data as Record<string, unknown>);
+    console.log('[usage:codex] fetched data:', JSON.stringify(data));
+    return data;
+  }
+
   // 对外提供快照(用于 init 推送)
   snapshot(): UsageSnapshot {
     return JSON.parse(JSON.stringify(this.state)) as UsageSnapshot;
@@ -339,6 +385,64 @@ export function calcPercent(used: number | string, limit: number | string): numb
   const l = Number(limit) || 0;
   if (l <= 0) return 0;
   return Math.max(0, Math.min(100, Math.round((u / l) * 100)));
+}
+
+// Kimi GetSubscriptionStats 响应映射（纯函数，便于测试）
+// 新接口只给 0-1 的已用比例，没有绝对配额数字；映射为 limit=100 的百分比语义（保留两位小数）
+export function mapKimiSubscriptionStats(json: Record<string, unknown>): KimiUsageData {
+  const ratioToMetric = (ratio: unknown, resetTime: unknown): UsageMetric => {
+    const pct = Math.max(0, Math.min(100, Math.round((Number(ratio) || 0) * 10000) / 100));
+    return {
+      limit: 100,
+      used: pct,
+      remaining: Math.round((100 - pct) * 100) / 100,
+      percent: pct,
+      resetTime: resetTime ? String(resetTime) : null
+    };
+  };
+  const r5h = (json.ratelimitCode5h as Record<string, unknown>) || {};
+  const r7d = (json.ratelimitCode7d as Record<string, unknown>) || {};
+  const sub = (json.subscriptionBalance as Record<string, unknown>) || {};
+  return {
+    total:         ratioToMetric(sub.amountUsedRatio, sub.expireTime),
+    codingWeekly:  ratioToMetric(r7d.ratio, r7d.resetTime),
+    codingFiveHour: ratioToMetric(r5h.ratio, r5h.resetTime)
+  };
+}
+
+// DeepSeek /user/balance 响应映射（纯函数，便于测试）
+export function mapDeepseekBalance(json: Record<string, unknown>): DeepseekUsageData {
+  const infos = (json?.balance_infos as unknown[]) || [];
+  const first = infos[0] as Record<string, unknown> | undefined;
+  if (!first) throw new Error('no balance info');
+  return {
+    isAvailable: !!json.is_available,
+    currency: first.currency ? String(first.currency) : null,
+    totalBalance: parseFloat(String(first.total_balance)) || 0,
+    grantedBalance: parseFloat(String(first.granted_balance)) || 0,
+    toppedUpBalance: parseFloat(String(first.topped_up_balance)) || 0,
+  };
+}
+
+// Codex wham/usage 响应映射（纯函数，便于测试）
+export function mapWhamUsage(json: Record<string, unknown>): CodexUsageData {
+  const rl = (json?.rate_limit as Record<string, unknown>) || {};
+  const mapWindow = (w: unknown): CodexWindowData | null => {
+    if (!w || typeof w !== 'object') return null;
+    const o = w as Record<string, unknown>;
+    return {
+      usedPercent: Math.max(0, Math.min(100, Number(o.used_percent) || 0)),
+      windowSeconds: Number(o.limit_window_seconds) || 0,
+      resetAt: typeof o.reset_at === 'number' ? o.reset_at : null,
+    };
+  };
+  const credits = (json?.credits as Record<string, unknown>) || {};
+  return {
+    planType: json.plan_type ? String(json.plan_type) : null,
+    primary: mapWindow(rl.primary_window),
+    secondary: mapWindow(rl.secondary_window),
+    creditsBalance: credits.balance != null ? String(credits.balance) : null,
+  };
 }
 
 // 解析代理 URL 为 axios 的 proxy 配置格式

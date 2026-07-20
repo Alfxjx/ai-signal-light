@@ -8,6 +8,7 @@ const {
   kimiFiveHour,
   minimaxFiveHour,
   copilotSlot,
+  codexSlot,
   isProviderVisible,
   pendingByCwd
 } = useUsageState();
@@ -15,6 +16,7 @@ const {
 const kimiVisible = computed<boolean>(() => isProviderVisible('kimi'));
 const minimaxVisible = computed<boolean>(() => isProviderVisible('minimax'));
 const copilotVisible = computed<boolean>(() => isProviderVisible('copilot'));
+const codexVisible = computed<boolean>(() => isProviderVisible('codex'));
 
 const pendingCount = computed<number>(() => Object.keys(pendingByCwd).length);
 
@@ -170,6 +172,18 @@ function onDotClick() {
           <span class="fb-bar-pct">{{ copilotSlot.percent }}%</span>
         </div>
         <div class="fb-reset" v-if="copilotSlot.resetText">{{ copilotSlot.resetText }}</div>
+      </div>
+      <div class="fb-row" v-if="codexVisible">
+        <div class="fb-bar-row">
+          <span class="fb-bar-label">Cx</span>
+          <div class="fb-bar">
+            <div class="fb-bar-fill"
+                 :class="`fb-bar-fill--${codexSlot.level}`"
+                 :style="{ width: codexSlot.percent + '%' }"></div>
+          </div>
+          <span class="fb-bar-pct">{{ codexSlot.percent }}%</span>
+        </div>
+        <div class="fb-reset" v-if="codexSlot.resetText">{{ codexSlot.resetText }}</div>
       </div>
     </div>
   </div>

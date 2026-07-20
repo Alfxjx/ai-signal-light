@@ -1,4 +1,4 @@
-export type ProviderId = 'kimi' | 'minimax' | 'copilot';
+export type ProviderId = 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex';
 export type UsageError = 'no_token' | 'disabled' | string;
 
 export interface UsageMetric {
@@ -38,7 +38,31 @@ export interface CopilotUsageData {
   licenseType: string | null;
 }
 
-export type ProviderUsageData = KimiUsageData | MinimaxUsageData | CopilotUsageData;
+export interface DeepseekUsageData {
+  isAvailable: boolean;
+  currency: string | null;
+  totalBalance: number;
+  grantedBalance: number;
+  toppedUpBalance: number;
+}
+
+export interface CodexWindowData {
+  /** 已用 %（服务端 used_percent 原样） */
+  usedPercent: number;
+  /** 窗口时长（秒），UI 据此判断显示 5h / day / week */
+  windowSeconds: number;
+  /** 秒级 Unix 时间戳 */
+  resetAt: number | null;
+}
+
+export interface CodexUsageData {
+  planType: string | null;
+  primary: CodexWindowData | null;
+  secondary: CodexWindowData | null;
+  creditsBalance: string | null;
+}
+
+export type ProviderUsageData = KimiUsageData | MinimaxUsageData | CopilotUsageData | DeepseekUsageData | CodexUsageData;
 
 export interface UsageProviderState {
   data: ProviderUsageData | null;

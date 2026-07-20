@@ -52,6 +52,8 @@ export interface AppConfig {
   kimi: ProviderConfig;
   minimax: ProviderConfig;
   copilot: ProviderConfig;
+  deepseek: ProviderConfig;
+  codex: ProviderConfig;
   proxy: { url: string };
   intervalMinutes: number;
   window: WindowConfig;
@@ -74,10 +76,12 @@ export interface MobileAppConfig {
   thresholds: UsageThresholds;
 }
 
-export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'window' | 'proxy' | 'floatingBall' | 'thresholds' | 'lanMode'>> & {
+export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex' | 'window' | 'proxy' | 'floatingBall' | 'thresholds' | 'lanMode'>> & {
   kimi?: Partial<ProviderConfig>;
   minimax?: Partial<ProviderConfig>;
   copilot?: Partial<ProviderConfig>;
+  deepseek?: Partial<ProviderConfig>;
+  codex?: Partial<ProviderConfig>;
   proxy?: Partial<{ url: string }>;
   window?: Partial<WindowConfig>;
   hooks?: Partial<{

@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [auto-provider-auth](plans/auto-provider-auth.md) | [history](history/auto-provider-auth.md)
+- 时间：2026-07-20
+- 范围：Kimi 改内嵌登录窗口抓 token、Copilot 改 Device Flow OAuth、新增 DeepSeek（余额）与 Codex（读 ~/.codex/auth.json）provider
+- 关联：`src/main/{kimi-login,copilot-auth,codex-credentials,usage-monitor,main,config,server,preload}.ts`、`src/shared/types/{usage,config,ipc}.ts`、`src/renderer/src/{Settings.vue,components/UsageCard.vue,FloatingBall.vue,App.vue,composables/useUsageState.ts,types/messages.ts}`
+
 ## [qr-lan-fetch-config](plans/qr-lan-fetch-config.md) | [history](history/qr-lan-fetch-config.md)
 - 时间：2026-06-23
 - 范围：修复 QR 容量超限；QR 只携带 host/port/apiKey，手机端扫码后走 WS 反向拉取精简 `MobileAppConfig`

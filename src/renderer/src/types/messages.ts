@@ -16,6 +16,9 @@ export type {
   MinimaxUsageData,
   CopilotPremiumData,
   CopilotUsageData,
+  DeepseekUsageData,
+  CodexUsageData,
+  CodexWindowData,
   UsageProviderState,
   UsageUpdatePayload,
 } from '../../../shared/types/usage';
@@ -37,6 +40,8 @@ export interface UsageState {
   kimi: import('../../../shared/types/usage').UsageProviderState | null;
   minimax: import('../../../shared/types/usage').UsageProviderState | null;
   copilot: import('../../../shared/types/usage').UsageProviderState | null;
+  deepseek: import('../../../shared/types/usage').UsageProviderState | null;
+  codex: import('../../../shared/types/usage').UsageProviderState | null;
   enabled: Record<string, boolean>;
   thresholds: import('../../../shared/types/config').UsageThresholds;
 }
@@ -46,6 +51,8 @@ export interface UsageInitPayload {
   kimi: import('../../../shared/types/usage').UsageProviderState | null;
   minimax: import('../../../shared/types/usage').UsageProviderState | null;
   copilot: import('../../../shared/types/usage').UsageProviderState | null;
+  deepseek: import('../../../shared/types/usage').UsageProviderState | null;
+  codex: import('../../../shared/types/usage').UsageProviderState | null;
   enabled?: Record<string, boolean>;
   intervalMinutes?: number;
   thresholds?: import('../../../shared/types/config').UsageThresholds;
