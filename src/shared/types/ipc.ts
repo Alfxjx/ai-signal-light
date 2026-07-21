@@ -104,6 +104,8 @@ export interface ElectronAPI {
     // 弹窗渲染层回报指针当前位置：用于决定是否取消关闭 timer
     // （leave tray 后，如果光标进了弹窗，就不关）
     pointer: (inside: boolean) => void;
+    // 主进程通知弹窗：窗口已显示（hover 触发），可据此请求刷新数据
+    onShown: (cb: () => void) => void;
   };
 }
 
@@ -131,4 +133,5 @@ export const IPC_CHANNELS = {
   FLOATING_BALL_GET_STATE: 'floating-ball:get-state',
   FLOATING_BALL_NOTIFY_CLEARED: 'floating-ball:notify-cleared',
   TRAY_HOVER_POINTER: 'tray-hover:pointer',
+  TRAY_HOVER_SHOWN: 'tray-hover:shown',
 } as const;

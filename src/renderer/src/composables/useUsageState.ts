@@ -91,7 +91,7 @@ export function useUsageState() {
     }
   }
 
-  const { isConnected, connect } = useWebSocket(handleMessage);
+  const { isConnected, connect, send } = useWebSocket(handleMessage);
 
   onMounted(() => {
     connect();
@@ -276,6 +276,8 @@ export function useUsageState() {
     lastUpdatedTs,
     // 原始 state refs：tray-hover 弹窗需要 deepseek 余额 + codex primary windowSeconds 展示
     deepseek,
-    codex
+    codex,
+    // 暴露 WS send，供 tray-hover 在显示时主动请求刷新
+    send,
   };
 }

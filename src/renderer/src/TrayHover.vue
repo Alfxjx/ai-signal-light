@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import { useUsageState } from './composables/useUsageState';
 import type { DeepseekUsageData, CodexUsageData, CodexWindowData } from './types/messages';
 import { formatAge } from './utils/time';
@@ -16,6 +16,8 @@ const {
   deepseek,
   codex,
   lastUpdatedTs,
+  isConnected,
+  send,
 } = useUsageState();
 
 const kimiVisible    = computed<boolean>(() => isProviderVisible('kimi'));
@@ -57,6 +59,25 @@ const now = computed<number>(() => Date.now());
 const anyVisible = computed<boolean>(() =>
   kimiVisible.value || minimaxVisible.value || copilotVisible.value || codexVisible.value || deepseekVisible.value
 );
+
+// hover 显示时主动请求服务端刷新一次用量数据
+const pendingRefresh = ref(false);
+function requestRefresh(): void {
+  if (isConnected.value && send({ type: 'refresh' })) {
+    pendingRefresh.value = false;
+  } else {
+    pendingRefresh.value = true;
+  }
+}
+watch(isConnected, (connected) => {
+  if (connected && pendingRefresh.value) {
+    send({ type: 'refresh' });
+    pendingRefresh.value = false;
+  }
+});
+window.electronAPI?.trayHover?.onShown?.(() => {
+  requestRefresh();
+});
 
 // 把"指针是否在窗口内"汇报给主进程
 // 主进程会用它配合 tray 的 mouse-enter/leave 决定要不要取消/排队隐藏弹窗
