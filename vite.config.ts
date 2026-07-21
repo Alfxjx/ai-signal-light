@@ -19,6 +19,7 @@ export default defineConfig({
         main: resolve(RENDERER_SRC, 'index.html'),
         settings: resolve(RENDERER_SRC, 'settings.html'),
         'floating-ball': resolve(RENDERER_SRC, 'floating-ball.html'),
+        'tray-hover': resolve(RENDERER_SRC, 'tray-hover.html'),
       },
     },
   },

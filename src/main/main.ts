@@ -27,12 +27,26 @@ let mainWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let floatingBallWindow: BrowserWindow | null = null;
 let qrWindow: BrowserWindow | null = null;
+let trayHoverWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let server: StatusServer | null = null;
 let configStore: ConfigStore | null = null;
 let usageMonitor: UsageMonitor | null = null;
 let copilotDeviceCancelled = false;
 let isQuitting = false;
+
+// 托盘 hover 弹窗：进入/离开的 debounce timer 和指针位置标记
+// - trayHoverShowTimer: 鼠标进入托盘后延迟 180ms 才弹窗，避免快速划过闪烁
+// - trayHoverHideTimer: 鼠标离开托盘/弹窗后延迟 280ms 才关闭，允许移到弹窗上继续看
+// - pointerInsideTray / pointerInsideHover: 弹窗渲染层通过 IPC 回报指针位置
+// - lastHoverCursor: 鼠标进入托盘瞬间捕获的坐标，定位 popup 时以它为锚点
+const TRAY_HOVER_SHOW_DELAY_MS = 180;
+const TRAY_HOVER_HIDE_DELAY_MS = 280;
+let trayHoverShowTimer: NodeJS.Timeout | null = null;
+let trayHoverHideTimer: NodeJS.Timeout | null = null;
+let pointerInsideTray = false;
+let pointerInsideHover = false;
+let lastHoverCursor: { x: number; y: number } | null = null;
 
 // 判断是否为开发模式
 const isDev = process.argv.includes('--dev');
@@ -147,6 +161,146 @@ function isRectVisible(x: number, y: number, w: number, h: number): boolean {
   });
 }
 
+// ==================== 托盘 hover 弹窗 ====================
+
+const TH_WIDTH = 200;   // 与 tray-hover.css 的 html/body width 保持一致
+const TH_HEIGHT = 260;  // 单列分段：header + 5 个 provider section + padding
+
+// 创建托盘 hover 弹窗（首次 hover 时创建，之后复用）
+function createTrayHoverWindow(): BrowserWindow {
+  if (trayHoverWindow && !trayHoverWindow.isDestroyed()) {
+    return trayHoverWindow;
+  }
+  trayHoverWindow = new BrowserWindow({
+    width: TH_WIDTH,
+    height: TH_HEIGHT,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    focusable: false,
+    hasShadow: false,
+    show: false,
+    // 永远在托盘图标之上层；同时不抢主屏焦点
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    }
+  });
+  // 失焦时不自动隐藏 — 由 tray 的 mouse-leave/弹窗的 mouse-leave 共同决定
+  trayHoverWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  trayHoverWindow.loadURL(`${RENDERER_BASE}/tray-hover.html`);
+  if (isDev) {
+    // dev 模式下打开独立 devtools 窗口，方便调 tray-hover 弹窗的样式/数据
+    trayHoverWindow.webContents.openDevTools({ mode: 'detach' });
+    // dev 模式下自动定位+显示弹窗，省得每次调试都得 hover 托盘图标
+    // tray 刚构造时 getBounds() 可能返回 0,0,0,0，延迟 200ms / 800ms 再定位一次兜底
+    positionTrayHover();
+    trayHoverWindow.show();
+    setTimeout(() => positionTrayHover(), 200);
+    setTimeout(() => positionTrayHover(), 800);
+  }
+  trayHoverWindow.on('closed', () => { trayHoverWindow = null; });
+  return trayHoverWindow;
+}
+
+// 把弹窗定位到托盘图标正上方：水平居中于图标，底部贴任务栏
+// 锚点：优先 tray.getBounds()（hover 时已过构造期，bounds 有效），无效时退化为
+//       mouse-enter 瞬间捕获的 cursor（lastHoverCursor）
+// 任务栏方位由 display.workArea 相对 display.bounds 缩进的那条边推断：
+//   - 底部（默认）：popup 水平居中于图标，bottom = wa.bottom（贴任务栏上沿）
+//   - 顶部：popup 水平居中于图标，top = wa.top（贴任务栏下沿）
+//   - 左/右：popup 贴任务栏内侧边，竖直居中于图标
+function positionTrayHover(): void {
+  if (!trayHoverWindow || trayHoverWindow.isDestroyed()) return;
+
+  const icon = tray && !tray.isDestroyed() ? tray.getBounds() : null;
+  const iconValid = !!icon && icon.width > 0 && icon.height > 0;
+  // 图标中心；icon bounds 无效时退化为 hover 捕获的 cursor / 当前 cursor
+  const fallback = lastHoverCursor ?? screen.getCursorScreenPoint();
+  const centerX = iconValid ? icon.x + icon.width / 2 : fallback.x;
+  const centerY = iconValid ? icon.y + icon.height / 2 : fallback.y;
+
+  const display = screen.getDisplayNearestPoint({ x: centerX, y: centerY }) || screen.getPrimaryDisplay();
+  const wa = display.workArea;
+  const db = display.bounds;
+
+  // 推断任务栏所在边：workArea 相对 bounds 缩进的那条边即任务栏
+  const taskbarTop = wa.y > db.y;
+  const taskbarLeft = wa.x > db.x;
+  const taskbarRight = wa.x + wa.width < db.x + db.width;
+
+  let x: number;
+  let y: number;
+  if (taskbarLeft || taskbarRight) {
+    // 任务栏在左/右：贴内侧边，竖直居中于图标
+    x = taskbarLeft ? wa.x : wa.x + wa.width - TH_WIDTH;
+    y = Math.round(centerY - TH_HEIGHT / 2);
+    if (y < wa.y) y = wa.y;
+    if (y + TH_HEIGHT > wa.y + wa.height) y = wa.y + wa.height - TH_HEIGHT;
+  } else if (taskbarTop) {
+    // 任务栏在顶部：图标下方，水平居中，顶部贴任务栏
+    x = Math.round(centerX - TH_WIDTH / 2);
+    y = wa.y;
+  } else {
+    // 默认任务栏在底部：图标上方，水平居中，底部贴任务栏
+    x = Math.round(centerX - TH_WIDTH / 2);
+    y = wa.y + wa.height - TH_HEIGHT;
+  }
+  if (x < wa.x) x = wa.x;
+  if (x + TH_WIDTH > wa.x + wa.width) x = wa.x + wa.width - TH_WIDTH;
+
+  console.log('[tray-hover] position:', { icon, centerX, centerY, x, y, wa });
+  trayHoverWindow.setBounds({ x, y, width: TH_WIDTH, height: TH_HEIGHT });
+}
+
+function clearTrayHoverTimers(): void {
+  if (trayHoverShowTimer) { clearTimeout(trayHoverShowTimer); trayHoverShowTimer = null; }
+  if (trayHoverHideTimer) { clearTimeout(trayHoverHideTimer); trayHoverHideTimer = null; }
+}
+
+function scheduleShowTrayHover(): void {
+  if (trayHoverHideTimer) { clearTimeout(trayHoverHideTimer); trayHoverHideTimer = null; }
+  if (trayHoverWindow && trayHoverWindow.isVisible()) return; // 已经显示
+  if (trayHoverShowTimer) return; // 已经在排队
+  trayHoverShowTimer = setTimeout(() => {
+    trayHoverShowTimer = null;
+    const win = createTrayHoverWindow();
+    positionTrayHover();
+    if (!win.isVisible()) win.show();
+  }, TRAY_HOVER_SHOW_DELAY_MS);
+}
+
+function scheduleHideTrayHover(): void {
+  if (trayHoverShowTimer) { clearTimeout(trayHoverShowTimer); trayHoverShowTimer = null; }
+  if (!trayHoverWindow || !trayHoverWindow.isVisible()) return;
+  if (trayHoverHideTimer) return;
+  trayHoverHideTimer = setTimeout(() => {
+    trayHoverHideTimer = null;
+    if (trayHoverWindow && !trayHoverWindow.isDestroyed() && trayHoverWindow.isVisible()) {
+      trayHoverWindow.hide();
+    }
+  }, TRAY_HOVER_HIDE_DELAY_MS);
+}
+
+// 托盘弹窗渲染层回报：指针是否在窗口内
+ipcMain.on(IPC_CHANNELS.TRAY_HOVER_POINTER, (_event, inside: boolean) => {
+  pointerInsideHover = !!inside;
+  if (inside) {
+    // 光标进了弹窗 → 取消隐藏排队
+    if (trayHoverHideTimer) { clearTimeout(trayHoverHideTimer); trayHoverHideTimer = null; }
+  } else {
+    // 光标离开弹窗 → 如果也不在托盘上，就排队隐藏
+    if (!pointerInsideTray) scheduleHideTrayHover();
+  }
+});
+
 // 创建系统托盘
 function createTray(): void {
   const iconPath = path.join(__dirname, '..', 'renderer', 'technical-support.png');
@@ -163,6 +317,21 @@ function createTray(): void {
 
   tray.setContextMenu(buildTrayMenu());
   tray.on('click', () => toggleWindow());
+
+  // hover 弹窗：mouse-enter 后延迟弹，mouse-leave 后延迟收
+  // 收尾由两个 IPC 状态共同决定（pointerInsideTray / pointerInsideHover）
+  tray.on('mouse-enter', () => {
+    pointerInsideTray = true;
+    // 捕获进入瞬间的 cursor 坐标，定位 popup 时作为锚点（不依赖可能不准的 tray.getBounds）
+    lastHoverCursor = screen.getCursorScreenPoint();
+    if (trayHoverHideTimer) { clearTimeout(trayHoverHideTimer); trayHoverHideTimer = null; }
+    scheduleShowTrayHover();
+  });
+  tray.on('mouse-leave', () => {
+    pointerInsideTray = false;
+    // 光标可能移到了弹窗上 → 等 pointer 事件来决定是否真关
+    if (!pointerInsideHover) scheduleHideTrayHover();
+  });
 }
 
 // 构造托盘菜单（每次 config 变化时调用以刷新勾选状态）
@@ -541,6 +710,9 @@ app.on('window-all-closed', () => {
 // 应用退出前清理
 app.on('before-quit', () => {
   isQuitting = true;
+  clearTrayHoverTimers();
+  if (trayHoverWindow && !trayHoverWindow.isDestroyed()) trayHoverWindow.destroy();
+  trayHoverWindow = null;
   if (usageMonitor) usageMonitor.stop();
   if (server) server.stop();
 });

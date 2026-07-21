@@ -7,6 +7,16 @@
 - 关联：相关模块/文件
 -->
 
+## [tray-hover-above-icon](plans/tray-hover-above-icon.md) | [history](history/tray-hover-above-icon.md)
+- 时间：2026-07-21
+- 范围：托盘 hover 弹窗定位改为图标正上方、水平居中于图标、底部贴任务栏（含任务栏在顶/左/右的适配）
+- 关联：`src/main/main.ts`
+
+## [tray-hover-usage-popup](plans/tray-hover-usage-popup.md) | [history](history/tray-hover-usage-popup.md)
+- 时间：2026-07-21
+- 范围：鼠标 hover 托盘图标时弹出"简易用量"悬浮层（4 provider mini bar + DeepSeek 余额 + 最后更新时间），离开后自动关闭
+- 关联：`src/main/{main,preload}.ts`、`src/shared/types/ipc.ts`、`src/renderer/src/{TrayHover.vue,tray-hover.html,tray-hover.ts,styles/tray-hover.css,composables/useUsageState.ts}`、`vite.config.ts`
+
 ## [auto-provider-auth](plans/auto-provider-auth.md) | [history](history/auto-provider-auth.md)
 - 时间：2026-07-20
 - 范围：Kimi 改内嵌登录窗口抓 token、Copilot 改 Device Flow OAuth、新增 DeepSeek（余额）与 Codex（读 ~/.codex/auth.json）provider

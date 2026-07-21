@@ -100,6 +100,11 @@ export interface ElectronAPI {
     getState: () => Promise<FloatingBallState>;
     notifyCleared: (cwd: string) => Promise<void>;
   };
+  trayHover: {
+    // 弹窗渲染层回报指针当前位置：用于决定是否取消关闭 timer
+    // （leave tray 后，如果光标进了弹窗，就不关）
+    pointer: (inside: boolean) => void;
+  };
 }
 
 /** IPC 通道名称常量（主进程和 preload 共用） */
@@ -125,4 +130,5 @@ export const IPC_CHANNELS = {
   FLOATING_BALL_OPEN_MAIN: 'floating-ball:open-main',
   FLOATING_BALL_GET_STATE: 'floating-ball:get-state',
   FLOATING_BALL_NOTIFY_CLEARED: 'floating-ball:notify-cleared',
+  TRAY_HOVER_POINTER: 'tray-hover:pointer',
 } as const;

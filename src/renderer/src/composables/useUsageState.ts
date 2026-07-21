@@ -185,6 +185,23 @@ export function useUsageState() {
     };
   });
 
+  // Kimi 的 codingWeekly 是 UsageMetric（main 进程已翻成「已用 %」），与 5h 槽同样的语义
+  const kimiWeekly = computed<FiveHourSlot>(() => {
+    const state = kimi.value;
+    const data = state?.data as KimiUsageData | undefined;
+    const m = data?.codingWeekly;
+    if (!state || state.error || !m || !m.limit) {
+      return { percent: 0, resetTime: null, resetText: '', level: 'muted' };
+    }
+    const percent = Math.max(0, Math.min(100, m.percent ?? 0));
+    return {
+      percent,
+      resetTime: m.resetTime ?? null,
+      resetText: formatReset(m.resetTime ?? null, now.value),
+      level: barLevel(percent, thresholds)
+    };
+  });
+
   const copilotSlot = computed<FiveHourSlot>(() => {
     const state = copilot.value;
     const data = state?.data as CopilotUsageData | undefined;
@@ -229,15 +246,36 @@ export function useUsageState() {
 
   const pendingCount = computed<number>(() => Object.keys(pendingByCwd).length);
 
+  // 最近一次用量刷新时间戳（5 个 provider 取最新），用于顶部"X 分钟前更新"展示
+  const lastUpdatedTs = computed<number | null>(() => {
+    const ts = [
+      kimi.value?.lastUpdated,
+      minimax.value?.lastUpdated,
+      copilot.value?.lastUpdated,
+      deepseek.value?.lastUpdated,
+      codex.value?.lastUpdated,
+    ]
+      .filter((v): v is string => typeof v === 'string')
+      .map((v) => new Date(v).getTime())
+      .filter((t) => !Number.isNaN(t));
+    if (ts.length === 0) return null;
+    return Math.max(...ts);
+  });
+
   return {
     isConnected,
     kimiFiveHour,
+    kimiWeekly,
     minimaxFiveHour,
     minimaxWeekly,
     copilotSlot,
     codexSlot,
     isProviderVisible,
     pendingCount,
-    pendingByCwd
+    pendingByCwd,
+    lastUpdatedTs,
+    // 原始 state refs：tray-hover 弹窗需要 deepseek 余额 + codex primary windowSeconds 展示
+    deepseek,
+    codex
   };
 }

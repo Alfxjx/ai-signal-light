@@ -23,6 +23,7 @@ const IPC_CHANNELS = {
   FLOATING_BALL_OPEN_MAIN: 'floating-ball:open-main',
   FLOATING_BALL_GET_STATE: 'floating-ball:get-state',
   FLOATING_BALL_NOTIFY_CLEARED: 'floating-ball:notify-cleared',
+  TRAY_HOVER_POINTER: 'tray-hover:pointer',
 } as const;
 
 // 安全地暴露 API 给渲染进程
@@ -72,5 +73,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getState: () => ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_GET_STATE),
     notifyCleared: (cwd: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_NOTIFY_CLEARED, cwd)
+  },
+
+  // 托盘 hover 弹窗：渲染层回报指针是否在窗口内
+  trayHover: {
+    pointer: (inside: boolean) => ipcRenderer.send(IPC_CHANNELS.TRAY_HOVER_POINTER, inside)
   }
 });

@@ -1,0 +1,132 @@
+/* 托盘 hover 速览弹窗 — 单列分段布局 */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 200px;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  -webkit-app-region: no-drag;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.th {
+  width: 200px;
+  background: rgba(20, 20, 30, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  padding: 10px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  -webkit-app-region: no-drag;
+}
+
+/* ===== 顶部：标题 + 更新时间 ===== */
+.th-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.th-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.5px;
+}
+
+.th-updated {
+  font-size: 10px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.40);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== 单列分段列表 ===== */
+.th-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.th-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.th-section-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  letter-spacing: 0.2px;
+  margin-bottom: 2px;
+}
+
+/* 每行：缩进左对齐，结构 [tag] [pct]% [(reset)] */
+.th-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding-left: 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  -webkit-app-region: no-drag;
+}
+
+.th-tag {
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  min-width: 36px;
+}
+
+/* 百分比：按 barLevel 三档着色 */
+.th-pct {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.th-pct--fresh  { color: #22a150; }
+.th-pct--warn   { color: #a78d25; }
+.th-pct--danger { color: #ef4444; }
+.th-pct--muted  { color: rgba(255, 255, 255, 0.35); }
+
+/* reset 时间：贴右，弱化 */
+.th-reset {
+  color: rgba(255, 255, 255, 0.40);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* DeepSeek 余额：单独的文字样式 */
+.th-balance {
+  color: rgba(255, 255, 255, 0.75);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.th-empty {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  text-align: center;
+  padding: 8px 0 2px;
+}
