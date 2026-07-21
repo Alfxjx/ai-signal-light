@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { useUsageState } from './composables/useUsageState';
 import type { DeepseekUsageData, CodexUsageData, CodexWindowData } from './types/messages';
 import { formatAge } from './utils/time';
@@ -60,24 +60,14 @@ const anyVisible = computed<boolean>(() =>
   kimiVisible.value || minimaxVisible.value || copilotVisible.value || codexVisible.value || deepseekVisible.value
 );
 
-// hover 显示时主动请求服务端刷新一次用量数据
-const pendingRefresh = ref(false);
-function requestRefresh(): void {
+// 手动刷新：点击标题旁的刷新按钮，向服务端请求一次用量刷新
+const isRefreshing = ref(false);
+function onRefresh(): void {
   if (isConnected.value && send({ type: 'refresh' })) {
-    pendingRefresh.value = false;
-  } else {
-    pendingRefresh.value = true;
+    isRefreshing.value = true;
+    setTimeout(() => { isRefreshing.value = false; }, 1000);
   }
 }
-watch(isConnected, (connected) => {
-  if (connected && pendingRefresh.value) {
-    send({ type: 'refresh' });
-    pendingRefresh.value = false;
-  }
-});
-window.electronAPI?.trayHover?.onShown?.(() => {
-  requestRefresh();
-});
 
 // 把"指针是否在窗口内"汇报给主进程
 // 主进程会用它配合 tray 的 mouse-enter/leave 决定要不要取消/排队隐藏弹窗
@@ -105,7 +95,10 @@ onBeforeUnmount(() => {
 <template>
   <div class="th">
     <div class="th-header">
-      <span class="th-title">用量速览</span>
+      <div class="th-header-left">
+        <span class="th-title">用量速览</span>
+        <button class="th-refresh" :class="{ spinning: isRefreshing }" title="刷新" @click="onRefresh">↻</button>
+      </div>
       <span class="th-updated" :data-ts="lastUpdatedTs">{{ formatAge(lastUpdatedTs, now) }}</span>
     </div>
 

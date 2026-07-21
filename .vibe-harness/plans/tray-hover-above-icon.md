@@ -16,19 +16,20 @@
 3. 水平 clamp 到 workArea；删除不再使用的 `GAP` 常量。
 4. 更新函数上方注释，console.log 内容同步调整。
 
-### hover 刷新
-- `src/shared/types/ipc.ts`：新增 `TRAY_HOVER_SHOWN` 通道、`trayHover.onShown` API
-- `src/main/preload.ts`：暴露 `trayHover.onShown`
-- `src/main/main.ts`：`scheduleShowTrayHover()` 在 `win.show()` 后发送 `tray-hover:shown`
-- `src/renderer/src/composables/useUsageState.ts`：暴露 `send`
-- `src/renderer/src/TrayHover.vue`：收到 `shown` 后通过 WS 发送 `{ type: 'refresh' }`；若 WS 尚未连接则等 `isConnected` 变 true 再发
+### hover 刷新（v2.1.2 改为手动）
+- ~~自动刷新方案已废弃~~（v2.1.1 的 `tray-hover:shown` IPC 已移除）
+- `src/shared/types/ipc.ts` / `src/main/preload.ts` / `src/main/main.ts`：移除 `TRAY_HOVER_SHOWN` 通道与所有发送点
+- `src/renderer/src/composables/useUsageState.ts`：保留 `send` 暴露
+- `src/renderer/src/TrayHover.vue`：标题旁加 `↻` 刷新按钮，点击时 `send({ type: 'refresh' })` 并转圈 1s（与主面板 `.btn-refresh` 同模式）
+- `src/renderer/src/styles/tray-hover.css`：新增 `.th-header-left` / `.th-refresh` / `.th-refresh.spinning` 样式
 
 ## 验证
 - `npm run typecheck` + `npm run build:main`
 - `npm run dev` 手动 hover 托盘确认位置，并观察主进程日志收到 refresh 请求
 
 ## 发布
-- `npm run release` 发 patch（2.1.1）
+- v2.1.1：定位 + hover 自动刷新（后被 v2.1.2 替代）
+- v2.1.2：改为手动刷新按钮 — `npm run release -- --release-as patch`
 - `git push --follow-tags origin main`
 - `npm run build` 打包 exe 并运行
 

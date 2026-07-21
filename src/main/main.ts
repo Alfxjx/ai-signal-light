@@ -203,7 +203,6 @@ function createTrayHoverWindow(): BrowserWindow {
     // tray 刚构造时 getBounds() 可能返回 0,0,0,0，延迟 200ms / 800ms 再定位一次兜底
     positionTrayHover();
     trayHoverWindow.show();
-    trayHoverWindow.webContents.send(IPC_CHANNELS.TRAY_HOVER_SHOWN);
     setTimeout(() => positionTrayHover(), 200);
     setTimeout(() => positionTrayHover(), 800);
   }
@@ -275,10 +274,6 @@ function scheduleShowTrayHover(): void {
     const win = createTrayHoverWindow();
     positionTrayHover();
     if (!win.isVisible()) win.show();
-    // 通知弹窗已显示，让它主动请求刷新一次用量数据
-    if (!win.isDestroyed()) {
-      win.webContents.send(IPC_CHANNELS.TRAY_HOVER_SHOWN);
-    }
   }, TRAY_HOVER_SHOW_DELAY_MS);
 }
 
