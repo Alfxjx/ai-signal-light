@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.1.2](https://github.com/Alfxjx/ai-signal-light/compare/v2.1.1...v2.1.2) (2026-07-21)
+
+
+### ✨ 新功能
+
+* 托盘 hover 弹窗改为手动刷新用量数据 ([e8f73b6](https://github.com/Alfxjx/ai-signal-light/commit/e8f73b6917a95c9444f6ed0e8e59cb431c027cc3))
+
+
+### 📝 文档
+
+* **harness:** update tray-hover-above-icon history with refresh and release notes ([7cb1bb1](https://github.com/Alfxjx/ai-signal-light/commit/7cb1bb1dccf3c8f9c2b74d8697a0a02726ae7fcf))
+
 ## [2.1.1](https://github.com/Alfxjx/ai-signal-light/compare/v2.1.0...v2.1.1) (2026-07-21)
 
 ## [2.1.0](https://github.com/Alfxjx/ai-signal-light/compare/v2.0.0...v2.1.0) (2026-07-21)
