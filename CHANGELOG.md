@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.1.0](https://github.com/Alfxjx/ai-signal-light/compare/v2.0.0...v2.1.0) (2026-07-21)
+
+
+### ✨ 新功能
+
+* 添加浮层速览栏 ([393c5af](https://github.com/Alfxjx/ai-signal-light/commit/393c5af065ea4831cc5f01a779130d34a164bc23))
+
 ## [2.0.0](https://github.com/Alfxjx/ai-signal-light/compare/v1.4.1...v2.0.0) (2026-07-20)
 
 ## [1.4.0](https://github.com/Alfxjx/ai-signal-light/compare/v1.3.0...v1.4.0) (2026-06-24)
