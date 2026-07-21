@@ -2,7 +2,7 @@
 
 ## 改动摘要
 1. 托盘 hover 弹窗定位从「光标侧边、竖直居中于光标」改为「**托盘图标正上方、水平居中于图标、底部贴任务栏**」。
-2. 每次 hover 显示弹窗时，通过新增 IPC `tray-hover:shown` 通知渲染层，渲染层立即向服务端 WS 发送 `{ type: 'refresh' }`，强制刷新一次用量数据。
+2. hover 刷新策略：v2.1.1 为 hover 自动刷新（`tray-hover:shown` IPC），v2.1.2 **撤回自动刷新**，改为标题旁 `↻` 刷新按钮手动触发（与主面板 `.btn-refresh` 同模式）。
 
 ## 改动文件
 ### 定位
@@ -15,36 +15,29 @@
   - 水平 clamp 到 workArea；删除不再使用的 `GAP` 常量
   - `console.log` 改为输出 `{ icon, centerX, centerY, x, y, wa }`
 
-### hover 刷新
-- **`src/shared/types/ipc.ts`**：新增 `TRAY_HOVER_SHOWN = 'tray-hover:shown'`；`ElectronAPI.trayHover` 新增 `onShown(cb: () => void)`
-- **`src/main/preload.ts`**：暴露 `trayHover.onShown`，内部 `ipcRenderer.on(TRAY_HOVER_SHOWN, ...)`
-- **`src/main/main.ts`**：
-  - `scheduleShowTrayHover()` 在 `win.show()` 后发送 `TRAY_HOVER_SHOWN`
-  - dev 模式自动显示弹窗的分支也发送 `TRAY_HOVER_SHOWN`，方便调试
-- **`src/renderer/src/composables/useUsageState.ts`**：从 `useWebSocket` 取出 `send` 并暴露给消费方
-- **`src/renderer/src/TrayHover.vue`**：
-  - 解构 `isConnected` / `send`
-  - 监听 `tray-hover:shown`，调用 `requestRefresh()`
-  - 若收到 shown 时 WS 尚未连接，则置 `pendingRefresh = true`，等 `watch(isConnected)` 触发后再发送 `{ type: 'refresh' }`
+### hover 刷新（v2.1.1 → v2.1.2 演进）
+- **v2.1.1（自动刷新，已废弃）**：`ipc.ts` / `preload.ts` 新增 `TRAY_HOVER_SHOWN`；`main.ts` 在 show 后发送；`TrayHover.vue` 收到后 WS 发 refresh
+- **v2.1.2（手动刷新按钮，当前方案）**：
+  - `src/shared/types/ipc.ts` / `src/main/preload.ts` / `src/main/main.ts`：**移除** `TRAY_HOVER_SHOWN` 通道与全部发送点
+  - `src/renderer/src/composables/useUsageState.ts`：保留 `send` 暴露（按钮复用）
+  - `src/renderer/src/TrayHover.vue`：标题旁新增 `↻` 刷新按钮，`onRefresh()` 中 `isConnected && send({ type: 'refresh' })` 后置 `isRefreshing` 转圈 1s；header 结构改为 `th-header-left`（title + button）+ `th-updated`
+  - `src/renderer/src/styles/tray-hover.css`：新增 `.th-header-left` / `.th-refresh` / `.th-refresh:hover` / `.th-refresh.spinning` + `@keyframes th-spin`
 
 ## 影响范围
 - 定位逻辑仅影响 tray hover 弹窗；悬浮球、主窗口、设置窗口均不动
-- 新增 1 条 IPC（main → renderer）和复用 1 条 WS 消息（renderer → server），无新增主进程接口
+- 复用 1 条既有 WS 消息（renderer → server `{ type: 'refresh' }`），无新增主进程接口；IPC 无净新增（v2.1.1 的 shown 通道已随 v2.1.2 移除）
 - 自动隐藏任务栏（workArea == bounds）走默认底部分支，行为正确
 - 多屏：用 `getDisplayNearestPoint(图标中心)` 定位到托盘所在屏
 
 ## 发布
-- 版本：`2.1.1`
-- 命令：`npm run release -- --release-as patch`
-- 提交：`dd46f04 chore(release): 2.1.1`
-- 标签：`v2.1.1`
-- 已 push：`git push --follow-tags origin main`（`main` 从 `f10ba36` 推进到 `dd46f04`）
-- 产物：`dist/AI状态监控 2.1.1.exe`（portable）
+- **v2.1.1**：定位 + hover 自动刷新（commit `dd46f04`，tag `v2.1.1`，产物 `dist/AI状态监控 2.1.1.exe`）
+- **v2.1.2（当前）**：撤回自动刷新，改手动刷新按钮
+  - 提交：`e8f73b6 feat: 托盘 hover 弹窗改为手动刷新用量数据` + `97c35ae chore(release): 2.1.2`
+  - 标签：`v2.1.2`，已 `git push --follow-tags origin main`
+  - 产物：`dist/AI状态监控 2.1.2.exe`（portable）
 
 ## 自测
-- ✅ `npm run typecheck` 通过
-- ✅ `npm run build:main` 通过
-- ✅ `npm run dev` 自动显示弹窗并触发 refresh：日志出现 `[Server] user requested refresh`，随后各 provider 重新拉取数据
-- ✅ `npm run build` 成功产出 `dist/AI状态监控 2.1.1.exe`
-- ✅ 运行打包后的 exe：进程可正常启动（taskkill 能找到 PID 并终止）
-- ⏸ 真实鼠标 hover 托盘图标的位置与刷新效果需用户手动确认
+- ✅ `npm run typecheck` / `build:main` / `vite build` 通过
+- ✅ v2.1.2 `npm run dev`：弹窗正常显示且定位正确，日志**不再出现** `[Server] user requested refresh`（确认 hover 不再自动刷新）
+- ✅ `npm run build` 成功产出 `dist/AI状态监控 2.1.2.exe`；运行后进程可正常启动（PID 可 taskkill）
+- ⏸ 按钮点击触发 refresh 的实际交互效果需用户手动确认（WS refresh 链路在 v2.1.1 已验证，按钮复用同一 `send` 调用）
