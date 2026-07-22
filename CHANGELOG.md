@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.2.0](https://github.com/Alfxjx/ai-signal-light/compare/v2.1.2...v2.2.0) (2026-07-22)
+
+
+### ✨ 新功能
+
+* add usage pace indicator to UsageCard for 5h/week limits ([4effc6c](https://github.com/Alfxjx/ai-signal-light/commit/4effc6cc0c33225e210a71783bf1c02de1c3dc06))
+
+
+### 📝 文档
+
+* **harness:** update tray-hover-above-icon history for v2.1.2 manual refresh button ([ac5c663](https://github.com/Alfxjx/ai-signal-light/commit/ac5c66339c8b2888f011560db0398a257fdb82a4))
+
 ## [2.1.2](https://github.com/Alfxjx/ai-signal-light/compare/v2.1.1...v2.1.2) (2026-07-21)
 
 
