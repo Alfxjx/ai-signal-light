@@ -462,11 +462,53 @@ body {
   color: rgba(255, 255, 255, 0.85);
 }
 
+.usage-pace {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.usage-pace.pace-fast {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.usage-pace.pace-slow {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.15);
+}
+
+.usage-pace.pace-average {
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .usage-bar {
+  position: relative;
   height: 4px;
   background: rgba(255, 255, 255, 0.08);
   border-radius: 2px;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.usage-bar-marker {
+  position: absolute;
+  top: -2px;
+  left: 0;
+  width: 2px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 1px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.4);
 }
 
 .usage-bar-fill {

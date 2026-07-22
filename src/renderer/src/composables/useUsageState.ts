@@ -15,6 +15,7 @@ import type {
   CodexUsageData,
 } from '../types/messages';
 import { DEFAULT_USAGE_THRESHOLDS } from '../types/messages';
+import { calcUsagePace } from '../utils/usage';
 
 export interface FiveHourSlot {
   /** 剩余百分比 0-100（用于填充 mini bar） */
@@ -25,7 +26,16 @@ export interface FiveHourSlot {
   resetText: string;
   /** "fresh" | "warn" | "danger" —— barClass 三档 */
   level: 'fresh' | 'warn' | 'danger' | 'muted';
+  /** 当前消耗节奏：快 / 慢 / 平均 / 无法计算 */
+  pace: 'fast' | 'slow' | 'average' | null;
+  /** 当前已用 % 与期望平均 % 的差值；正数表示比平均快 */
+  paceDelta: number | null;
+  /** 按均匀消耗计算，当前时刻期望已用 % */
+  expectedPercent: number | null;
 }
+
+const WINDOW_5H_MS = 5 * 60 * 60 * 1000;
+const WINDOW_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 // 小于 365 天的毫秒数视为"相对剩余时间"，否则视为绝对时间戳
 const MAX_RELATIVE_MS = 365 * 24 * 60 * 60 * 1000;
@@ -109,6 +119,25 @@ export function useUsageState() {
     return 'fresh';
   }
 
+  function buildSlot(
+    percent: number,
+    resetTime: Date | string | number | null,
+    windowMs: number,
+    level: FiveHourSlot['level']
+  ): FiveHourSlot {
+    const absoluteReset = makeResetTime(resetTime);
+    const pace = calcUsagePace(percent, absoluteReset, windowMs, now.value);
+    return {
+      percent,
+      resetTime: absoluteReset,
+      resetText: formatReset(resetTime, now.value),
+      level,
+      pace: pace.pace,
+      paceDelta: pace.delta,
+      expectedPercent: pace.expectedPercent,
+    };
+  }
+
   function makeResetTime(raw: string | number | Date | null): number | null {
     if (raw === null || raw === undefined || raw === '') return null;
     if (raw instanceof Date) return raw.getTime();
@@ -142,47 +171,32 @@ export function useUsageState() {
     const data = state?.data as KimiUsageData | undefined;
     const m = data?.codingFiveHour;
     if (!state || state.error || !m || !m.limit) {
-      return { percent: 0, resetTime: null, resetText: '', level: 'muted' };
+      return { percent: 0, resetTime: null, resetText: '', level: 'muted', pace: null, paceDelta: null, expectedPercent: null };
     }
     // 统一显示"已用 %"：main 进程已翻转
     const percent = Math.max(0, Math.min(100, m.percent ?? 0));
-    return {
-      percent,
-      resetTime: m.resetTime ?? null,
-      resetText: formatReset(m.resetTime ?? null, now.value),
-      level: barLevel(percent, thresholds)
-    };
+    return buildSlot(percent, m.resetTime ?? null, WINDOW_5H_MS, barLevel(percent, thresholds));
   });
 
   const minimaxFiveHour = computed<FiveHourSlot>(() => {
     const state = minimax.value;
     const data = state?.data as MinimaxUsageData | undefined;
     if (!state || state.error || !data) {
-      return { percent: 0, resetTime: null, resetText: '', level: 'muted' };
+      return { percent: 0, resetTime: null, resetText: '', level: 'muted', pace: null, paceDelta: null, expectedPercent: null };
     }
     // 服务端给的是"剩余 %"，bar 填充 = 100 - remaining
     const percent = Math.max(0, Math.min(100, 100 - (data.fiveHourPercent ?? 0)));
-    return {
-      percent,
-      resetTime: makeResetTime(data.fiveHourResetTime ?? null),
-      resetText: formatReset(data.fiveHourResetTime ?? null, now.value),
-      level: barLevel(percent, thresholds)
-    };
+    return buildSlot(percent, data.fiveHourResetTime ?? null, WINDOW_5H_MS, barLevel(percent, thresholds));
   });
 
   const minimaxWeekly = computed<FiveHourSlot>(() => {
     const state = minimax.value;
     const data = state?.data as MinimaxUsageData | undefined;
     if (!state || state.error || !data) {
-      return { percent: 0, resetTime: null, resetText: '', level: 'muted' };
+      return { percent: 0, resetTime: null, resetText: '', level: 'muted', pace: null, paceDelta: null, expectedPercent: null };
     }
     const percent = Math.max(0, Math.min(100, 100 - (data.weeklyPercent ?? 0)));
-    return {
-      percent,
-      resetTime: makeResetTime(data.weeklyResetTime ?? null),
-      resetText: formatReset(data.weeklyResetTime ?? null, now.value),
-      level: barLevel(percent, thresholds)
-    };
+    return buildSlot(percent, data.weeklyResetTime ?? null, WINDOW_WEEK_MS, barLevel(percent, thresholds));
   });
 
   // Kimi 的 codingWeekly 是 UsageMetric（main 进程已翻成「已用 %」），与 5h 槽同样的语义
@@ -191,22 +205,17 @@ export function useUsageState() {
     const data = state?.data as KimiUsageData | undefined;
     const m = data?.codingWeekly;
     if (!state || state.error || !m || !m.limit) {
-      return { percent: 0, resetTime: null, resetText: '', level: 'muted' };
+      return { percent: 0, resetTime: null, resetText: '', level: 'muted', pace: null, paceDelta: null, expectedPercent: null };
     }
     const percent = Math.max(0, Math.min(100, m.percent ?? 0));
-    return {
-      percent,
-      resetTime: m.resetTime ?? null,
-      resetText: formatReset(m.resetTime ?? null, now.value),
-      level: barLevel(percent, thresholds)
-    };
+    return buildSlot(percent, m.resetTime ?? null, WINDOW_WEEK_MS, barLevel(percent, thresholds));
   });
 
   const copilotSlot = computed<FiveHourSlot>(() => {
     const state = copilot.value;
     const data = state?.data as CopilotUsageData | undefined;
     if (!state || state.error || !data?.premium?.limit) {
-      return { percent: 0, resetTime: null, resetText: '', level: 'muted' };
+      return { percent: 0, resetTime: null, resetText: '', level: 'muted', pace: null, paceDelta: null, expectedPercent: null };
     }
     // Copilot：main 进程已把 percent 翻成「已用 %」，直接用
     const usedPct = Math.max(0, Math.min(100, data.premium.percent ?? 0));
@@ -214,7 +223,11 @@ export function useUsageState() {
       percent: usedPct,
       resetTime: data.premium.resetDate ?? null,
       resetText: data.premium.resetDate ? data.premium.resetDate.slice(5, 10) : '',
-      level: barLevel(usedPct, thresholds)
+      level: barLevel(usedPct, thresholds),
+      // Copilot premium 是按月重置，不属于 5h/周窗口，不计算 pace
+      pace: null,
+      paceDelta: null,
+      expectedPercent: null,
     };
   });
 
@@ -223,16 +236,19 @@ export function useUsageState() {
     const data = state?.data as CodexUsageData | undefined;
     const win = data?.primary ?? data?.secondary ?? null;
     if (!state || state.error || !win) {
-      return { percent: 0, resetTime: null, resetText: '', level: 'muted' };
+      return { percent: 0, resetTime: null, resetText: '', level: 'muted', pace: null, paceDelta: null, expectedPercent: null };
     }
     const percent = Math.max(0, Math.min(100, win.usedPercent ?? 0));
     const resetMs = win.resetAt ? win.resetAt * 1000 : null;
-    return {
-      percent,
-      resetTime: resetMs,
-      resetText: formatReset(resetMs, now.value),
-      level: barLevel(percent, thresholds)
-    };
+    const windowMs = win.windowSeconds * 1000;
+    // 只给 5h / week 窗口计算 pace；day 窗口跳过
+    const isPaceWindow = windowMs <= WINDOW_5H_MS + 60 * 1000 || windowMs > 24 * 60 * 60 * 1000;
+    const slot = buildSlot(percent, resetMs, isPaceWindow ? windowMs : 0, barLevel(percent, thresholds));
+    if (!isPaceWindow) {
+      slot.pace = null;
+      slot.paceDelta = null;
+    }
+    return slot;
   });
 
   const isProviderVisible = (id: 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex') => {

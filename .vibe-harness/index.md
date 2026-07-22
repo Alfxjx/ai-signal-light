@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [usage-pace-indicator](plans/usage-pace-indicator.md) | [history](history/usage-pace-indicator.md)
+- 时间：2026-07-22
+- 范围：主界面 UsageCard 为 5h / 周限额模型增加"消耗节奏"提示（快/慢/平均），基于重置时间计算期望平均消耗
+- 关联：`src/renderer/src/{utils/usage,composables/useUsageState,components/UsageCard,styles/main.css}`、`package.json`
+
 ## [tray-hover-above-icon](plans/tray-hover-above-icon.md) | [history](history/tray-hover-above-icon.md)
 - 时间：2026-07-21
 - 范围：托盘 hover 弹窗定位改为图标正上方、水平居中于图标、底部贴任务栏（含任务栏在顶/左/右的适配）

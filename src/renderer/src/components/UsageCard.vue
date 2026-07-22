@@ -12,6 +12,7 @@ import type {
   UsageMetric,
 } from '../types/messages';
 import { formatAge, formatResetTime, barClass } from '../utils/time';
+import { paceText, paceArrow, calcUsagePace, inferAllPlanWindowMs, type UsagePaceResult } from '../utils/usage';
 
 const props = defineProps<{
   usage: UsageState;
@@ -47,6 +48,39 @@ function usageStatusText(provider: ProviderId): string {
   if (state.error === 'no_token') return 'Not Configured';
   if (state.error) return 'Error';
   return 'OK';
+}
+
+const WINDOW_5H_MS = 5 * 60 * 60 * 1000;
+const WINDOW_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+function parseResetMs(raw: string | number | null | undefined): number | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = Number(raw);
+  if (!Number.isNaN(n) && n > 0 && n < 365 * 24 * 60 * 60 * 1000) {
+    // 相对毫秒数
+    return Date.now() + n;
+  }
+  if (!Number.isNaN(n)) return n;
+  const d = new Date(raw as string);
+  return Number.isNaN(d.getTime()) ? null : d.getTime();
+}
+
+function slotPace(usedPercent: number, resetRaw: string | number | null | undefined, windowMs: number): UsagePaceResult {
+  return calcUsagePace(usedPercent, parseResetMs(resetRaw), windowMs, props.now);
+}
+
+function paceClass(pace: 'fast' | 'slow' | 'average' | null): string {
+  if (pace === 'fast') return 'pace-fast';
+  if (pace === 'slow') return 'pace-slow';
+  if (pace === 'average') return 'pace-average';
+  return '';
+}
+
+function paceTooltip(pace: 'fast' | 'slow' | 'average' | null, delta: number | null): string {
+  if (!pace || delta === null) return '';
+  const sign = delta > 0 ? '+' : '';
+  const desc = pace === 'fast' ? '比平均消耗快' : pace === 'slow' ? '比平均消耗慢' : '与平均消耗持平';
+  return `${desc} ${sign}${delta.toFixed(1)}%`;
 }
 
 function usageStatusClass(provider: ProviderId): string {
@@ -99,6 +133,37 @@ const minimaxFiveHourText = computed<string>(() => {
 const minimaxWeeklyText = computed<string>(() => {
   return `${minimaxWeeklyPercent.value}%`;
 });
+
+// ---- Pace（消耗节奏）：仅 5h / 周窗口根据重置时间计算 ----
+const kimiFiveHourPace = computed<UsagePaceResult>(() =>
+  slotPace(kimiPercent('codingFiveHour'), kimiData('codingFiveHour')?.resetTime, WINDOW_5H_MS)
+);
+const kimiWeeklyPace = computed<UsagePaceResult>(() =>
+  slotPace(kimiPercent('codingWeekly'), kimiData('codingWeekly')?.resetTime, WINDOW_WEEK_MS)
+);
+const minimaxFiveHourPace = computed<UsagePaceResult>(() =>
+  slotPace(minimaxFiveHourPercent.value, minimaxData.value?.fiveHourResetTime, WINDOW_5H_MS)
+);
+const minimaxWeeklyPace = computed<UsagePaceResult>(() =>
+  slotPace(minimaxWeeklyPercent.value, minimaxData.value?.weeklyResetTime, WINDOW_WEEK_MS)
+);
+const kimiTotalPace = computed<UsagePaceResult>(() => {
+  const used = kimiPercent('total');
+  const resetMs = parseResetMs(kimiData('total')?.resetTime);
+  const windowMs = resetMs ? inferAllPlanWindowMs(resetMs, props.now) : null;
+  if (!windowMs) return { pace: null, delta: null, expectedPercent: null };
+  return slotPace(used, resetMs, windowMs);
+});
+function codexPace(w: CodexWindowData | null): UsagePaceResult {
+  if (!w) return { pace: null, delta: null, expectedPercent: null };
+  const windowMs = w.windowSeconds * 1000;
+  const isPaceWindow = windowMs <= WINDOW_5H_MS + 60 * 1000 || windowMs > 24 * 60 * 60 * 1000;
+  if (!isPaceWindow) return { pace: null, delta: null, expectedPercent: null };
+  return slotPace(codexWindowPercent(w), w.resetAt ? w.resetAt * 1000 : null, windowMs);
+}
+
+const codexPrimaryPace = computed<UsagePaceResult>(() => codexPace(codexData.value?.primary ?? null));
+const codexSecondaryPace = computed<UsagePaceResult>(() => codexPace(codexData.value?.secondary ?? null));
 
 // ---- Copilot 专用 ----
 const copilotData = computed<CopilotUsageData | null>(() => {
@@ -216,12 +281,23 @@ const allNoToken = computed<boolean>(() => {
         <template v-if="showUsageBars('kimi')">
           <div class="usage-bar-block" data-hide-compact>
             <div class="usage-bar-label">
-              <span>all plan</span>
-              <span class="usage-bar-value">{{ kimiText('total') }}</span>
+              <div class="usage-time">
+                <span>all plan</span>
+                <div class="usage-bar-meta">{{ formatResetTime(kimiData('total')?.resetTime) }}</div>
+              </div>
+              <span class="usage-bar-value">{{ kimiText('total') }}
+                <span v-if="kimiTotalPace.pace" class="usage-pace" :class="paceClass(kimiTotalPace.pace)"
+                  :title="paceTooltip(kimiTotalPace.pace, kimiTotalPace.delta)">
+                  {{ paceText(kimiTotalPace.pace) }}{{ paceArrow(kimiTotalPace.pace) }}
+                </span>
+              </span>
             </div>
             <div class="usage-bar">
               <div class="usage-bar-fill" :style="{ width: kimiPercent('total') + '%' }"
                 :class="barClass(kimiPercent('total'), usage.thresholds)"></div>
+              <div v-if="kimiTotalPace.expectedPercent != null" class="usage-bar-marker"
+                :style="{ left: kimiTotalPace.expectedPercent + '%' }"
+                :title="`平均消耗 ${kimiTotalPace.expectedPercent.toFixed(1)}%`"></div>
             </div>
           </div>
           <div class="usage-bar-block" data-hide-compact>
@@ -230,11 +306,19 @@ const allNoToken = computed<boolean>(() => {
                 <span>week</span>
                 <div class="usage-bar-meta">{{ formatResetTime(kimiData('codingWeekly')?.resetTime) }}</div>
               </div>
-              <span class="usage-bar-value">{{ kimiText('codingWeekly') }}</span>
+              <span class="usage-bar-value">{{ kimiText('codingWeekly') }}
+                <span v-if="kimiWeeklyPace.pace" class="usage-pace" :class="paceClass(kimiWeeklyPace.pace)"
+                  :title="paceTooltip(kimiWeeklyPace.pace, kimiWeeklyPace.delta)">
+                  {{ paceText(kimiWeeklyPace.pace) }}{{ paceArrow(kimiWeeklyPace.pace) }}
+                </span>
+              </span>
             </div>
             <div class="usage-bar">
               <div class="usage-bar-fill" :style="{ width: kimiPercent('codingWeekly') + '%' }"
                 :class="barClass(kimiPercent('codingWeekly'), usage.thresholds)"></div>
+              <div v-if="kimiWeeklyPace.expectedPercent != null" class="usage-bar-marker"
+                :style="{ left: kimiWeeklyPace.expectedPercent + '%' }"
+                :title="`平均消耗 ${kimiWeeklyPace.expectedPercent.toFixed(1)}%`"></div>
             </div>
           </div>
           <div class="usage-bar-block">
@@ -243,11 +327,19 @@ const allNoToken = computed<boolean>(() => {
                 <span>5h</span>
                 <div class="usage-bar-meta">{{ formatResetTime(kimiData('codingFiveHour')?.resetTime) }}</div>
               </div>
-              <span class="usage-bar-value">{{ kimiText('codingFiveHour') }}</span>
+              <span class="usage-bar-value">{{ kimiText('codingFiveHour') }}
+                <span v-if="kimiFiveHourPace.pace" class="usage-pace" :class="paceClass(kimiFiveHourPace.pace)"
+                  :title="paceTooltip(kimiFiveHourPace.pace, kimiFiveHourPace.delta)">
+                  {{ paceText(kimiFiveHourPace.pace) }}{{ paceArrow(kimiFiveHourPace.pace) }}
+                </span>
+              </span>
             </div>
             <div class="usage-bar">
               <div class="usage-bar-fill" :style="{ width: kimiPercent('codingFiveHour') + '%' }"
                 :class="barClass(kimiPercent('codingFiveHour'), usage.thresholds)"></div>
+              <div v-if="kimiFiveHourPace.expectedPercent != null" class="usage-bar-marker"
+                :style="{ left: kimiFiveHourPace.expectedPercent + '%' }"
+                :title="`平均消耗 ${kimiFiveHourPace.expectedPercent.toFixed(1)}%`"></div>
             </div>
           </div>
         </template>
@@ -272,11 +364,19 @@ const allNoToken = computed<boolean>(() => {
                 <span>5h</span>
                 <div class="usage-bar-meta">{{ formatResetTime(minimaxData?.fiveHourResetTime, true) }}</div>
               </div>
-              <span class="usage-bar-value">{{ minimaxFiveHourText }}</span>
+              <span class="usage-bar-value">{{ minimaxFiveHourText }}
+                <span v-if="minimaxFiveHourPace.pace" class="usage-pace" :class="paceClass(minimaxFiveHourPace.pace)"
+                  :title="paceTooltip(minimaxFiveHourPace.pace, minimaxFiveHourPace.delta)">
+                  {{ paceText(minimaxFiveHourPace.pace) }}{{ paceArrow(minimaxFiveHourPace.pace) }}
+                </span>
+              </span>
             </div>
             <div class="usage-bar">
               <div class="usage-bar-fill" :style="{ width: minimaxFiveHourPercent + '%' }"
                 :class="barClass(minimaxFiveHourPercent, usage.thresholds)"></div>
+              <div v-if="minimaxFiveHourPace.expectedPercent != null" class="usage-bar-marker"
+                :style="{ left: minimaxFiveHourPace.expectedPercent + '%' }"
+                :title="`平均消耗 ${minimaxFiveHourPace.expectedPercent.toFixed(1)}%`"></div>
             </div>
           </div>
           <div class="usage-bar-block" data-hide-compact>
@@ -286,11 +386,19 @@ const allNoToken = computed<boolean>(() => {
                 <div class="usage-bar-meta" v-if="minimaxData?.weeklyResetTime">{{
                   formatResetTime(minimaxData.weeklyResetTime, true) }}</div>
               </div>
-              <span class="usage-bar-value">{{ minimaxWeeklyText }}</span>
+              <span class="usage-bar-value">{{ minimaxWeeklyText }}
+                <span v-if="minimaxWeeklyPace.pace" class="usage-pace" :class="paceClass(minimaxWeeklyPace.pace)"
+                  :title="paceTooltip(minimaxWeeklyPace.pace, minimaxWeeklyPace.delta)">
+                  {{ paceText(minimaxWeeklyPace.pace) }}{{ paceArrow(minimaxWeeklyPace.pace) }}
+                </span>
+              </span>
             </div>
             <div class="usage-bar">
               <div class="usage-bar-fill" :style="{ width: minimaxWeeklyPercent + '%' }"
                 :class="barClass(minimaxWeeklyPercent, usage.thresholds)"></div>
+              <div v-if="minimaxWeeklyPace.expectedPercent != null" class="usage-bar-marker"
+                :style="{ left: minimaxWeeklyPace.expectedPercent + '%' }"
+                :title="`平均消耗 ${minimaxWeeklyPace.expectedPercent.toFixed(1)}%`"></div>
             </div>
           </div>
         </template>
@@ -332,11 +440,20 @@ const allNoToken = computed<boolean>(() => {
                 <span>{{ codexWindowLabel(codexData.primary.windowSeconds) }}</span>
                 <div class="usage-bar-meta" v-if="codexData.primary.resetAt">{{ formatResetTime(codexData.primary.resetAt * 1000) }}</div>
               </div>
-              <span class="usage-bar-value">{{ codexWindowText(codexData.primary) }}</span>
+              <span class="usage-bar-value">{{ codexWindowText(codexData.primary) }}
+                <span v-if="codexPrimaryPace.pace" class="usage-pace"
+                  :class="paceClass(codexPrimaryPace.pace)"
+                  :title="paceTooltip(codexPrimaryPace.pace, codexPrimaryPace.delta)">
+                  {{ paceText(codexPrimaryPace.pace) }}{{ paceArrow(codexPrimaryPace.pace) }}
+                </span>
+              </span>
             </div>
             <div class="usage-bar">
               <div class="usage-bar-fill" :style="{ width: codexWindowPercent(codexData.primary) + '%' }"
                 :class="barClass(codexWindowPercent(codexData.primary), usage.thresholds)"></div>
+              <div v-if="codexPrimaryPace.expectedPercent != null" class="usage-bar-marker"
+                :style="{ left: codexPrimaryPace.expectedPercent + '%' }"
+                :title="`平均消耗 ${codexPrimaryPace.expectedPercent.toFixed(1)}%`"></div>
             </div>
           </div>
           <div class="usage-bar-block" v-if="codexData?.secondary" data-hide-compact>
@@ -345,11 +462,20 @@ const allNoToken = computed<boolean>(() => {
                 <span>{{ codexWindowLabel(codexData.secondary.windowSeconds) }}</span>
                 <div class="usage-bar-meta" v-if="codexData.secondary.resetAt">{{ formatResetTime(codexData.secondary.resetAt * 1000) }}</div>
               </div>
-              <span class="usage-bar-value">{{ codexWindowText(codexData.secondary) }}</span>
+              <span class="usage-bar-value">{{ codexWindowText(codexData.secondary) }}
+                <span v-if="codexSecondaryPace.pace" class="usage-pace"
+                  :class="paceClass(codexSecondaryPace.pace)"
+                  :title="paceTooltip(codexSecondaryPace.pace, codexSecondaryPace.delta)">
+                  {{ paceText(codexSecondaryPace.pace) }}{{ paceArrow(codexSecondaryPace.pace) }}
+                </span>
+              </span>
             </div>
             <div class="usage-bar">
               <div class="usage-bar-fill" :style="{ width: codexWindowPercent(codexData.secondary) + '%' }"
                 :class="barClass(codexWindowPercent(codexData.secondary), usage.thresholds)"></div>
+              <div v-if="codexSecondaryPace.expectedPercent != null" class="usage-bar-marker"
+                :style="{ left: codexSecondaryPace.expectedPercent + '%' }"
+                :title="`平均消耗 ${codexSecondaryPace.expectedPercent.toFixed(1)}%`"></div>
             </div>
           </div>
         </template>

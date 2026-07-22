@@ -42,7 +42,7 @@
     "electron-builder": "^24.0.0",
     "typescript": "^5.5.0",
     "vite": "^5.4.0",
-    "vitest": "^4.1.8",
+    "vitest": "^3.0.0",
     "vue-tsc": "^2.1.0",
     "wait-on": "^8.0.0"
   },
@@ -51,6 +51,9 @@
     "qrcode": "^1.5.4",
     "vue": "^3.5.35",
     "ws": "^8.16.0"
+  },
+  "overrides": {
+    "std-env": "^3.0.0"
   },
   "build": {
     "appId": "com.example.ai-status-monitor",
