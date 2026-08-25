@@ -53,6 +53,7 @@ function usageStatusText(provider: ProviderId): string {
 
 const WINDOW_5H_MS = 5 * 60 * 60 * 1000;
 const WINDOW_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const WINDOW_MONTH_MS = 31 * 24 * 60 * 60 * 1000;
 
 function parseResetMs(raw: string | number | null | undefined): number | null {
   if (raw === null || raw === undefined || raw === '') return null;
@@ -239,6 +240,13 @@ function volcengineText(key: keyof VolcengineUsageData): string {
   if (!m || !m.limit) return '—';
   return `${m.percent}%`;
 }
+// 火山 pacing：仅 weekly(7d) / monthly(31d) 有公开窗口时长；session 时长未公开，不估算
+const volcengineWeeklyPace = computed<UsagePaceResult>(() =>
+  slotPace(volcenginePercent('weekly'), volcengineMetric('weekly')?.resetTime, WINDOW_WEEK_MS)
+);
+const volcengineMonthlyPace = computed<UsagePaceResult>(() =>
+  slotPace(volcenginePercent('monthly'), volcengineMetric('monthly')?.resetTime, WINDOW_MONTH_MS)
+);
 // ---- 卡片头 / 底部 ----
 const usageLastTs = computed<number | null>(() => {
   const ks = ([
@@ -531,11 +539,19 @@ const allNoToken = computed<boolean>(() => {
               <span>weekly</span>
               <div class="usage-bar-meta">{{ formatResetTime(volcengineMetric('weekly')?.resetTime) }}</div>
             </div>
-            <span class="usage-bar-value">{{ volcengineText('weekly') }}</span>
+            <span class="usage-bar-value">{{ volcengineText('weekly') }}
+              <span v-if="volcengineWeeklyPace.pace" class="usage-pace" :class="paceClass(volcengineWeeklyPace.pace)"
+                :title="paceTooltip(volcengineWeeklyPace.pace, volcengineWeeklyPace.delta)">
+                {{ paceText(volcengineWeeklyPace.pace) }}{{ paceArrow(volcengineWeeklyPace.pace) }}
+              </span>
+            </span>
           </div>
           <div class="usage-bar">
             <div class="usage-bar-fill" :style="{ width: volcenginePercent('weekly') + '%' }"
               :class="barClass(volcenginePercent('weekly'), usage.thresholds)"></div>
+            <div v-if="volcengineWeeklyPace.expectedPercent != null" class="usage-bar-marker"
+              :style="{ left: volcengineWeeklyPace.expectedPercent + '%' }"
+              :title="`平均消耗 ${volcengineWeeklyPace.expectedPercent.toFixed(1)}%`"></div>
           </div>
         </div>
         <div class="usage-bar-block">
@@ -544,11 +560,19 @@ const allNoToken = computed<boolean>(() => {
               <span>monthly</span>
               <div class="usage-bar-meta">{{ formatResetTime(volcengineMetric('monthly')?.resetTime) }}</div>
             </div>
-            <span class="usage-bar-value">{{ volcengineText('monthly') }}</span>
+            <span class="usage-bar-value">{{ volcengineText('monthly') }}
+              <span v-if="volcengineMonthlyPace.pace" class="usage-pace" :class="paceClass(volcengineMonthlyPace.pace)"
+                :title="paceTooltip(volcengineMonthlyPace.pace, volcengineMonthlyPace.delta)">
+                {{ paceText(volcengineMonthlyPace.pace) }}{{ paceArrow(volcengineMonthlyPace.pace) }}
+              </span>
+            </span>
           </div>
           <div class="usage-bar">
             <div class="usage-bar-fill" :style="{ width: volcenginePercent('monthly') + '%' }"
               :class="barClass(volcenginePercent('monthly'), usage.thresholds)"></div>
+            <div v-if="volcengineMonthlyPace.expectedPercent != null" class="usage-bar-marker"
+              :style="{ left: volcengineMonthlyPace.expectedPercent + '%' }"
+              :title="`平均消耗 ${volcengineMonthlyPace.expectedPercent.toFixed(1)}%`"></div>
           </div>
         </div>
       </template>
