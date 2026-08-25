@@ -24,6 +24,28 @@ body {
   flex-direction: column;
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  position: relative;
+  will-change: transform; /* 顶部吸附动画用 transform 走 GPU 合成 */
+}
+
+/* 顶部吸附动画进行中：关掉 backdrop-filter，避免模糊层在 transform 滑动时错位/闪烁 */
+.app--dock-animating {
+  backdrop-filter: none;
+}
+
+/* 顶部吸附收起态：窗口被推到屏幕上方，屏内只剩面板底边几像素。
+   在底边画一条把手，提示"鼠标移上来可以拉出"。 */
+.app--docked::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
 }
 
 /* ===== 标题栏 ===== */

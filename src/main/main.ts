@@ -8,6 +8,7 @@ import { ConfigStore, VALID_INTERVALS, HOOK_EVENTS } from './config';
 import { UsageMonitor, parseProxyUrl } from './usage-monitor';
 import { startDeviceFlow, pollDeviceFlow, isCopilotOAuthToken } from './copilot-auth';
 import { codexAuthAvailable } from './codex-credentials';
+import { TopEdgeDock, type DockState } from './edge-dock';
 import { WS_PORT } from '../shared/constants';
 import { IPC_CHANNELS } from '../shared/types/ipc';
 import type { HooksInstallResult, HooksUninstallResult } from '../shared/types/ipc';
@@ -33,6 +34,7 @@ let configStore: ConfigStore | null = null;
 let usageMonitor: UsageMonitor | null = null;
 let copilotDeviceCancelled = false;
 let isQuitting = false;
+let dock: TopEdgeDock | null = null;
 
 // 托盘 hover 弹窗：进入/离开的 debounce timer 和指针位置标记
 // - trayHoverShowTimer: 鼠标进入托盘后延迟 180ms 才弹窗，避免快速划过闪烁
@@ -62,7 +64,7 @@ const CLAUDE_SETTINGS = path.join(os.homedir(), '.claude', 'settings.json');
 const CLAUDE_SETTINGS_BAK = CLAUDE_SETTINGS + '.bak';
 
 function createWindow(): void {
-  const cfgWin = (configStore && configStore.get().window) || { width: 240, height: 550, x: null, y: null, isCompact: true };
+  const cfgWin = (configStore && configStore.get().window) || { width: 240, height: 550, x: null, y: null, isCompact: true, dockedTop: false };
   const persistedW = Number.isFinite(cfgWin.width) ? cfgWin.width : 240;
   const persistedH = Number.isFinite(cfgWin.height) ? cfgWin.height : 550;
   // 持久化的 x/y 必须落在当前某个显示器内才有效（防止断开副屏后窗口飞到屏外）
@@ -107,22 +109,57 @@ function createWindow(): void {
     mainWindow?.show();
     // 无持久化位置（首次启动或越界 fallback）才自动贴当前光标所在屏右上角
     if (!hasSavedPos) positionWindow();
+    // 上次退出时吸附在顶部 → 无动画恢复收起态
+    if (cfgWin.dockedTop) dock?.start(true);
   });
 
+  // 顶部吸附：拖到屏幕顶部松手自动收起，hover 触发带自动滑出
+  dock = createTopEdgeDock();
+
   // 持久化窗口尺寸/位置（debounce 400ms）
+  // 吸附态下 x/y 由 dock 托管（收起时 y 是负数），只存尺寸，避免把屏外坐标写进 config
   const saveBounds = () => {
     if (!mainWindow || mainWindow.isDestroyed() || !configStore) return;
     const b = mainWindow.getBounds();
     const currentWindow = configStore.get().window;
-    configStore.update({ window: { width: b.width, height: b.height, x: b.x, y: b.y, isCompact: currentWindow.isCompact } });
+    const docked = !!dock?.docked;
+    configStore.update({
+      window: {
+        width: b.width,
+        height: b.height,
+        x: docked ? currentWindow.x : b.x,
+        y: docked ? currentWindow.y : b.y,
+        isCompact: currentWindow.isCompact
+      }
+    });
   };
   let boundsTimer: NodeJS.Timeout | null = null;
   const scheduleSave = () => {
     if (boundsTimer) clearTimeout(boundsTimer);
     boundsTimer = setTimeout(saveBounds, 400);
   };
+  // 拖动结束判定：Windows 上 'moved' 在拖动过程中也会连发，所以统一靠 debounce 兜底
+  let moveSettleTimer: NodeJS.Timeout | null = null;
+  const scheduleMoveSettled = () => {
+    if (dock?.animating) return; // 忽略动画自身产生的 move
+    if (moveSettleTimer) clearTimeout(moveSettleTimer);
+    moveSettleTimer = setTimeout(() => {
+      moveSettleTimer = null;
+      dock?.handleMoveSettled();
+    }, MOVE_SETTLE_MS);
+  };
   mainWindow.on('resize', scheduleSave);
-  mainWindow.on('move', scheduleSave);
+  mainWindow.on('move', () => {
+    scheduleMoveSettled();
+    scheduleSave();
+  });
+
+  // 隐藏/最小化时停掉 cursor 轮询，重新显示时按持久化状态恢复
+  mainWindow.on('hide', () => dock?.stop());
+  mainWindow.on('minimize', () => dock?.stop());
+  mainWindow.on('show', () => {
+    if (configStore?.get().window.dockedTop) dock?.start(true);
+  });
 
   // 关闭按钮只是隐藏窗口
   mainWindow.on('close', (event) => {
@@ -133,7 +170,51 @@ function createWindow(): void {
   });
 
   mainWindow.on('closed', () => {
+    dock?.stop();
+    dock = null;
     mainWindow = null;
+  });
+}
+
+/** 拖动停止多久算「松手」 */
+const MOVE_SETTLE_MS = 300;
+
+// 构造顶部吸附控制器：把 electron 能力适配成 DockHost
+function createTopEdgeDock(): TopEdgeDock {
+  return new TopEdgeDock({
+    getBounds: () => mainWindow!.getBounds(),
+    setBounds: (r) => {
+      // 防止把 NaN/undefined 传给 Electron（会抛 conversion failure）
+      for (const k of ['x', 'y', 'width', 'height'] as const) {
+        if (!Number.isFinite(r[k])) {
+          console.error('[dock] setBounds 收到非法值', k, r[k], r, dock?.state);
+          return;
+        }
+      }
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setBounds(r);
+    },
+    getWorkArea: (p) => (screen.getDisplayNearestPoint(p) || screen.getPrimaryDisplay()).workArea,
+    getCursor: () => screen.getCursorScreenPoint(),
+    // 面板自身聚焦，或设置/QR 窗口开着时不收起，免得把用户正在看的东西抽走
+    isBusy: () => {
+      if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()) return true;
+      if (settingsWindow && !settingsWindow.isDestroyed() && settingsWindow.isVisible()) return true;
+      if (qrWindow && !qrWindow.isDestroyed() && qrWindow.isVisible()) return true;
+      return false;
+    },
+    onStateChange: (state: DockState) => {
+      configStore?.update({ window: { dockedTop: state === 'collapsed' } });
+      // 通知渲染层画/撤掉顶部把手
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(IPC_CHANNELS.WINDOW_DOCK_STATE, state);
+      }
+    },
+    // 窗口已瞬移到目标位，让渲染层按补偿值做 GPU transform 滑动
+    animate: (compensationY: number) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(IPC_CHANNELS.WINDOW_DOCK_ANIM, { compensationY });
+      }
+    }
   });
 }
 
@@ -723,6 +804,7 @@ app.on('before-quit', () => {
   trayHoverWindow = null;
   if (usageMonitor) usageMonitor.stop();
   if (server) server.stop();
+  dock?.stop();
 });
 
 // IPC 通信
@@ -945,6 +1027,8 @@ ipcMain.handle(IPC_CHANNELS.WINDOW_RESIZE, async (_event, { height }: { height: 
   if (mainWindow && !mainWindow.isDestroyed()) {
     const b = mainWindow.getBounds();
     mainWindow.setBounds({ x: b.x, y: b.y, width: b.width, height });
+    // 吸附态下高度变了要重新摆位，否则收起态的 y 会错位
+    dock?.reapply();
   }
 });
 

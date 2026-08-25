@@ -12,6 +12,11 @@
 - 范围：安卓端用量页 UI 改版：双列网格/单列详情切换（SharedPreferences 持久化）、DeepSeek 余额放大（渐变 tile / 全宽余额条）、同心多环网格卡、节奏徽章化
 - 关联：`android-app/.../ui/components/{UsageBar,PaceBadge,ConcentricRings,GridProviderCard,DeepseekBalance,ProviderCard}.kt`、`android-app/.../ui/home/UsageTab.kt`
 
+## [top-edge-dock](plans/top-edge-dock.md) | [history](history/top-edge-dock.md)
+- 时间：2026-08-25
+- 范围：主面板顶部吸附自动隐藏：拖到屏幕顶部松手收起、鼠标划到顶部触发带滑出、重启恢复收起态
+- 关联：`src/main/{edge-dock,main,config,preload}.ts`、`src/shared/types/{config,ipc}.ts`、`src/renderer/src/{App.vue,styles/main.css}`、`src/main/edge-dock.test.ts`
+
 ## [kimi-coding-api-key](plans/kimi-coding-api-key.md) | [history](history/kimi-coding-api-key.md)
 - 时间：2026-08-25
 - 范围：Kimi 用量改开放平台 API Key + `coding/v1/usages`(GET)，移除网页登录窗口；两端 UI 从三行精简为两行

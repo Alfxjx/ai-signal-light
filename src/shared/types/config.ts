@@ -17,6 +17,8 @@ export interface WindowConfig {
   x: number | null;
   y: number | null;
   isCompact: boolean;
+  /** 是否吸附在屏幕顶部（收起态）；x/y 始终存展开态的位置 */
+  dockedTop: boolean;
 }
 
 export interface HooksEnabledConfig {

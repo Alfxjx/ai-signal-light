@@ -56,6 +56,9 @@ export interface WindowState {
   isCompact: boolean;
 }
 
+/** 主面板顶部吸附状态 */
+export type DockStateName = 'free' | 'collapsed' | 'expanded';
+
 export interface FloatingBallState {
   visible: boolean;
   enabled: boolean;
@@ -84,6 +87,9 @@ export interface ElectronAPI {
   resizeWindow: (opts: { height: number }) => Promise<void>;
   getWindowState: () => Promise<WindowState | null>;
   setCompact: (isCompact: boolean) => Promise<void>;
+  onDockStateChange: (cb: (state: DockStateName) => void) => void;
+  /** 顶部吸附动画：窗口已被主进程瞬移，渲染层把内容 translateY(补偿值)→0 做 GPU 滑动 */
+  onDockAnim: (cb: (payload: { compensationY: number }) => void) => void;
   getHooksSnippet: (enabledOverride?: Partial<{ Notification: boolean; Stop: boolean; PreToolUse: boolean }>) => Promise<HooksSnippetInfo | null>;
   installHooks: () => Promise<HooksInstallResult>;
   uninstallHooks: () => Promise<HooksUninstallResult>;
@@ -125,5 +131,7 @@ export const IPC_CHANNELS = {
   FLOATING_BALL_OPEN_MAIN: 'floating-ball:open-main',
   FLOATING_BALL_GET_STATE: 'floating-ball:get-state',
   FLOATING_BALL_NOTIFY_CLEARED: 'floating-ball:notify-cleared',
+  WINDOW_DOCK_STATE: 'window:dock-state',
+  WINDOW_DOCK_ANIM: 'window:dock-anim',
   TRAY_HOVER_POINTER: 'tray-hover:pointer',
 } as const;

@@ -45,6 +45,30 @@ const now = ref(Date.now());
 
 const isElectron = computed(() => !!window.electronAPI);
 
+// 顶部吸附状态（主进程推送）：collapsed 时在面板顶部画一条把手做视觉提示
+const dockState = ref<'free' | 'collapsed' | 'expanded'>('free');
+// 顶部吸附动画时长，需与 src/main/edge-dock.ts 的 ANIM_MS 一致
+const DOCK_ANIM_MS = 180;
+let dockAnimTimer: ReturnType<typeof setTimeout> | null = null;
+const appEl = ref<HTMLElement | null>(null);
+
+function runDockAnim(compensationY: number) {
+  const el = appEl.value;
+  if (!el) return;
+  el.classList.add('app--dock-animating'); // 动画期间关 backdrop-filter，避免模糊层错位
+  el.style.transition = 'none';
+  el.style.transform = `translateY(${compensationY}px)`;
+  void el.offsetHeight; // 强制 reflow，保证下一次写生效
+  el.style.transition = `transform ${DOCK_ANIM_MS}ms cubic-bezier(.22,.61,.36,1)`;
+  el.style.transform = 'translateY(0px)';
+  if (dockAnimTimer) clearTimeout(dockAnimTimer);
+  dockAnimTimer = setTimeout(() => {
+    dockAnimTimer = null;
+    el.classList.remove('app--dock-animating');
+    el.style.transition = 'none';
+  }, DOCK_ANIM_MS + 50);
+}
+
 // ====== WebSocket ======
 const { isConnected, connect, send } = useWebSocket(handleMessage);
 
@@ -197,6 +221,10 @@ onMounted(() => {
     window.electronAPI?.getWindowState().then((s) => {
       if (s && typeof s.isCompact === 'boolean') isCompact.value = s.isCompact;
     });
+    // 顶部吸附状态：收起时画把手提示可 hover 拉出
+    window.electronAPI?.onDockStateChange?.((s) => { dockState.value = s; });
+    // 顶部吸附动画：窗口瞬移到目标位，这里用 CSS transform 做 GPU 滑动
+    window.electronAPI?.onDockAnim?.(({ compensationY }) => runDockAnim(compensationY));
   }
 });
 
@@ -204,6 +232,10 @@ onBeforeUnmount(() => {
   if (ageTimer) {
     clearInterval(ageTimer);
     ageTimer = null;
+  }
+  if (dockAnimTimer) {
+    clearTimeout(dockAnimTimer);
+    dockAnimTimer = null;
   }
   // WS 由 useWebSocket 自己在 onBeforeUnmount 关
 });
@@ -216,7 +248,7 @@ const lastUpdateText = computed(() => {
 </script>
 
 <template>
-  <div class="app">
+  <div ref="appEl" class="app" :class="{ 'app--docked': dockState === 'collapsed' }">
     <TitleBar :is-pinned="isPinned" :is-electron="isElectron"
               @toggle-pin="togglePin" @minimize="minimize" @open-settings="openSettings"
               @toggle-floating-ball="toggleFloatingBall" />

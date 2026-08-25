@@ -18,7 +18,7 @@ const DEFAULTS: AppConfig = {
   volcengine: { cookie: '', csrfToken: '', enabled: true, useProxy: false },
   proxy: { url: '' },
   intervalMinutes: 10,
-  window: { width: 240, height: 550, x: null, y: null, isCompact: true },
+  window: { width: 240, height: 550, x: null, y: null, isCompact: true, dockedTop: false },
   hooks: {
     enabled: { Notification: true, Stop: true, PreToolUse: true },
     endpoint: { autoInstalled: false }

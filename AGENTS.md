@@ -45,6 +45,8 @@ src/
 │   ├── codex-credentials.ts   # Reads/refreshes ~/.codex/auth.json (OpenAI OAuth) for wham/usage API
 │   ├── config.ts              # ConfigStore: userData/config.json with atomic writes; VALID_INTERVALS, HOOK_EVENTS
 │   ├── pairing.ts             # QR payload (v/host/port/apiKey) + LAN IP detection + MobileAppConfig projection
+│   ├── edge-dock.ts           # TopEdgeDock: 主面板顶部吸附/收起/滑出状态机（依赖注入，不 import electron）
+│   ├── edge-dock.test.ts      # Vitest, colocated
 │   └── usage-monitor.test.ts  # Vitest, colocated
 ├── renderer/src/              # Vue 3 + TS (vite build → dist/renderer)
 │   ├── main.ts / App.vue                  # Main panel entry + root
@@ -78,6 +80,7 @@ landing/                       # Vue 3 + Tailwind landing page (own package.json
 - **Pending notifications (red dot)**: Claude Code hooks (`Notification` / `Stop` / `PreToolUse`) are installed as `~/.ai-status-monitor/claude-hook.js` + entries in `~/.claude/settings.json`; the hook POSTs to `http://127.0.0.1:3456/api/hooks/claude`. `StatusServer` keeps a `pendingByCwd` map and broadcasts `pendingChanged` over WS. The renderer clears a pending entry when the user clicks the project or a newer assistant response arrives.
 - **Usage quotas**: `UsageMonitor` polls provider APIs every `intervalMinutes` (5/10/15/30/60), pushes `usageInit` / `usageUpdate` over WS. Progress bar width and label percent both represent **used %** for all providers (bar wider = closer to limit); warn/danger thresholds are configurable in settings. Auth per provider: **Kimi** — manual openplatform API key, queries `GET https://api.kimi.com/coding/v1/usages` (7d + 5h windows, `codingWeekly` / `codingFiveHour`); **MiniMax** — manual openplatform API key; **Copilot** — GitHub Device Flow OAuth (`copilot-auth.ts`, `gho_` token in `copilot.token`; legacy cookie paste still works, distinguished by prefix); **DeepSeek** — manual platform API key (balance only, no rate windows); **Codex** — auto-reads `~/.codex/auth.json`, refreshes via auth.openai.com when expired (`codex-credentials.ts`). `UsageMonitor._safeRun` accepts an optional `resolveToken` for auto credential sources (currently only Codex).
 - **QR pairing (Android)**: desktop shows a QR containing only `{v, host, port, apiKey}` (`src/main/pairing.ts`); the Android app scans it, connects to the WS server with the apiKey, and pulls a trimmed `MobileAppConfig` via the server's `getConfig` handler, then keeps syncing over LAN WebSocket.
+- **顶部吸附收起 (`edge-dock.ts`)**: 主面板拖到屏幕顶部松手（顶边距 workArea 顶边 ≤ 10px）即吸附，延迟后动画收起到 `workArea.y - height + 5`，屏内只剩面板**底边** 5px；主进程每 120ms 轮询 `screen.getCursorScreenPoint()`，光标进顶部触发带则滑出，离开且窗口不"忙"（面板未聚焦、设置/QR 窗口未开）则重新收起；从展开态拖离顶部即退出吸附。状态存 `config.window.dockedTop`，通过 `WINDOW_DOCK_STATE` 通道推给渲染层画底边把手（`.app--docked`）。吸附态下窗口 bounds 由 dock 托管，`saveBounds` 必须保留 config 里旧的 x/y，不能写入收起态的负 y。
 
 ## Conventions
 

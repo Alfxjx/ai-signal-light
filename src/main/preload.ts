@@ -21,6 +21,8 @@ const IPC_CHANNELS = {
   FLOATING_BALL_OPEN_MAIN: 'floating-ball:open-main',
   FLOATING_BALL_GET_STATE: 'floating-ball:get-state',
   FLOATING_BALL_NOTIFY_CLEARED: 'floating-ball:notify-cleared',
+  WINDOW_DOCK_STATE: 'window:dock-state',
+  WINDOW_DOCK_ANIM: 'window:dock-anim',
   TRAY_HOVER_POINTER: 'tray-hover:pointer',
 } as const;
 
@@ -43,6 +45,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resizeWindow: (opts: { height: number }) => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_RESIZE, opts),
   getWindowState: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_GET_STATE),
   setCompact: (isCompact: boolean) => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_SET_COMPACT, isCompact),
+  // 顶部吸附状态：'free' | 'collapsed' | 'expanded'，渲染层据此画顶部把手
+  onDockStateChange: (cb: (state: string) => void) =>
+    ipcRenderer.on(IPC_CHANNELS.WINDOW_DOCK_STATE, (_e, state) => cb(state)),
+  // 顶部吸附动画：收到补偿值后做 CSS transform 滑动
+  onDockAnim: (cb: (payload: { compensationY: number }) => void) =>
+    ipcRenderer.on(IPC_CHANNELS.WINDOW_DOCK_ANIM, (_e, payload) => cb(payload)),
 
   // Claude Code hooks
   getHooksSnippet: (enabledOverride?: unknown) =>
