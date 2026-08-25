@@ -36,6 +36,17 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+private val W5H = 5L * 60 * 60 * 1000
+private val W7D = 7L * 24 * 60 * 60 * 1000
+private val W30D = 30L * 24 * 60 * 60 * 1000
+
+/** MiniMax 的 reset 时间是「距重置的剩余毫秒数」，转成绝对 ISO 时间供 calcPace 使用 */
+private fun relativeMsToIso(raw: String?, nowMs: Long): String? {
+    val n = raw?.trim()?.toLongOrNull() ?: return null
+    if (n <= 0) return null
+    return Instant.ofEpochMilli(nowMs + n).toString()
+}
+
 @Composable
 fun UsageTab(
     usage: UsageSnapshot,
@@ -98,9 +109,14 @@ private fun KimiCard(state: UsageProviderState<KimiUsageData>?, config: AppConfi
     }
 
     val bars = if (data != null) {
+        val w = config.thresholds.warn
+        val d = config.thresholds.danger
+        val nowMs = System.currentTimeMillis()
         listOf(
-            data.codingWeekly.toBarItem("本周编码", config.thresholds.warn, config.thresholds.danger),
-            data.codingFiveHour.toBarItem("5 小时窗口", config.thresholds.warn, config.thresholds.danger)
+            data.codingWeekly.toBarItem("本周编码", w, d)
+                .copy(paceLabel = calcPace(data.codingWeekly.percent, data.codingWeekly.resetTime, W7D, nowMs).label),
+            data.codingFiveHour.toBarItem("5 小时窗口", w, d)
+                .copy(paceLabel = calcPace(data.codingFiveHour.percent, data.codingFiveHour.resetTime, W5H, nowMs).label)
         )
     } else emptyList()
 
@@ -130,9 +146,18 @@ private fun MinimaxCard(state: UsageProviderState<MinimaxUsageData>?, config: Ap
 
     // Desktop shows used %; MiniMax returns remaining %, so flip it.
     val bars = if (data != null) {
+        val w = config.thresholds.warn
+        val d = config.thresholds.danger
+        val nowMs = System.currentTimeMillis()
         listOf(
-            UsageBarItem("5 小时窗口", (100 - data.fiveHourPercent).coerceIn(0, 100), config.thresholds.warn, config.thresholds.danger),
-            UsageBarItem("本周", (100 - data.weeklyPercent).coerceIn(0, 100), config.thresholds.warn, config.thresholds.danger)
+            UsageBarItem(
+                "5 小时窗口", (100 - data.fiveHourPercent).coerceIn(0, 100), w, d,
+                paceLabel = calcPace(100 - data.fiveHourPercent, relativeMsToIso(data.fiveHourResetTime, nowMs), W5H, nowMs).label
+            ),
+            UsageBarItem(
+                "本周", (100 - data.weeklyPercent).coerceIn(0, 100), w, d,
+                paceLabel = calcPace(100 - data.weeklyPercent, relativeMsToIso(data.weeklyResetTime, nowMs), W7D, nowMs).label
+            )
         )
     } else emptyList()
 
@@ -210,16 +235,13 @@ private fun VolcengineCard(state: UsageProviderState<VolcengineUsageData>?, conf
         val w = config.thresholds.warn
         val d = config.thresholds.danger
         val nowMs = System.currentTimeMillis()
-        val w5h = 5L * 60 * 60 * 1000
-        val wWeek = 7L * 24 * 60 * 60 * 1000
-        val wMonth = 30L * 24 * 60 * 60 * 1000
         listOf(
             data.session.toBarItem("会话 (session)", w, d)
-                .copy(paceLabel = calcPace(data.session.percent, data.session.resetTime, w5h, nowMs).label),
+                .copy(paceLabel = calcPace(data.session.percent, data.session.resetTime, W5H, nowMs).label),
             data.weekly.toBarItem("本周 (weekly)", w, d)
-                .copy(paceLabel = calcPace(data.weekly.percent, data.weekly.resetTime, wWeek, nowMs).label),
+                .copy(paceLabel = calcPace(data.weekly.percent, data.weekly.resetTime, W7D, nowMs).label),
             data.monthly.toBarItem("本月 (monthly)", w, d)
-                .copy(paceLabel = calcPace(data.monthly.percent, data.monthly.resetTime, wMonth, nowMs).label)
+                .copy(paceLabel = calcPace(data.monthly.percent, data.monthly.resetTime, W30D, nowMs).label)
         )
     } else emptyList()
 
