@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 火山引擎 console.volcengine.com 使用 DigiCert Global Root G2 签发的证书链。
+     部分安卓 ROM 的系统 CA 库缺少这条链，导致 CertPathValidatorException。
+     这里把该链的中间证书与根证书作为信任锚点下发，并保留系统默认信任库。 -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">console.volcengine.com</domain>
+        <trust-anchors>
+            <certificates src="@raw/volcengine_rapidssl_g1" />
+            <certificates src="@raw/volcengine_digicert_g2" />
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
