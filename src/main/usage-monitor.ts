@@ -396,20 +396,31 @@ export class UsageMonitor {
     if (proxyConfig) reqConfig.proxy = proxyConfig;
     const res = await http.post<unknown>(VOLCENGINE_API, undefined, reqConfig);
 
-    const isAuthError = res.status === 401 || res.status === 403;
-    const hasAuthError = typeof res.data === 'object'
-      && !!((res.data as Record<string, unknown>)?.ResponseMetadata as Record<string, unknown> | undefined)?.Error;
+    const json = (typeof res.data === 'object' && res.data) ? (res.data as Record<string, unknown>) : {};
+    const apiErr = (json?.ResponseMetadata as Record<string, unknown> | undefined)?.Error as Record<string, unknown> | undefined;
+    const errCode = apiErr?.Code ? String(apiErr.Code) : null;
+    // 火山引擎鉴权失败时返回 HTTP 200 + ResponseMetadata.Error（InvalidCSRFToken 等），
+    // 因此不能只按 status 判断，必须同时看返回体里的 Error。
+    if (errCode) {
+      if (/csrf|token/i.test(errCode)) {
+        throw new Error('x-csrf-token 无效或已过期，请从 DevTools 重新复制完整值');
+      }
+      if (/login|signature|access.?key|credential|auth|session/i.test(errCode)) {
+        throw new Error('登录态已过期，请更新 Cookie / x-csrf-token');
+      }
+      console.error(`[usage:volcengine] api error ${errCode}\n  body: ${JSON.stringify(json).slice(0, 500)}`);
+      throw new Error(`API 错误: ${errCode}`);
+    }
     if (res.status >= 400) {
-      const bodyText = typeof res.data === 'string' ? res.data : JSON.stringify(res.data || {});
-      if (isAuthError || hasAuthError) {
+      const bodyText = typeof res.data === 'string' ? res.data : JSON.stringify(json || {});
+      if (res.status === 401 || res.status === 403) {
         throw new Error('登录态已过期，请更新 Cookie / x-csrf-token');
       }
       console.error(`[usage:volcengine] HTTP ${res.status}\n  body: ${bodyText.slice(0, 500)}`);
       throw new Error(`HTTP ${res.status}: ${bodyText.slice(0, 200)}`);
     }
 
-    const json = res.data as Record<string, unknown>;
-    if (!json || typeof json !== 'object' || !((json.Result as { QuotaUsage?: unknown } | undefined)?.QuotaUsage)) {
+    if (!(json.Result as { QuotaUsage?: unknown } | undefined)?.QuotaUsage) {
       throw new Error('invalid response');
     }
     const data = mapVolcengineUsage(json);
