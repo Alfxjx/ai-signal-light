@@ -31,6 +31,7 @@ import com.aisignallight.domain.model.VolcengineUsageData
 import com.aisignallight.ui.components.ProviderCard
 import com.aisignallight.ui.components.UsageBarItem
 import com.aisignallight.ui.components.toBarItem
+import com.aisignallight.domain.utils.calcPace
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -206,10 +207,19 @@ private fun VolcengineCard(state: UsageProviderState<VolcengineUsageData>?, conf
     }
 
     val bars = if (data != null) {
+        val w = config.thresholds.warn
+        val d = config.thresholds.danger
+        val nowMs = System.currentTimeMillis()
+        val w5h = 5L * 60 * 60 * 1000
+        val wWeek = 7L * 24 * 60 * 60 * 1000
+        val wMonth = 30L * 24 * 60 * 60 * 1000
         listOf(
-            data.session.toBarItem("会话 (session)", config.thresholds.warn, config.thresholds.danger),
-            data.weekly.toBarItem("本周 (weekly)", config.thresholds.warn, config.thresholds.danger),
-            data.monthly.toBarItem("本月 (monthly)", config.thresholds.warn, config.thresholds.danger)
+            data.session.toBarItem("会话 (session)", w, d)
+                .copy(paceLabel = calcPace(data.session.percent, data.session.resetTime, w5h, nowMs).label),
+            data.weekly.toBarItem("本周 (weekly)", w, d)
+                .copy(paceLabel = calcPace(data.weekly.percent, data.weekly.resetTime, wWeek, nowMs).label),
+            data.monthly.toBarItem("本月 (monthly)", w, d)
+                .copy(paceLabel = calcPace(data.monthly.percent, data.monthly.resetTime, wMonth, nowMs).label)
         )
     } else emptyList()
 
