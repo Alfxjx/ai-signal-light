@@ -45,6 +45,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import com.aisignallight.domain.model.ProviderConfig
 import com.aisignallight.domain.model.ThemeMode
+import com.aisignallight.domain.model.VolcengineProviderConfig
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -130,6 +131,11 @@ fun SettingsScreen(
                 title = "Copilot (Cookie)",
                 config = uiState.copilot,
                 onChange = { viewModel.updateCopilot(it) }
+            )
+
+            VolcengineSection(
+                config = uiState.volcengine,
+                onChange = { viewModel.updateVolcengine(it) }
             )
 
             OutlinedTextField(
@@ -250,5 +256,63 @@ private fun ProviderSection(
             )
             Text("使用全局代理", style = MaterialTheme.typography.bodyMedium)
         }
+    }
+}
+
+@Composable
+private fun VolcengineSection(
+    config: VolcengineProviderConfig,
+    onChange: (VolcengineProviderConfig) -> Unit
+) {
+    var showCookie by remember { mutableStateOf(false) }
+    var showCsrf by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(text = "火山引擎 (Ark Coding Plan)", style = MaterialTheme.typography.titleMedium)
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = config.enabled, onCheckedChange = { onChange(config.copy(enabled = it)) })
+            Text("启用", style = MaterialTheme.typography.bodyMedium)
+        }
+
+        OutlinedTextField(
+            value = config.cookie,
+            onValueChange = { onChange(config.copy(cookie = it)) },
+            label = { Text("Cookie") },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = if (showCookie) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = showCookie, onCheckedChange = { showCookie = it })
+            Text("显示", style = MaterialTheme.typography.bodyMedium)
+        }
+
+        OutlinedTextField(
+            value = config.csrfToken,
+            onValueChange = { onChange(config.copy(csrfToken = it)) },
+            label = { Text("x-csrf-token") },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = if (showCsrf) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = showCsrf, onCheckedChange = { showCsrf = it })
+            Text("显示", style = MaterialTheme.typography.bodyMedium)
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = config.useProxy, onCheckedChange = { onChange(config.copy(useProxy = it)) })
+            Text("使用全局代理", style = MaterialTheme.typography.bodyMedium)
+        }
+
+        Text(
+            text = "打开桌面控制台 Coding Plan 页面的 DevTools，复制 GetCodingPlanUsage 请求的 Cookie 与 x-csrf-token。登录过期需重新粘贴。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline
+        )
     }
 }

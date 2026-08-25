@@ -6,11 +6,13 @@ import com.aisignallight.domain.model.KimiUsageData
 import com.aisignallight.domain.model.MinimaxUsageData
 import com.aisignallight.domain.model.UsageProviderState
 import com.aisignallight.domain.model.UsageSnapshot
+import com.aisignallight.domain.model.VolcengineUsageData
 import com.aisignallight.domain.repository.ConfigRepository
 import com.aisignallight.domain.repository.UsageRepository
 import com.aisignallight.data.remote.CopilotApi
 import com.aisignallight.data.remote.KimiApi
 import com.aisignallight.data.remote.MinimaxApi
+import com.aisignallight.data.remote.VolcengineApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +28,8 @@ class UsageRepositoryImpl @Inject constructor(
     private val configRepository: ConfigRepository,
     private val kimiApi: KimiApi,
     private val minimaxApi: MinimaxApi,
-    private val copilotApi: CopilotApi
+    private val copilotApi: CopilotApi,
+    private val volcengineApi: VolcengineApi
 ) : UsageRepository {
 
     private val _usageFlow = MutableStateFlow(UsageSnapshot())
@@ -46,11 +49,13 @@ class UsageRepositoryImpl @Inject constructor(
         val kimi = async { fetchKimi(config, proxyUrl, now) }
         val minimax = async { fetchMinimax(config, proxyUrl, now) }
         val copilot = async { fetchCopilot(config, proxyUrl, now) }
+        val volcengine = async { fetchVolcengine(config, proxyUrl, now) }
 
         UsageSnapshot(
             kimi = kimi.await(),
             minimax = minimax.await(),
-            copilot = copilot.await()
+            copilot = copilot.await(),
+            volcengine = volcengine.await()
         )
     }
 
@@ -85,6 +90,25 @@ class UsageRepositoryImpl @Inject constructor(
         return try {
             val proxy = if (cfg.useProxy) proxyUrl else null
             UsageProviderState(data = copilotApi.fetch(cfg.token, proxy), lastUpdated = now, error = null)
+        } catch (e: Exception) {
+            UsageProviderState(error = formatError(e), lastUpdated = now)
+        }
+    }
+
+    private suspend fun fetchVolcengine(
+        config: AppConfig, proxyUrl: String?, now: String
+    ): UsageProviderState<VolcengineUsageData> {
+        val cfg = config.volcengine
+        if (!cfg.enabled) return UsageProviderState(error = "disabled", lastUpdated = now)
+        if (cfg.cookie.isBlank() || cfg.csrfToken.isBlank()) {
+            return UsageProviderState(error = "no_token", lastUpdated = now)
+        }
+        return try {
+            val proxy = if (cfg.useProxy) proxyUrl else null
+            UsageProviderState(
+                data = volcengineApi.fetch(cfg.cookie, cfg.csrfToken, proxy),
+                lastUpdated = now, error = null
+            )
         } catch (e: Exception) {
             UsageProviderState(error = formatError(e), lastUpdated = now)
         }

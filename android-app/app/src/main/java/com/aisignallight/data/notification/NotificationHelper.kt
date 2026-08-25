@@ -73,7 +73,6 @@ class NotificationHelper @Inject constructor(
 
     private fun kimiAlerts(data: KimiUsageData, warn: Int): List<Alert> {
         return listOf(
-            Alert("Kimi", "全部配额", data.total.percent),
             Alert("Kimi", "本周编码", data.codingWeekly.percent),
             Alert("Kimi", "5 小时窗口", data.codingFiveHour.percent)
         ).filter { it.percent >= warn }

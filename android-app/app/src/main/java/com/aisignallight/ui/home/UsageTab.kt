@@ -27,6 +27,7 @@ import com.aisignallight.domain.model.KimiUsageData
 import com.aisignallight.domain.model.MinimaxUsageData
 import com.aisignallight.domain.model.UsageProviderState
 import com.aisignallight.domain.model.UsageSnapshot
+import com.aisignallight.domain.model.VolcengineUsageData
 import com.aisignallight.ui.components.ProviderCard
 import com.aisignallight.ui.components.UsageBarItem
 import com.aisignallight.ui.components.toBarItem
@@ -58,6 +59,7 @@ fun UsageTab(
         KimiCard(usage.kimi, config)
         MinimaxCard(usage.minimax, config)
         CopilotCard(usage.copilot, config)
+        VolcengineCard(usage.volcengine, config)
 
         if (allNoToken(usage)) {
             Text(
@@ -96,7 +98,6 @@ private fun KimiCard(state: UsageProviderState<KimiUsageData>?, config: AppConfi
 
     val bars = if (data != null) {
         listOf(
-            data.total.toBarItem("全部配额", config.thresholds.warn, config.thresholds.danger),
             data.codingWeekly.toBarItem("本周编码", config.thresholds.warn, config.thresholds.danger),
             data.codingFiveHour.toBarItem("5 小时窗口", config.thresholds.warn, config.thresholds.danger)
         )
@@ -182,11 +183,43 @@ private fun CopilotCard(state: UsageProviderState<CopilotUsageData>?, config: Ap
 }
 
 private fun allEmpty(usage: UsageSnapshot): Boolean {
-    return usage.kimi == null && usage.minimax == null && usage.copilot == null
+    return usage.kimi == null && usage.minimax == null && usage.copilot == null && usage.volcengine == null
 }
 
 private fun allNoToken(usage: UsageSnapshot): Boolean {
-    return listOfNotNull(usage.kimi, usage.minimax, usage.copilot).all { it.error == "no_token" }
+    return listOfNotNull(usage.kimi, usage.minimax, usage.copilot, usage.volcengine).all { it.error == "no_token" }
+}
+
+@Composable
+private fun VolcengineCard(state: UsageProviderState<VolcengineUsageData>?, config: AppConfig) {
+    val data = state?.data
+    val error = state?.error
+    val statusText = when (error) {
+        "disabled" -> stringResource(R.string.error_disabled)
+        "no_token" -> stringResource(R.string.error_no_token)
+        null -> if (data != null) "正常" else stringResource(R.string.loading)
+        else -> error
+    }
+    val statusColor = when (error) {
+        null -> if (data != null) Color(0xFF4CAF50) else MaterialTheme.colorScheme.outline
+        else -> Color(0xFFF44336)
+    }
+
+    val bars = if (data != null) {
+        listOf(
+            data.session.toBarItem("会话 (session)", config.thresholds.warn, config.thresholds.danger),
+            data.weekly.toBarItem("本周 (weekly)", config.thresholds.warn, config.thresholds.danger),
+            data.monthly.toBarItem("本月 (monthly)", config.thresholds.warn, config.thresholds.danger)
+        )
+    } else emptyList()
+
+    ProviderCard(
+        title = "火山引擎 Coding Plan",
+        statusText = statusText,
+        statusColor = statusColor,
+        bars = bars,
+        footer = state?.lastUpdated?.let { "最后更新：${formatIso(it)}" }
+    )
 }
 
 private fun formatIso(iso: String): String {

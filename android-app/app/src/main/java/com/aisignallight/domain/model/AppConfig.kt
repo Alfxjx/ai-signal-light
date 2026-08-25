@@ -10,6 +10,14 @@ data class ProviderConfig(
 )
 
 @Serializable
+data class VolcengineProviderConfig(
+    val cookie: String = "",
+    val csrfToken: String = "",
+    val enabled: Boolean = true,
+    val useProxy: Boolean = false
+)
+
+@Serializable
 data class UsageThresholds(
     val warn: Int = 50,
     val danger: Int = 80
@@ -32,6 +40,7 @@ data class AppConfig(
     val kimi: ProviderConfig = ProviderConfig(),
     val minimax: ProviderConfig = ProviderConfig(),
     val copilot: ProviderConfig = ProviderConfig(),
+    val volcengine: VolcengineProviderConfig = VolcengineProviderConfig(),
     val proxy: ProxyConfig = ProxyConfig(),
     val intervalMinutes: Int = 10,
     val thresholds: UsageThresholds = UsageThresholds(),

@@ -8,6 +8,7 @@ import com.aisignallight.domain.model.ProviderConfig
 import com.aisignallight.domain.model.ProxyConfig
 import com.aisignallight.domain.model.ThemeMode
 import com.aisignallight.domain.model.UsageThresholds
+import com.aisignallight.domain.model.VolcengineProviderConfig
 import com.aisignallight.domain.repository.ConfigRepository
 import com.aisignallight.worker.UsagePollingWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -34,6 +35,7 @@ class SettingsViewModel @Inject constructor(
                 kimi = config.kimi,
                 minimax = config.minimax,
                 copilot = config.copilot,
+                volcengine = config.volcengine,
                 proxyUrl = config.proxy.url,
                 intervalMinutes = config.intervalMinutes,
                 warnThreshold = config.thresholds.warn,
@@ -53,6 +55,10 @@ class SettingsViewModel @Inject constructor(
 
     fun updateCopilot(config: ProviderConfig) {
         _uiState.value = _uiState.value.copy(copilot = config)
+    }
+
+    fun updateVolcengine(config: VolcengineProviderConfig) {
+        _uiState.value = _uiState.value.copy(volcengine = config)
     }
 
     fun updateProxy(url: String) {
@@ -83,6 +89,7 @@ class SettingsViewModel @Inject constructor(
             kimi = state.kimi,
             minimax = state.minimax,
             copilot = state.copilot,
+            volcengine = state.volcengine,
             proxy = ProxyConfig(url = state.proxyUrl),
             intervalMinutes = state.intervalMinutes,
             thresholds = UsageThresholds(warn = state.warnThreshold, danger = state.dangerThreshold),
@@ -102,6 +109,7 @@ data class SettingsUiState(
     val kimi: ProviderConfig = ProviderConfig(),
     val minimax: ProviderConfig = ProviderConfig(),
     val copilot: ProviderConfig = ProviderConfig(),
+    val volcengine: VolcengineProviderConfig = VolcengineProviderConfig(),
     val proxyUrl: String = "",
     val intervalMinutes: Int = 10,
     val warnThreshold: Int = 50,

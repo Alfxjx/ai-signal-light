@@ -11,7 +11,6 @@ data class UsageMetric(
 )
 
 data class KimiUsageData(
-    val total: UsageMetric = UsageMetric(),
     val codingWeekly: UsageMetric = UsageMetric(),
     val codingFiveHour: UsageMetric = UsageMetric()
 )
@@ -42,6 +41,12 @@ data class CopilotUsageData(
     val licenseType: String? = null
 )
 
+data class VolcengineUsageData(
+    val session: UsageMetric = UsageMetric(),
+    val weekly: UsageMetric = UsageMetric(),
+    val monthly: UsageMetric = UsageMetric()
+)
+
 data class UsageProviderState<T>(
     val data: T? = null,
     val lastUpdated: String? = null,
@@ -51,13 +56,15 @@ data class UsageProviderState<T>(
 data class UsageSnapshot(
     val kimi: UsageProviderState<KimiUsageData>? = null,
     val minimax: UsageProviderState<MinimaxUsageData>? = null,
-    val copilot: UsageProviderState<CopilotUsageData>? = null
+    val copilot: UsageProviderState<CopilotUsageData>? = null,
+    val volcengine: UsageProviderState<VolcengineUsageData>? = null
 )
 
 enum class ProviderId(val value: String) {
     KIMI("kimi"),
     MINIMAX("minimax"),
-    COPILOT("copilot")
+    COPILOT("copilot"),
+    VOLCENGINE("volcengine")
 }
 
 sealed class ProviderUsageData {
@@ -73,5 +80,9 @@ sealed class ProviderUsageData {
 
     data class CopilotData(val data: CopilotUsageData) : ProviderUsageData() {
         override val providerId: ProviderId = ProviderId.COPILOT
+    }
+
+    data class VolcengineData(val data: VolcengineUsageData) : ProviderUsageData() {
+        override val providerId: ProviderId = ProviderId.VOLCENGINE
     }
 }

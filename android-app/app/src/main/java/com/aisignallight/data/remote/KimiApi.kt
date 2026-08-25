@@ -4,15 +4,11 @@ import com.aisignallight.domain.model.KimiUsageData
 import com.aisignallight.domain.model.UsageMetric
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.request.get
 import io.ktor.client.request.header
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -23,15 +19,13 @@ class KimiApi @Inject constructor(
     private val clientProvider: KtorClientProvider
 ) {
     companion object {
-        const val URL = "https://www.kimi.com/apiv2/kimi.gateway.billing.v1.BillingService/GetUsages"
+        const val URL = "https://api.kimi.com/coding/v1/usages"
     }
 
     suspend fun fetch(token: String, proxyUrl: String?): KimiUsageData {
         val client: HttpClient = clientProvider.create(proxyUrl)
-        val response: HttpResponse = client.post(URL) {
+        val response: HttpResponse = client.get(URL) {
             header("Authorization", "Bearer ${token.trim()}")
-            contentType(ContentType.Application.Json)
-            setBody(mapOf("scope" to listOf("FEATURE_CODING")))
         }
 
         if (response.status.value >= 400) {
@@ -41,45 +35,29 @@ class KimiApi @Inject constructor(
 
         val json = response.body<JsonObject>()
 
-        val totalObj = json["totalQuota"]?.jsonObject ?: JsonObject(emptyMap())
-        val totalLimit = totalObj["limit"]?.jsonPrimitive?.doubleOrNull?.toInt() ?: 0
-        val totalUsed = totalObj["used"]?.jsonPrimitive?.doubleOrNull?.toInt() ?: 0
-        val totalRemaining = totalObj["remaining"]?.jsonPrimitive?.doubleOrNull?.toInt() ?: 0
-        val total = UsageMetric(
-            limit = totalLimit,
-            used = totalUsed,
-            remaining = totalRemaining,
-            percent = calcPercent(totalUsed, totalLimit)
-        )
+        // 服务端 limit/used/remaining 为字符串数字，这里统一转 Int
+        fun num(o: JsonObject?, key: String): Int =
+            o?.get(key)?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+        fun metric(o: JsonObject?): UsageMetric {
+            val limit = num(o, "limit")
+            val used = num(o, "used")
+            return UsageMetric(
+                limit = limit,
+                used = used,
+                remaining = num(o, "remaining"),
+                percent = calcPercent(used, limit),
+                resetTime = o?.get("resetTime")?.jsonPrimitive?.content
+            )
+        }
 
-        val usages = json["usages"]?.jsonArray
-        val usage = usages?.firstOrNull()?.jsonObject ?: JsonObject(emptyMap())
-        val dTotal = usage["detail"]?.jsonObject ?: JsonObject(emptyMap())
-        val limits = usage["limits"]?.jsonArray
-        val d5h = limits?.firstOrNull()?.jsonObject?.get("detail")?.jsonObject ?: JsonObject(emptyMap())
+        // 7 天周期窗口
+        val usageObj = json["usage"]?.jsonObject ?: JsonObject(emptyMap())
+        val codingWeekly = metric(usageObj)
 
-        val weeklyLimit = dTotal["limit"]?.jsonPrimitive?.doubleOrNull?.toInt() ?: 0
-        val weeklyUsed = dTotal["used"]?.jsonPrimitive?.doubleOrNull?.toInt() ?: 0
-        val weeklyRemaining = dTotal["remaining"]?.jsonPrimitive?.doubleOrNull?.toInt() ?: 0
-        val codingWeekly = UsageMetric(
-            limit = weeklyLimit,
-            used = weeklyUsed,
-            remaining = weeklyRemaining,
-            percent = calcPercent(weeklyUsed, weeklyLimit),
-            resetTime = dTotal["resetTime"]?.jsonPrimitive?.content
-        )
+        // 5 小时窗口（limits 数组第一个元素的 detail）
+        val detail = json["limits"]?.jsonArray?.firstOrNull()?.jsonObject?.get("detail")?.jsonObject
+        val codingFiveHour = metric(detail)
 
-        val fiveHourLimit = d5h["limit"]?.jsonPrimitive?.doubleOrNull?.toInt() ?: 0
-        val fiveHourUsed = d5h["used"]?.jsonPrimitive?.doubleOrNull?.toInt() ?: 0
-        val fiveHourRemaining = d5h["remaining"]?.jsonPrimitive?.doubleOrNull?.toInt() ?: 0
-        val codingFiveHour = UsageMetric(
-            limit = fiveHourLimit,
-            used = fiveHourUsed,
-            remaining = fiveHourRemaining,
-            percent = calcPercent(fiveHourUsed, fiveHourLimit),
-            resetTime = d5h["resetTime"]?.jsonPrimitive?.content
-        )
-
-        return KimiUsageData(total = total, codingWeekly = codingWeekly, codingFiveHour = codingFiveHour)
+        return KimiUsageData(codingWeekly = codingWeekly, codingFiveHour = codingFiveHour)
     }
 }
