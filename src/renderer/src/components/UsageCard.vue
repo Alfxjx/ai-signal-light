@@ -53,7 +53,7 @@ function usageStatusText(provider: ProviderId): string {
 
 const WINDOW_5H_MS = 5 * 60 * 60 * 1000;
 const WINDOW_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-const WINDOW_MONTH_MS = 31 * 24 * 60 * 60 * 1000;
+const WINDOW_MONTH_MS = 30 * 24 * 60 * 60 * 1000; // 一个月按 30 天
 
 function parseResetMs(raw: string | number | null | undefined): number | null {
   if (raw === null || raw === undefined || raw === '') return null;
@@ -240,7 +240,10 @@ function volcengineText(key: keyof VolcengineUsageData): string {
   if (!m || !m.limit) return '—';
   return `${m.percent}%`;
 }
-// 火山 pacing：仅 weekly(7d) / monthly(31d) 有公开窗口时长；session 时长未公开，不估算
+// 火山 pacing：session=5h、weekly=7d、monthly=一个月(30天)（用户确认的窗口时长）
+const volcengineSessionPace = computed<UsagePaceResult>(() =>
+  slotPace(volcenginePercent('session'), volcengineMetric('session')?.resetTime, WINDOW_5H_MS)
+);
 const volcengineWeeklyPace = computed<UsagePaceResult>(() =>
   slotPace(volcenginePercent('weekly'), volcengineMetric('weekly')?.resetTime, WINDOW_WEEK_MS)
 );
@@ -526,11 +529,19 @@ const allNoToken = computed<boolean>(() => {
               <span>session</span>
               <div class="usage-bar-meta">{{ formatResetTime(volcengineMetric('session')?.resetTime) }}</div>
             </div>
-            <span class="usage-bar-value">{{ volcengineText('session') }}</span>
+            <span class="usage-bar-value">{{ volcengineText('session') }}
+              <span v-if="volcengineSessionPace.pace" class="usage-pace" :class="paceClass(volcengineSessionPace.pace)"
+                :title="paceTooltip(volcengineSessionPace.pace, volcengineSessionPace.delta)">
+                {{ paceText(volcengineSessionPace.pace) }}{{ paceArrow(volcengineSessionPace.pace) }}
+              </span>
+            </span>
           </div>
           <div class="usage-bar">
             <div class="usage-bar-fill" :style="{ width: volcenginePercent('session') + '%' }"
               :class="barClass(volcenginePercent('session'), usage.thresholds)"></div>
+            <div v-if="volcengineSessionPace.expectedPercent != null" class="usage-bar-marker"
+              :style="{ left: volcengineSessionPace.expectedPercent + '%' }"
+              :title="`平均消耗 ${volcengineSessionPace.expectedPercent.toFixed(1)}%`"></div>
           </div>
         </div>
         <div class="usage-bar-block">
