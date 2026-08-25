@@ -64,16 +64,17 @@ fun UsageTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        if (isLoading && allEmpty(usage)) {
+        if (isLoading && allEmpty(usage, config)) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
         }
 
-        KimiCard(usage.kimi, config)
-        MinimaxCard(usage.minimax, config)
-        CopilotCard(usage.copilot, config)
-        VolcengineCard(usage.volcengine, config)
+        // 只渲染在设置里启用的 provider（禁用的不占位）
+        if (config.kimi.enabled) KimiCard(usage.kimi, config)
+        if (config.minimax.enabled) MinimaxCard(usage.minimax, config)
+        if (config.copilot.enabled) CopilotCard(usage.copilot, config)
+        if (config.volcengine.enabled) VolcengineCard(usage.volcengine, config)
 
-        if (allNoToken(usage)) {
+        if (allNoToken(usage, config)) {
             Text(
                 text = "未配置 Token，请在设置中添加",
                 style = MaterialTheme.typography.bodyMedium,
@@ -208,12 +209,22 @@ private fun CopilotCard(state: UsageProviderState<CopilotUsageData>?, config: Ap
     )
 }
 
-private fun allEmpty(usage: UsageSnapshot): Boolean {
-    return usage.kimi == null && usage.minimax == null && usage.copilot == null && usage.volcengine == null
+private fun allEmpty(usage: UsageSnapshot, config: AppConfig): Boolean {
+    return (!config.kimi.enabled || usage.kimi == null)
+        && (!config.minimax.enabled || usage.minimax == null)
+        && (!config.copilot.enabled || usage.copilot == null)
+        && (!config.volcengine.enabled || usage.volcengine == null)
 }
 
-private fun allNoToken(usage: UsageSnapshot): Boolean {
-    return listOfNotNull(usage.kimi, usage.minimax, usage.copilot, usage.volcengine).all { it.error == "no_token" }
+private fun allNoToken(usage: UsageSnapshot, config: AppConfig): Boolean {
+    val enabledAndMissing = listOf(
+        config.kimi.enabled to usage.kimi,
+        config.minimax.enabled to usage.minimax,
+        config.copilot.enabled to usage.copilot,
+        config.volcengine.enabled to usage.volcengine,
+    ).filter { it.first } // 只看已启用的
+    if (enabledAndMissing.isEmpty()) return false // 全部禁用时不该显示"未配置"
+    return enabledAndMissing.all { it.second?.error == "no_token" }
 }
 
 @Composable
