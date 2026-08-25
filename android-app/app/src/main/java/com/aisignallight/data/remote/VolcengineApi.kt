@@ -34,7 +34,25 @@ class VolcengineApi @Inject constructor(
             header("Referer", "https://console.volcengine.com/ark/region:cn-beijing/subscription/coding-plan")
         }
 
-        // 鉴权失败专属提示
+        // 鉴权失败时可能返回 HTTP 200 + ResponseMetadata.Error，需先检查返回体
+        val json = response.body<JsonObject>()
+        val apiErr = json["ResponseMetadata"]?.jsonObject?.get("Error")?.jsonObject
+        val errCode = apiErr?.get("Code")?.jsonPrimitive?.content
+        if (errCode != null) {
+            if (errCode.contains("csrf", ignoreCase = true) || errCode.contains("token", ignoreCase = true)) {
+                throw ApiException("x-csrf-token 无效或已过期，请从 DevTools 重新复制完整值")
+            }
+            if (errCode.contains("login", ignoreCase = true)
+                || errCode.contains("signature", ignoreCase = true)
+                || errCode.contains("accesskey", ignoreCase = true)
+                || errCode.contains("credential", ignoreCase = true)
+                || errCode.contains("auth", ignoreCase = true)
+                || errCode.contains("session", ignoreCase = true)
+            ) {
+                throw ApiException("登录态已过期，请更新 Cookie / x-csrf-token")
+            }
+            throw ApiException("API 错误: $errCode")
+        }
         if (response.status.value == 401 || response.status.value == 403) {
             throw ApiException("登录态已过期，请更新 Cookie / x-csrf-token")
         }
@@ -43,7 +61,6 @@ class VolcengineApi @Inject constructor(
             throw ApiException("HTTP ${response.status.value}: ${body.take(200)}")
         }
 
-        val json = response.body<JsonObject>()
         val quota = json["Result"]?.jsonObject?.get("QuotaUsage")?.jsonArray
             ?: throw ApiException("invalid response")
 
