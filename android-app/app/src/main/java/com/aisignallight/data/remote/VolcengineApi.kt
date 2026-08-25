@@ -2,12 +2,14 @@ package com.aisignallight.data.remote
 
 import com.aisignallight.domain.model.UsageMetric
 import com.aisignallight.domain.model.VolcengineUsageData
+import com.aisignallight.domain.repository.ConfigRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpHeaders
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
@@ -17,7 +19,8 @@ import java.time.Instant
 import javax.inject.Inject
 
 class VolcengineApi @Inject constructor(
-    private val clientProvider: KtorClientProvider
+    private val clientProvider: KtorClientProvider,
+    private val configRepository: ConfigRepository
 ) {
     companion object {
         const val URL =
@@ -83,10 +86,26 @@ class VolcengineApi @Inject constructor(
             )
         }
 
-        return VolcengineUsageData(
+        val data = VolcengineUsageData(
             session = metric("session"),
             weekly = metric("weekly"),
             monthly = metric("monthly")
         )
+        // 成功后从 Set-Cookie 抓新 csrfToken 并回写，跟随服务端轮换
+        refreshCsrfFromResponse(response, csrfToken)
+        return data
+    }
+
+    /** 从 Set-Cookie 解析新 csrfToken（服务端每次响应会轮换），与当前不同则保存配置 */
+    private suspend fun refreshCsrfFromResponse(response: HttpResponse, currentCsrf: String) {
+        val lines: List<String> = response.headers.getAll(HttpHeaders.SetCookie) ?: return
+        var newCsrf: String? = null
+        for (line in lines) {
+            val m = Regex("(?:^|;\\s*)csrfToken=([^;]+)", RegexOption.IGNORE_CASE).find(line)
+            if (m != null) { newCsrf = m.groupValues[1]; break }
+        }
+        if (newCsrf == null || newCsrf == currentCsrf) return
+        val cur = configRepository.getConfig()
+        configRepository.saveConfig(cur.copy(volcengine = cur.volcengine.copy(csrfToken = newCsrf)))
     }
 }

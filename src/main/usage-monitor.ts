@@ -425,7 +425,26 @@ export class UsageMonitor {
     }
     const data = mapVolcengineUsage(json);
     console.log('[usage:volcengine] fetched data:', JSON.stringify(data));
+    // 成功后从 Set-Cookie 抓新 csrfToken 并回写，跟随服务端轮换
+    this.syncVolcengineCsrf(res);
     return data;
+  }
+
+  /** 从 Set-Cookie 解析新 csrfToken（服务端每次响应会轮换），与现有不同则回写配置 */
+  private syncVolcengineCsrf(res: { headers: Record<string, unknown> }): void {
+    const setCookie = res.headers['set-cookie'];
+    const lines = Array.isArray(setCookie) ? setCookie : (setCookie ? [setCookie] : []);
+    let newCsrf: string | null = null;
+    for (const line of lines) {
+      const m = /(?:^|;\s*)csrfToken=([^;]+)/i.exec(String(line));
+      if (m) { newCsrf = m[1]; break; }
+    }
+    if (!newCsrf) return;
+    const cur = this.configStore.get().volcengine.csrfToken;
+    if (newCsrf !== cur) {
+      this.configStore.update({ volcengine: { csrfToken: newCsrf } });
+      console.log('[usage:volcengine] csrfToken auto-refreshed');
+    }
   }
 
   // 对外提供快照(用于 init 推送)
