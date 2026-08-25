@@ -47,6 +47,33 @@ private fun relativeMsToIso(raw: String?, nowMs: Long): String? {
     return Instant.ofEpochMilli(nowMs + n).toString()
 }
 
+/** 解析绝对 ISO 重置时间为 epoch 毫秒；无法解析返回 null */
+private fun parseResetMs(iso: String?): Long? =
+    iso?.takeIf { it.isNotBlank() }?.let {
+        runCatching { Instant.parse(it).toEpochMilli() }.getOrNull()
+    }
+
+/** 与 Electron formatResetTime 一致的显示：绝对剩余时间 → "Reset in XdYhZm" */
+private fun resetLabelFromMs(resetMs: Long?, nowMs: Long): String? {
+    if (resetMs == null || resetMs <= nowMs) return null
+    val diff = resetMs - nowMs
+    val days = diff / 86_400_000
+    val hours = (diff % 86_400_000) / 3_600_000
+    val mins = Math.ceil((diff % 3_600_000) / 60_000.0).toInt()
+    val parts = mutableListOf<String>()
+    if (days > 0) parts.add("${days}d")
+    if (hours > 0 || (days > 0 && mins > 0)) parts.add("${hours}h")
+    if (mins > 0 || parts.isEmpty()) parts.add("${mins}m")
+    return "Reset in ${parts.joinToString("")}"
+}
+
+/** MiniMax 的相对毫秒剩余 → "Reset in XdYhZm" */
+private fun relativeResetLabel(relativeMsRaw: String?, nowMs: Long): String? {
+    val n = relativeMsRaw?.trim()?.toLongOrNull() ?: return null
+    if (n <= 0) return null
+    return resetLabelFromMs(nowMs + n, nowMs)
+}
+
 @Composable
 fun UsageTab(
     usage: UsageSnapshot,
@@ -115,9 +142,15 @@ private fun KimiCard(state: UsageProviderState<KimiUsageData>?, config: AppConfi
         val nowMs = System.currentTimeMillis()
         listOf(
             data.codingWeekly.toBarItem("本周编码", w, d)
-                .copy(paceLabel = calcPace(data.codingWeekly.percent, data.codingWeekly.resetTime, W7D, nowMs).label),
+                .copy(
+                    paceLabel = calcPace(data.codingWeekly.percent, data.codingWeekly.resetTime, W7D, nowMs).label,
+                    resetLabel = resetLabelFromMs(parseResetMs(data.codingWeekly.resetTime), nowMs)
+                ),
             data.codingFiveHour.toBarItem("5 小时窗口", w, d)
-                .copy(paceLabel = calcPace(data.codingFiveHour.percent, data.codingFiveHour.resetTime, W5H, nowMs).label)
+                .copy(
+                    paceLabel = calcPace(data.codingFiveHour.percent, data.codingFiveHour.resetTime, W5H, nowMs).label,
+                    resetLabel = resetLabelFromMs(parseResetMs(data.codingFiveHour.resetTime), nowMs)
+                )
         )
     } else emptyList()
 
@@ -153,11 +186,13 @@ private fun MinimaxCard(state: UsageProviderState<MinimaxUsageData>?, config: Ap
         listOf(
             UsageBarItem(
                 "5 小时窗口", (100 - data.fiveHourPercent).coerceIn(0, 100), w, d,
-                paceLabel = calcPace(100 - data.fiveHourPercent, relativeMsToIso(data.fiveHourResetTime, nowMs), W5H, nowMs).label
+                paceLabel = calcPace(100 - data.fiveHourPercent, relativeMsToIso(data.fiveHourResetTime, nowMs), W5H, nowMs).label,
+                resetLabel = relativeResetLabel(data.fiveHourResetTime, nowMs)
             ),
             UsageBarItem(
                 "本周", (100 - data.weeklyPercent).coerceIn(0, 100), w, d,
-                paceLabel = calcPace(100 - data.weeklyPercent, relativeMsToIso(data.weeklyResetTime, nowMs), W7D, nowMs).label
+                paceLabel = calcPace(100 - data.weeklyPercent, relativeMsToIso(data.weeklyResetTime, nowMs), W7D, nowMs).label,
+                resetLabel = relativeResetLabel(data.weeklyResetTime, nowMs)
             )
         )
     } else emptyList()
@@ -248,11 +283,20 @@ private fun VolcengineCard(state: UsageProviderState<VolcengineUsageData>?, conf
         val nowMs = System.currentTimeMillis()
         listOf(
             data.session.toBarItem("会话 (session)", w, d)
-                .copy(paceLabel = calcPace(data.session.percent, data.session.resetTime, W5H, nowMs).label),
+                .copy(
+                    paceLabel = calcPace(data.session.percent, data.session.resetTime, W5H, nowMs).label,
+                    resetLabel = resetLabelFromMs(parseResetMs(data.session.resetTime), nowMs)
+                ),
             data.weekly.toBarItem("本周 (weekly)", w, d)
-                .copy(paceLabel = calcPace(data.weekly.percent, data.weekly.resetTime, W7D, nowMs).label),
+                .copy(
+                    paceLabel = calcPace(data.weekly.percent, data.weekly.resetTime, W7D, nowMs).label,
+                    resetLabel = resetLabelFromMs(parseResetMs(data.weekly.resetTime), nowMs)
+                ),
             data.monthly.toBarItem("本月 (monthly)", w, d)
-                .copy(paceLabel = calcPace(data.monthly.percent, data.monthly.resetTime, W30D, nowMs).label)
+                .copy(
+                    paceLabel = calcPace(data.monthly.percent, data.monthly.resetTime, W30D, nowMs).label,
+                    resetLabel = resetLabelFromMs(parseResetMs(data.monthly.resetTime), nowMs)
+                )
         )
     } else emptyList()
 

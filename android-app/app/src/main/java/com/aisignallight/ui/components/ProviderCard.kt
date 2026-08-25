@@ -52,7 +52,16 @@ fun ProviderCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = bar.label, style = MaterialTheme.typography.bodyMedium)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = bar.label, style = MaterialTheme.typography.bodyMedium)
+                        if (!bar.resetLabel.isNullOrEmpty()) {
+                            Text(
+                                text = bar.resetLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "${bar.percent}%",
@@ -94,7 +103,8 @@ data class UsageBarItem(
     val percent: Int,
     val warnThreshold: Int = 50,
     val dangerThreshold: Int = 80,
-    val paceLabel: String? = null
+    val paceLabel: String? = null,
+    val resetLabel: String? = null
 )
 
 fun UsageMetric.toBarItem(label: String, warnThreshold: Int = 50, dangerThreshold: Int = 80): UsageBarItem {
