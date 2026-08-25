@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.3.0](https://github.com/Alfxjx/ai-signal-light/compare/v2.2.0...v2.3.0) (2026-08-25)
+
+
+### ✨ 新功能
+
+* 火山请求成功后自动从 Set-Cookie 刷新 csrfToken 并回写配置（Electron+Android） ([c7625c5](https://github.com/Alfxjx/ai-signal-light/commit/c7625c593bf9222a0644def925fb3d08064c3f76))
+* 火山引擎用量卡新增 weekly/monthly 消耗节奏(慢平快) ([c9ec490](https://github.com/Alfxjx/ai-signal-light/commit/c9ec490a7420725ddef1c709a3096f5273e30604))
+* 火山用量卡 session(5h)/monthly(30d) 补齐消耗节奏 ([8c64c6a](https://github.com/Alfxjx/ai-signal-light/commit/8c64c6a609807a170e90e814ec693e8e9ded2884))
+* 接入deepseek 方舟 ([7fffa2b](https://github.com/Alfxjx/ai-signal-light/commit/7fffa2bcfee6ea3a050f07a65b8a13e716cd090e))
+* Android 端 kimi/minimax 用量卡也显示消耗节奏(慢平快) ([d3efb4a](https://github.com/Alfxjx/ai-signal-light/commit/d3efb4add26977daf9f29c46f04ebb1f0f8d8d14))
+* Android 端火山引擎用量卡新增消耗节奏(慢平快)与单测 ([3090b48](https://github.com/Alfxjx/ai-signal-light/commit/3090b48b79e45f7ca8ed37a270e40fba18b924f0))
+* Android 端新增 DeepSeek 余额查询 + 扫码同步纳入 deepseek ([344cf8e](https://github.com/Alfxjx/ai-signal-light/commit/344cf8e87dd8bb265354043d2939ab284565bc41))
+* Android 端新增火山引擎 Coding Plan 用量监控 ([d1c0463](https://github.com/Alfxjx/ai-signal-light/commit/d1c0463858386ff1c8572cdc3b26342c067dc872))
+* Android Usage 卡片显示各窗口 Reset in XdYhZm 重置时间 ([377ef5a](https://github.com/Alfxjx/ai-signal-light/commit/377ef5a05d3edce3663a7b8e8dab5eb6cb779e5c))
+* Android Usage 页只渲染启用中的 provider 卡片，禁用不再显示 ([606eeea](https://github.com/Alfxjx/ai-signal-light/commit/606eeea78f700c8d4b4d7f9f6d2734b662e87175))
+* Electron 端新增火山引擎 Coding Plan 用量监控 ([0036d52](https://github.com/Alfxjx/ai-signal-light/commit/0036d52188659ab74e645491b5f4750d1750110c))
+
+
+### 🐛 修复
+
+* 火山引擎 200 带 ResponseMetadata.Error 时给出明确的 CSRF/登录过期提示 ([b411a8a](https://github.com/Alfxjx/ai-signal-light/commit/b411a8aa165b3b3c51b5ab88c0bee77299b9b779))
+* 内置 DigiCert 证书链信任锚点解决安卓 CertPath 校验失败 ([f13ac0e](https://github.com/Alfxjx/ai-signal-light/commit/f13ac0ecc05ce30393bb5750dbf9bf8d7af6d8d4))
+* Android 火山引擎识别 200 返回的 ResponseMetadata.Error ([0a8cb7a](https://github.com/Alfxjx/ai-signal-light/commit/0a8cb7a3dd1e45e9013a70a6cef0872dd4a90979))
+
+
+### 📝 文档
+
+* 火山引擎 Ark Coding Plan 用量监控设计文档 ([8ab11dc](https://github.com/Alfxjx/ai-signal-light/commit/8ab11dc7e229b0cea325db051228005aeb298e40))
+* 火山引擎 Coding Plan 用量监控实施计划（Electron + Android） ([6cae891](https://github.com/Alfxjx/ai-signal-light/commit/6cae8916a24047474dc6bc4e434b3272d30b7d20))
+
 ## [2.2.0](https://github.com/Alfxjx/ai-signal-light/compare/v2.1.2...v2.2.0) (2026-07-22)
 
 
