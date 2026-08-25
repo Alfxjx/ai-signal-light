@@ -6,6 +6,7 @@
 
 import axios, { AxiosError, AxiosProxyConfig } from 'axios';
 import type { ConfigStore } from './config';
+import type { ProviderConfig } from '../shared/types/config';
 import { CopilotSessionCache, fetchCopilotUser, isCopilotOAuthToken } from './copilot-auth';
 import { getCodexAuth } from './codex-credentials';
 import type {
@@ -17,16 +18,18 @@ import type {
   DeepseekUsageData,
   CodexUsageData,
   CodexWindowData,
+  VolcengineUsageData,
   UsageUpdatePayload,
   UsageSnapshot,
   ProviderUsageData,
 } from '../shared/types/usage';
 
-const KIMI_API = 'https://www.kimi.com/apiv2/kimi.gateway.membership.v2.MembershipService/GetSubscriptionStats';
+const KIMI_API = 'https://api.kimi.com/coding/v1/usages';
 const MINIMAX_API = 'https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains';
 const COPILOT_API = 'https://github.com/github-copilot/chat/entitlement';
 const DEEPSEEK_API = 'https://api.deepseek.com/user/balance';
 const CODEX_USAGE_API = 'https://chatgpt.com/backend-api/wham/usage';
+const VOLCENGINE_API = 'https://console.volcengine.com/api/top/ark/cn-beijing/2024-01-01/GetCodingPlanUsage';
 const REQUEST_TIMEOUT_MS = 8000;
 
 // 浏览器风格的 UA,避免被部分 API 当作 node 客户端拒绝
@@ -58,7 +61,8 @@ export class UsageMonitor {
     minimax: { data: null, lastUpdated: null, error: null },
     copilot: { data: null, lastUpdated: null, error: null },
     deepseek: { data: null, lastUpdated: null, error: null },
-    codex:   { data: null, lastUpdated: null, error: null }
+    codex:   { data: null, lastUpdated: null, error: null },
+    volcengine: { data: null, lastUpdated: null, error: null }
   };
 
   constructor(configStore: ConfigStore) {
@@ -113,7 +117,8 @@ export class UsageMonitor {
       this._safeRun('copilot', this.fetchCopilot.bind(this)),
       this._safeRun('deepseek', this.fetchDeepseek.bind(this)),
       this._safeRun('codex',   this.fetchCodex.bind(this),
-        async (proxy) => (await getCodexAuth(proxy)) ? 'local' : null)
+        async (proxy) => (await getCodexAuth(proxy)) ? 'local' : null),
+      this._safeRun('volcengine', this.fetchVolcengine.bind(this))
     ]);
   }
 
@@ -136,7 +141,11 @@ export class UsageMonitor {
     const proxyConfig = cfg.useProxy && globalProxy ? parseProxyUrl(globalProxy) : null;
 
     // 手动 token 优先；为空时尝试自动来源（如 Codex 本地 CLI 凭证）
-    let token = cfg.token;
+    // volcengine 无 token 字段，凭证（cookie/csrf）由 fetchVolcengine 内部读取并校验，
+    // 这里用一个非空占位避免触发 no_token 提前返回。
+    let token = provider === 'volcengine'
+      ? 'volcengine'
+      : (cfg as ProviderConfig).token;
     if (!token && resolveToken) {
       token = (await resolveToken(proxyConfig)) || '';
     }
@@ -189,13 +198,11 @@ export class UsageMonitor {
     try {
       const reqConfig: { headers: Record<string, string>; proxy?: AxiosProxyConfig } = {
         headers: {
-          'Authorization': `Bearer ${token.trim()}`,
-          'Content-Type': 'application/json',
-          'Connect-Protocol-Version': '1',
+          'Authorization': `Bearer ${token.trim()}`
         }
       };
       if (proxyConfig) reqConfig.proxy = proxyConfig;
-      res = await http.post<unknown>(KIMI_API, {}, reqConfig);
+      res = await http.get<unknown>(KIMI_API, reqConfig);
     } catch (e) {
       throw e; // 网络层/超时
     }
@@ -211,7 +218,7 @@ export class UsageMonitor {
       throw new Error('invalid response');
     }
 
-    const data = mapKimiSubscriptionStats(json);
+    const data = mapKimiUsages(json);
     console.log('[usage:kimi] fetched data:', JSON.stringify(data));
     return data;
   }
@@ -372,6 +379,44 @@ export class UsageMonitor {
     return data;
   }
 
+  // ==================== Volcengine ====================
+
+  // token 参数为占位（_safeRun 的签名），实际凭证从配置 store 读取
+  private async fetchVolcengine(_token: string, proxyConfig: AxiosProxyConfig | null): Promise<VolcengineUsageData> {
+    const cfg = this.configStore.get().volcengine;
+    if (!cfg.cookie || !cfg.csrfToken) throw new Error('no_token');
+    const headers: Record<string, string> = {
+      'Cookie': cfg.cookie.trim(),
+      'x-csrf-token': cfg.csrfToken.trim(),
+      'Content-Type': 'application/json',
+      'Origin': 'https://console.volcengine.com',
+      'Referer': 'https://console.volcengine.com/ark/region:cn-beijing/subscription/coding-plan',
+    };
+    const reqConfig: { headers: Record<string, string>; proxy?: AxiosProxyConfig } = { headers };
+    if (proxyConfig) reqConfig.proxy = proxyConfig;
+    const res = await http.post<unknown>(VOLCENGINE_API, undefined, reqConfig);
+
+    const isAuthError = res.status === 401 || res.status === 403;
+    const hasAuthError = typeof res.data === 'object'
+      && !!((res.data as Record<string, unknown>)?.ResponseMetadata as Record<string, unknown> | undefined)?.Error;
+    if (res.status >= 400) {
+      const bodyText = typeof res.data === 'string' ? res.data : JSON.stringify(res.data || {});
+      if (isAuthError || hasAuthError) {
+        throw new Error('登录态已过期，请更新 Cookie / x-csrf-token');
+      }
+      console.error(`[usage:volcengine] HTTP ${res.status}\n  body: ${bodyText.slice(0, 500)}`);
+      throw new Error(`HTTP ${res.status}: ${bodyText.slice(0, 200)}`);
+    }
+
+    const json = res.data as Record<string, unknown>;
+    if (!json || typeof json !== 'object' || !((json.Result as { QuotaUsage?: unknown } | undefined)?.QuotaUsage)) {
+      throw new Error('invalid response');
+    }
+    const data = mapVolcengineUsage(json);
+    console.log('[usage:volcengine] fetched data:', JSON.stringify(data));
+    return data;
+  }
+
   // 对外提供快照(用于 init 推送)
   snapshot(): UsageSnapshot {
     return JSON.parse(JSON.stringify(this.state)) as UsageSnapshot;
@@ -387,26 +432,29 @@ export function calcPercent(used: number | string, limit: number | string): numb
   return Math.max(0, Math.min(100, Math.round((u / l) * 100)));
 }
 
-// Kimi GetSubscriptionStats 响应映射（纯函数，便于测试）
-// 新接口只给 0-1 的已用比例，没有绝对配额数字；映射为 limit=100 的百分比语义（保留两位小数）
-export function mapKimiSubscriptionStats(json: Record<string, unknown>): KimiUsageData {
-  const ratioToMetric = (ratio: unknown, resetTime: unknown): UsageMetric => {
-    const pct = Math.max(0, Math.min(100, Math.round((Number(ratio) || 0) * 10000) / 100));
+// Kimi /coding/v1/usages 响应映射（纯函数，便于测试）
+// 新接口只给 7 天周期（usage）与 5 小时窗口（limits[0].detail）两档；
+// totalQuota 恒为空对象，UI 已精简为两行，不再渲染「全部配额」。
+export function mapKimiUsages(json: Record<string, unknown>): KimiUsageData {
+  const toMetric = (o: Record<string, unknown> | null | undefined): UsageMetric => {
+    const limit = Number(o?.limit) || 0;
+    const used = Number(o?.used) || 0;
+    const remaining = Number(o?.remaining) || 0;
     return {
-      limit: 100,
-      used: pct,
-      remaining: Math.round((100 - pct) * 100) / 100,
-      percent: pct,
-      resetTime: resetTime ? String(resetTime) : null
+      limit,
+      used,
+      remaining,
+      percent: calcPercent(used, limit),
+      resetTime: o?.resetTime ? String(o.resetTime) : null,
     };
   };
-  const r5h = (json.ratelimitCode5h as Record<string, unknown>) || {};
-  const r7d = (json.ratelimitCode7d as Record<string, unknown>) || {};
-  const sub = (json.subscriptionBalance as Record<string, unknown>) || {};
+  const usage = (json.usage as Record<string, unknown>) || {};
+  const limits = (json.limits as unknown[]) || [];
+  const first = limits[0] as Record<string, unknown> | undefined;
+  const detail = (first?.detail as Record<string, unknown>) || undefined;
   return {
-    total:         ratioToMetric(sub.amountUsedRatio, sub.expireTime),
-    codingWeekly:  ratioToMetric(r7d.ratio, r7d.resetTime),
-    codingFiveHour: ratioToMetric(r5h.ratio, r5h.resetTime)
+    codingWeekly: toMetric(usage),
+    codingFiveHour: toMetric(detail),
   };
 }
 
@@ -442,6 +490,36 @@ export function mapWhamUsage(json: Record<string, unknown>): CodexUsageData {
     primary: mapWindow(rl.primary_window),
     secondary: mapWindow(rl.secondary_window),
     creditsBalance: credits.balance != null ? String(credits.balance) : null,
+  };
+}
+
+// Volcengine GetCodingPlanUsage 响应映射（纯函数，便于测试）
+// QuotaUsage 每档只给 Percent(已用%) 与 Cap(上限) 与 ResetTimestamp(秒级 Unix)。
+export function mapVolcengineUsage(json: Record<string, unknown>): VolcengineUsageData {
+  const quota = (json?.Result as Record<string, unknown> | undefined)?.QuotaUsage as unknown[] || [];
+  const toMetric = (level: string): UsageMetric => {
+    const item = quota.find(
+      (q) => (q as Record<string, unknown>)?.Level === level
+    ) as Record<string, unknown> | undefined;
+    const percent = Number(item?.Percent);
+    const limit = Number(item?.Cap);
+    const resetSec = Number(item?.ResetTimestamp);
+    return {
+      limit: limit || 0,
+      // 接口只给百分比与上限，没有 used 量
+      used: 0,
+      remaining: 0,
+      percent: Math.max(0, Math.min(100, Math.round(percent || 0))),
+      // 秒级时间戳 → ISO 绝对时间字符串，规避渲染层「相对/绝对 ms」启发式误判
+      resetTime: Number.isFinite(resetSec) && resetSec > 0
+        ? new Date(resetSec * 1000).toISOString()
+        : null,
+    };
+  };
+  return {
+    session: toMetric('session'),
+    weekly:  toMetric('weekly'),
+    monthly: toMetric('monthly'),
   };
 }
 

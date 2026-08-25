@@ -15,6 +15,7 @@ const DEFAULTS: AppConfig = {
   copilot: { token: '', enabled: true, useProxy: false },
   deepseek: { token: '', enabled: true, useProxy: false },
   codex:   { token: '', enabled: true, useProxy: false },
+  volcengine: { cookie: '', csrfToken: '', enabled: true, useProxy: false },
   proxy: { url: '' },
   intervalMinutes: 10,
   window: { width: 240, height: 550, x: null, y: null, isCompact: true },
@@ -72,6 +73,7 @@ export class ConfigStore {
         copilot: { ...DEFAULTS.copilot, ...(parsed.copilot || {}) },
         deepseek: { ...DEFAULTS.deepseek, ...(parsed.deepseek || {}) },
         codex:   { ...DEFAULTS.codex,   ...(parsed.codex   || {}) },
+        volcengine: { ...DEFAULTS.volcengine, ...(parsed.volcengine || {}) },
         proxy:   { ...DEFAULTS.proxy,   ...(parsed.proxy   || {}) },
         window:  { ...DEFAULTS.window,  ...(parsed.window  || {}) },
         hooks: {
@@ -119,6 +121,9 @@ export class ConfigStore {
     }
     if (partial.codex && typeof partial.codex === 'object') {
       this.data.codex = { ...this.data.codex, ...partial.codex };
+    }
+    if (partial.volcengine && typeof partial.volcengine === 'object') {
+      this.data.volcengine = { ...this.data.volcengine, ...partial.volcengine };
     }
     if (partial.proxy && typeof partial.proxy === 'object') {
       this.data.proxy = { ...this.data.proxy, ...partial.proxy };

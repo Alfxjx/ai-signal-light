@@ -9,10 +9,11 @@ import type {
   DeepseekUsageData,
   CodexUsageData,
   CodexWindowData,
+  VolcengineUsageData,
   UsageMetric,
 } from '../types/messages';
 import { formatAge, formatResetTime, barClass } from '../utils/time';
-import { paceText, paceArrow, calcUsagePace, inferAllPlanWindowMs, type UsagePaceResult } from '../utils/usage';
+import { paceText, paceArrow, calcUsagePace, type UsagePaceResult } from '../utils/usage';
 
 const props = defineProps<{
   usage: UsageState;
@@ -147,13 +148,6 @@ const minimaxFiveHourPace = computed<UsagePaceResult>(() =>
 const minimaxWeeklyPace = computed<UsagePaceResult>(() =>
   slotPace(minimaxWeeklyPercent.value, minimaxData.value?.weeklyResetTime, WINDOW_WEEK_MS)
 );
-const kimiTotalPace = computed<UsagePaceResult>(() => {
-  const used = kimiPercent('total');
-  const resetMs = parseResetMs(kimiData('total')?.resetTime);
-  const windowMs = resetMs ? inferAllPlanWindowMs(resetMs, props.now) : null;
-  if (!windowMs) return { pace: null, delta: null, expectedPercent: null };
-  return slotPace(used, resetMs, windowMs);
-});
 function codexPace(w: CodexWindowData | null): UsagePaceResult {
   if (!w) return { pace: null, delta: null, expectedPercent: null };
   const windowMs = w.windowSeconds * 1000;
@@ -227,6 +221,24 @@ function codexWindowText(w: CodexWindowData | null): string {
   if (!w) return '—';
   return `${codexWindowPercent(w)}%`;
 }
+// ---- Volcengine 专用 ----
+const volcengineData = computed<VolcengineUsageData | null>(() => {
+  return (props.usage.volcengine?.data as VolcengineUsageData | undefined) ?? null;
+});
+function volcengineMetric(key: keyof VolcengineUsageData): UsageMetric | null {
+  const d = volcengineData.value;
+  return (d?.[key] as UsageMetric | undefined) ?? null;
+}
+function volcenginePercent(key: keyof VolcengineUsageData): number {
+  const m = volcengineMetric(key);
+  if (!m || !m.limit) return 0;
+  return Math.max(0, Math.min(100, m.percent ?? 0));
+}
+function volcengineText(key: keyof VolcengineUsageData): string {
+  const m = volcengineMetric(key);
+  if (!m || !m.limit) return '—';
+  return `${m.percent}%`;
+}
 // ---- 卡片头 / 底部 ----
 const usageLastTs = computed<number | null>(() => {
   const ks = ([
@@ -235,6 +247,7 @@ const usageLastTs = computed<number | null>(() => {
     props.usage.copilot?.lastUpdated,
     props.usage.deepseek?.lastUpdated,
     props.usage.codex?.lastUpdated,
+    props.usage.volcengine?.lastUpdated,
   ].filter((v): v is string => typeof v === 'string')
     .map((v) => new Date(v).getTime())
     .filter((t) => !Number.isNaN(t))) as number[];
@@ -248,7 +261,8 @@ const allNoToken = computed<boolean>(() => {
   const copilotNoToken = props.usage.copilot?.error === 'no_token';
   const deepseekNoToken = props.usage.deepseek?.error === 'no_token';
   const codexNoToken = props.usage.codex?.error === 'no_token';
-  return kimiNoToken && miniNoToken && copilotNoToken && deepseekNoToken && codexNoToken;
+  const volcengineNoToken = props.usage.volcengine?.error === 'no_token';
+  return kimiNoToken && miniNoToken && copilotNoToken && deepseekNoToken && codexNoToken && volcengineNoToken;
 });
 </script>
 
@@ -279,27 +293,6 @@ const allNoToken = computed<boolean>(() => {
           </div>
         </div>
         <template v-if="showUsageBars('kimi')">
-          <div class="usage-bar-block" data-hide-compact>
-            <div class="usage-bar-label">
-              <div class="usage-time">
-                <span>all plan</span>
-                <div class="usage-bar-meta">{{ formatResetTime(kimiData('total')?.resetTime) }}</div>
-              </div>
-              <span class="usage-bar-value">{{ kimiText('total') }}
-                <span v-if="kimiTotalPace.pace" class="usage-pace" :class="paceClass(kimiTotalPace.pace)"
-                  :title="paceTooltip(kimiTotalPace.pace, kimiTotalPace.delta)">
-                  {{ paceText(kimiTotalPace.pace) }}{{ paceArrow(kimiTotalPace.pace) }}
-                </span>
-              </span>
-            </div>
-            <div class="usage-bar">
-              <div class="usage-bar-fill" :style="{ width: kimiPercent('total') + '%' }"
-                :class="barClass(kimiPercent('total'), usage.thresholds)"></div>
-              <div v-if="kimiTotalPace.expectedPercent != null" class="usage-bar-marker"
-                :style="{ left: kimiTotalPace.expectedPercent + '%' }"
-                :title="`平均消耗 ${kimiTotalPace.expectedPercent.toFixed(1)}%`"></div>
-            </div>
-          </div>
           <div class="usage-bar-block" data-hide-compact>
             <div class="usage-bar-label">
               <div class="usage-time">
@@ -506,6 +499,59 @@ const allNoToken = computed<boolean>(() => {
             :class="barClass(copilotPremiumPercent, usage.thresholds)"></div>
         </div>
       </div>
+    </div>
+
+    <!-- Volcengine -->
+    <div class="usage-row" v-if="!isProviderDisabled('volcengine')"
+      :data-disabled="String(isProviderDisabled('volcengine'))" data-provider="volcengine">
+      <div class="usage-row-header">
+        <span class="usage-name">Ark Coding Plan</span>
+        <div class="usage-status-wrapper">
+          <span class="usage-status" :class="usageStatusClass('volcengine')"
+            :title="usage.volcengine?.error || usageStatusText('volcengine')"></span>
+        </div>
+      </div>
+      <template v-if="showUsageBars('volcengine')">
+        <div class="usage-bar-block">
+          <div class="usage-bar-label">
+            <div class="usage-time">
+              <span>session</span>
+              <div class="usage-bar-meta">{{ formatResetTime(volcengineMetric('session')?.resetTime) }}</div>
+            </div>
+            <span class="usage-bar-value">{{ volcengineText('session') }}</span>
+          </div>
+          <div class="usage-bar">
+            <div class="usage-bar-fill" :style="{ width: volcenginePercent('session') + '%' }"
+              :class="barClass(volcenginePercent('session'), usage.thresholds)"></div>
+          </div>
+        </div>
+        <div class="usage-bar-block">
+          <div class="usage-bar-label">
+            <div class="usage-time">
+              <span>weekly</span>
+              <div class="usage-bar-meta">{{ formatResetTime(volcengineMetric('weekly')?.resetTime) }}</div>
+            </div>
+            <span class="usage-bar-value">{{ volcengineText('weekly') }}</span>
+          </div>
+          <div class="usage-bar">
+            <div class="usage-bar-fill" :style="{ width: volcenginePercent('weekly') + '%' }"
+              :class="barClass(volcenginePercent('weekly'), usage.thresholds)"></div>
+          </div>
+        </div>
+        <div class="usage-bar-block">
+          <div class="usage-bar-label">
+            <div class="usage-time">
+              <span>monthly</span>
+              <div class="usage-bar-meta">{{ formatResetTime(volcengineMetric('monthly')?.resetTime) }}</div>
+            </div>
+            <span class="usage-bar-value">{{ volcengineText('monthly') }}</span>
+          </div>
+          <div class="usage-bar">
+            <div class="usage-bar-fill" :style="{ width: volcenginePercent('monthly') + '%' }"
+              :class="barClass(volcenginePercent('monthly'), usage.thresholds)"></div>
+          </div>
+        </div>
+      </template>
     </div>
 
     <div class="usage-empty" v-show="allNoToken">No token configured, set in tray menu</div>

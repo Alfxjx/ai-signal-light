@@ -30,23 +30,18 @@ const deepseek = reactive<ProviderState>(makeProvider());
 const codexEnabled = ref<boolean>(false);
 const codexUseProxy = ref<boolean>(false);
 const codexAutoAvailable = ref<boolean>(false);
-const kimiTokenExp = ref<number | null>(null);
-const kimiLoginStatus = ref<string>('');
 
-const kimiTokenExpText = computed<string>(() => {
-  if (!kimiTokenExp.value) return '';
-  const d = new Date(kimiTokenExp.value * 1000);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-});
+const volcengineCookie = ref<string>('');
+const volcengineCsrfToken = ref<string>('');
+const volcengineEnabled = ref<boolean>(false);
+const volcengineUseProxy = ref<boolean>(false);
+const volcengineCookieChanged = ref<boolean>(false);
+const volcengineCsrfTokenChanged = ref<boolean>(false);
+const volcengineHasCookie = ref<boolean>(false);
+const volcengineHasCsrf = ref<boolean>(false);
+const volcengineShowCookie = ref<boolean>(false);
+const volcengineShowCsrf = ref<boolean>(false);
 
-async function startKimiLogin() {
-  if (!window.electronAPI) return;
-  kimiLoginStatus.value = '';
-  const r = await window.electronAPI.kimiStartLogin();
-  if (!r.success) {
-    kimiLoginStatus.value = '发起失败: ' + (r.error || '未知错误');
-  }
-}
 const copilotOAuth = ref<boolean>(false);
 const deviceFlowBusy = ref<boolean>(false);
 const deviceUserCode = ref<string>('');
@@ -201,8 +196,6 @@ onMounted(async () => {
   kimi.useProxy = !!cfg.kimi.useProxy;
   kimi.token = cfg.hasKimiToken ? (cfg.kimi.token || '') : '';
   kimi.hasToken = !!cfg.hasKimiToken;
-  kimiTokenExp.value = cfg.kimiTokenExp ?? null;
-
   minimax.enabled = !!cfg.minimax.enabled;
   minimax.useProxy = !!cfg.minimax.useProxy;
   minimax.token = cfg.hasMiniMaxToken ? (cfg.minimax.token || '') : '';
@@ -223,6 +216,15 @@ onMounted(async () => {
   codexUseProxy.value = !!cfg.codex?.useProxy;
   codexAutoAvailable.value = !!cfg.codexAutoAvailable;
 
+  volcengineEnabled.value = !!cfg.volcengine?.enabled;
+  volcengineUseProxy.value = !!cfg.volcengine?.useProxy;
+  volcengineCookie.value = cfg.hasVolcengineCookie ? (cfg.volcengine?.cookie || '') : '';
+  volcengineCsrfToken.value = cfg.hasVolcengineCsrfToken ? (cfg.volcengine?.csrfToken || '') : '';
+  volcengineCookieChanged.value = false;
+  volcengineCsrfTokenChanged.value = false;
+  volcengineHasCookie.value = !!cfg.hasVolcengineCookie;
+  volcengineHasCsrf.value = !!cfg.hasVolcengineCsrfToken;
+
   proxyUrl.value = cfg.hasProxy ? (cfg.proxy?.url || '') : '';
   hasProxy.value = !!cfg.hasProxy;
 
@@ -241,16 +243,6 @@ onMounted(async () => {
     dangerThreshold.value = cfg.thresholds.danger;
   }
   await refreshHelperPath();
-
-  window.electronAPI.onKimiLoginResult((r) => {
-    if (r.success) {
-      kimi.hasToken = true;
-      kimiTokenExp.value = r.tokenExp ?? null;
-      kimiLoginStatus.value = '已获取 Token，保存后生效';
-    } else {
-      kimiLoginStatus.value = r.error || '未获取到 Token';
-    }
-  });
 
   window.electronAPI.onCopilotDeviceResult((r) => {
     deviceFlowBusy.value = false;
@@ -296,6 +288,14 @@ async function onSave() {
         useProxy: deepseek.useProxy,
       },
       codex: { enabled: codexEnabled.value, useProxy: codexUseProxy.value },
+      volcengine: {
+        cookie: volcengineCookie.value.trim(),
+        cookieChanged: volcengineCookieChanged.value,
+        csrfToken: volcengineCsrfToken.value.trim(),
+        csrfTokenChanged: volcengineCsrfTokenChanged.value,
+        enabled: volcengineEnabled.value,
+        useProxy: volcengineUseProxy.value,
+      },
       proxy: {
         url: proxyUrl.value.trim(),
         urlChanged: proxyUrlChanged.value,
@@ -376,14 +376,14 @@ async function openQrCode() {
           </label>
         </div>
         <div class="settings-field">
-          <label class="settings-label" for="kimiToken">Bearer Token</label>
+          <label class="settings-label" for="kimiToken">API Key</label>
           <div class="settings-input-wrap">
             <input
               :type="kimi.showToken ? 'text' : 'password'"
               id="kimiToken"
               class="settings-input"
               v-model="kimi.token"
-              :placeholder="kimi.hasToken ? '留空保持原值' : '粘贴 Bearer Token'"
+              :placeholder="kimi.hasToken ? '留空保持原值' : '粘贴 Kimi 开放平台 API Key'"
               autocomplete="off"
               spellcheck="false"
               @input="kimi.tokenChanged = true"
@@ -392,15 +392,8 @@ async function openQrCode() {
               {{ kimi.showToken ? '🔒' : '👁' }}
             </button>
           </div>
-          <div class="settings-row" style="margin-top: 4px;">
-            <button type="button" class="btn-secondary" @click="startKimiLogin">登录 Kimi 账号自动获取</button>
-            <span v-if="kimiLoginStatus" class="settings-hint">{{ kimiLoginStatus }}</span>
-          </div>
-          <div class="settings-hint" v-if="kimiTokenExpText">
-            当前 Token 有效期至 {{ kimiTokenExpText }}；过期后点上方按钮重新获取（通常无需重新登录）。
-          </div>
-          <div class="settings-hint" v-else-if="!kimi.hasToken">
-            点上方按钮登录 kimi.com 自动获取 Token，也可手动粘贴。
+          <div class="settings-hint">
+            在开放平台（platform.kimi.com）创建 API Key，粘贴到上方，用于查询 Coding 套餐用量。
           </div>
         </div>
       </div>
@@ -542,6 +535,60 @@ async function openQrCode() {
         <div class="settings-field">
           <div class="settings-hint" v-if="codexAutoAvailable">已检测到本机 Codex CLI 登录（~/.codex/auth.json），自动读取，无需配置。</div>
           <div class="settings-hint" v-else>未检测到本机 Codex CLI 登录。请先安装并登录 Codex CLI（~/.codex/auth.json）。</div>
+        </div>
+      </div>
+
+      <!-- 火山引擎 Ark Coding Plan -->
+      <div class="settings-section" data-provider="volcengine">
+        <div class="settings-section-header">
+          <span class="settings-section-title">火山引擎 (Ark Coding Plan)</span>
+          <label class="settings-toggle">
+            <input type="checkbox" v-model="volcengineEnabled">
+            <span class="settings-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <label class="settings-toggle-label">
+            <input type="checkbox" v-model="volcengineUseProxy">
+            <span>使用代理</span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="volcengineCookie">Cookie</label>
+          <div class="settings-input-wrap">
+            <input
+              :type="volcengineShowCookie ? 'text' : 'password'"
+              id="volcengineCookie"
+              class="settings-input"
+              v-model="volcengineCookie"
+              :placeholder="volcengineHasCookie ? '留空保持原值' : '粘贴整段 Cookie'"
+              autocomplete="off" spellcheck="false"
+              @input="volcengineCookieChanged = true"
+            >
+            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="volcengineShowCookie = !volcengineShowCookie">
+              {{ volcengineShowCookie ? '🔒' : '👁' }}
+            </button>
+          </div>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="volcengineCsrf">x-csrf-token</label>
+          <div class="settings-input-wrap">
+            <input
+              :type="volcengineShowCsrf ? 'text' : 'password'"
+              id="volcengineCsrf"
+              class="settings-input"
+              v-model="volcengineCsrfToken"
+              :placeholder="volcengineHasCsrf ? '留空保持原值' : '粘贴 x-csrf-token'"
+              autocomplete="off" spellcheck="false"
+              @input="volcengineCsrfTokenChanged = true"
+            >
+            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="volcengineShowCsrf = !volcengineShowCsrf">
+              {{ volcengineShowCsrf ? '🔒' : '👁' }}
+            </button>
+          </div>
+          <div class="settings-hint">
+            在 console.volcengine.com 的 Coding Plan 页面打开 DevTools，复制 <code>GetCodingPlanUsage</code> 请求的整段 Cookie 与 x-csrf-token。Cookie 过期后需重新粘贴。
+          </div>
         </div>
       </div>
 

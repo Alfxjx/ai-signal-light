@@ -1,24 +1,28 @@
 import { describe, it, expect } from 'vitest';
-import { calcPercent, parseProxyUrl, formatAxiosError, mapDeepseekBalance, mapWhamUsage, mapKimiSubscriptionStats } from './usage-monitor';
+import { calcPercent, parseProxyUrl, formatAxiosError, mapDeepseekBalance, mapWhamUsage, mapKimiUsages, mapVolcengineUsage } from './usage-monitor';
 import type { AxiosProxyConfig } from 'axios';
 
-describe('mapKimiSubscriptionStats', () => {
-  it('把 0-1 ratio 映射为两位小数的百分比指标', () => {
+describe('mapKimiUsages', () => {
+  it('解析 7 天窗口(usage)与 5 小时窗口(limits[0].detail)', () => {
     const json = {
-      ratelimitCode5h: { ratio: 0.2375, enabled: true, resetTime: '2026-07-20T06:24:21Z' },
-      ratelimitCode7d: { ratio: 0.1517, enabled: true, resetTime: '2026-07-24T13:24:21Z' },
-      subscriptionBalance: { amountUsedRatio: 0.0255, expireTime: '2026-08-17T13:24:22Z' },
+      usage: { limit: '100', used: '31', remaining: '69', resetTime: '2026-08-28T13:24:22Z' },
+      limits: [
+        {
+          window: { duration: 300, timeUnit: 'TIME_UNIT_MINUTE' },
+          detail: { limit: '100', used: '34', remaining: '66', resetTime: '2026-08-25T02:24:22Z' },
+        }
+      ],
     };
-    expect(mapKimiSubscriptionStats(json)).toEqual({
-      total: { limit: 100, used: 2.55, remaining: 97.45, percent: 2.55, resetTime: '2026-08-17T13:24:22Z' },
-      codingWeekly: { limit: 100, used: 15.17, remaining: 84.83, percent: 15.17, resetTime: '2026-07-24T13:24:21Z' },
-      codingFiveHour: { limit: 100, used: 23.75, remaining: 76.25, percent: 23.75, resetTime: '2026-07-20T06:24:21Z' },
+    expect(mapKimiUsages(json)).toEqual({
+      codingWeekly: { limit: 100, used: 31, remaining: 69, percent: 31, resetTime: '2026-08-28T13:24:22Z' },
+      codingFiveHour: { limit: 100, used: 34, remaining: 66, percent: 34, resetTime: '2026-08-25T02:24:22Z' },
     });
   });
-  it('缺字段时容错为 0%', () => {
-    const r = mapKimiSubscriptionStats({});
-    expect(r.total.percent).toBe(0);
+  it('缺字段时容错为 0', () => {
+    const r = mapKimiUsages({});
+    expect(r.codingWeekly.percent).toBe(0);
     expect(r.codingFiveHour.resetTime).toBeNull();
+    expect(r.codingFiveHour.limit).toBe(0);
   });
 });
 
@@ -58,6 +62,31 @@ describe('mapWhamUsage', () => {
     const r = mapWhamUsage({});
     expect(r.primary).toBeNull();
     expect(r.planType).toBeNull();
+  });
+});
+
+describe('mapVolcengineUsage', () => {
+  it('解析三档定额', () => {
+    const real = {
+      Result: {
+        QuotaUsage: [
+          { Level: 'session', Percent: 6.0932815, ResetTimestamp: 1787639742, Cap: 100, RewardTotalPercent: 0 },
+          { Level: 'weekly', Percent: 0.8124375333333332, ResetTimestamp: 1788105600, Cap: 100, RewardTotalPercent: 0 },
+          { Level: 'monthly', Percent: 0.4062187666666666, ResetTimestamp: 1790351999, Cap: 100, RewardTotalPercent: 0 },
+        ],
+      },
+    } as unknown as Record<string, unknown>;
+    const r = mapVolcengineUsage(real);
+    expect(r.session.percent).toBe(6);
+    expect(r.weekly.percent).toBe(1);
+    expect(r.monthly.percent).toBe(0);
+    expect(r.session.limit).toBe(100);
+    expect(r.session.resetTime).toMatch(/^2026-/);
+  });
+  it('缺少 QuotaUsage 时容错为 0', () => {
+    const r = mapVolcengineUsage({});
+    expect(r.session.percent).toBe(0);
+    expect(r.monthly.resetTime).toBeNull();
   });
 });
 

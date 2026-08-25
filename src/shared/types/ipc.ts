@@ -5,10 +5,11 @@ export interface SettingsPayload extends AppConfig {
   hasMiniMaxToken: boolean;
   hasCopilotToken: boolean;
   hasProxy: boolean;
-  kimiTokenExp: number | null;
   copilotOAuth: boolean;
   hasDeepseekToken: boolean;
   codexAutoAvailable: boolean;
+  hasVolcengineCookie: boolean;
+  hasVolcengineCsrfToken: boolean;
 }
 
 export interface SettingsSavePayload {
@@ -17,6 +18,11 @@ export interface SettingsSavePayload {
   copilot: { token: string; tokenChanged: boolean; enabled: boolean; useProxy: boolean };
   deepseek: { token: string; tokenChanged: boolean; enabled: boolean; useProxy: boolean };
   codex?: { enabled: boolean; useProxy: boolean };
+  volcengine?: {
+    cookie: string; cookieChanged: boolean;
+    csrfToken: string; csrfTokenChanged: boolean;
+    enabled: boolean; useProxy: boolean;
+  };
   proxy: { url: string; urlChanged: boolean };
   intervalMinutes: number;
   hooks?: { enabled: { Notification: boolean; Stop: boolean; PreToolUse: boolean } };
@@ -67,13 +73,6 @@ export interface CopilotDeviceResult {
   error?: string;
 }
 
-export interface KimiLoginResult {
-  success: boolean;
-  /** 抓到的 token 过期时间（秒级 Unix 时间戳） */
-  tokenExp?: number | null;
-  error?: string;
-}
-
 /** 渲染进程侧 API 接口 */
 export interface ElectronAPI {
   toggleAlwaysOnTop: (enabled: boolean) => Promise<void>;
@@ -92,8 +91,6 @@ export interface ElectronAPI {
   copilotStartDeviceFlow: () => Promise<CopilotDeviceStartResult>;
   copilotCancelDeviceFlow: () => Promise<void>;
   onCopilotDeviceResult: (cb: (r: CopilotDeviceResult) => void) => void;
-  kimiStartLogin: () => Promise<{ success: boolean; error?: string }>;
-  onKimiLoginResult: (cb: (r: KimiLoginResult) => void) => void;
   floatingBall: {
     toggle: () => Promise<void>;
     openMain: () => Promise<void>;
@@ -124,8 +121,6 @@ export const IPC_CHANNELS = {
   COPILOT_DEVICE_START: 'copilot:device-start',
   COPILOT_DEVICE_CANCEL: 'copilot:device-cancel',
   COPILOT_DEVICE_RESULT: 'copilot:device-result',
-  KIMI_LOGIN_START: 'kimi:login-start',
-  KIMI_LOGIN_RESULT: 'kimi:login-result',
   FLOATING_BALL_TOGGLE: 'floating-ball:toggle',
   FLOATING_BALL_OPEN_MAIN: 'floating-ball:open-main',
   FLOATING_BALL_GET_STATE: 'floating-ball:get-state',

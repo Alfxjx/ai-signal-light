@@ -25,6 +25,7 @@ const usage = reactive<UsageState>({
   copilot: null,
   deepseek: null,
   codex: null,
+  volcengine: null,
   enabled: {},
   thresholds: { ...DEFAULT_USAGE_THRESHOLDS },
 });
@@ -122,6 +123,7 @@ function handleUsageInit(payload: UsageInitPayload) {
   usage.copilot = payload.copilot ?? null;
   usage.deepseek = payload.deepseek ?? null;
   usage.codex = payload.codex ?? null;
+  usage.volcengine = payload.volcengine ?? null;
   usage.enabled = payload.enabled ?? {};
   if (payload.thresholds) {
     usage.thresholds = {

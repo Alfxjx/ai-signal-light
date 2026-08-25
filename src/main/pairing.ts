@@ -60,6 +60,7 @@ export function toMobileConfig(config: AppConfig): MobileAppConfig {
     kimi: { ...config.kimi },
     minimax: { ...config.minimax },
     copilot: { ...config.copilot },
+    volcengine: { ...config.volcengine },
     proxy: { ...config.proxy },
     intervalMinutes: config.intervalMinutes,
     thresholds: { ...config.thresholds }

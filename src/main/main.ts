@@ -6,7 +6,6 @@ import QRCode from 'qrcode';
 import { StatusServer } from './server';
 import { ConfigStore, VALID_INTERVALS, HOOK_EVENTS } from './config';
 import { UsageMonitor, parseProxyUrl } from './usage-monitor';
-import { openKimiLoginWindow, closeKimiLoginWindow, decodeJwtExp } from './kimi-login';
 import { startDeviceFlow, pollDeviceFlow, isCopilotOAuthToken } from './copilot-auth';
 import { codexAuthAvailable } from './codex-credentials';
 import { WS_PORT } from '../shared/constants';
@@ -379,6 +378,15 @@ function buildTrayMenu(): Electron.Menu {
         rebuildTray();
       }
     },
+    {
+      label: '启用 Codex',
+      type: 'checkbox',
+      checked: cfg.codex.enabled,
+      click: (item: Electron.MenuItem) => {
+        configStore!.update({ codex: { enabled: item.checked } });
+        rebuildTray();
+      }
+    },
     { type: 'separator' },
     {
       label: 'LAN 模式（手机同步）',
@@ -734,15 +742,22 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, async () => {
     copilot: { token: cfg.copilot.token ? maskToken(cfg.copilot.token) : '', enabled: cfg.copilot.enabled, useProxy: cfg.copilot.useProxy },
     deepseek: { token: cfg.deepseek.token ? maskToken(cfg.deepseek.token) : '', enabled: cfg.deepseek.enabled, useProxy: cfg.deepseek.useProxy },
     codex:   { enabled: cfg.codex.enabled, useProxy: cfg.codex.useProxy },
+    volcengine: {
+      cookie: cfg.volcengine.cookie ? maskToken(cfg.volcengine.cookie) : '',
+      csrfToken: cfg.volcengine.csrfToken ? maskToken(cfg.volcengine.csrfToken) : '',
+      enabled: cfg.volcengine.enabled,
+      useProxy: cfg.volcengine.useProxy,
+    },
     proxy: { url: cfg.proxy?.url || '' },
     intervalMinutes: cfg.intervalMinutes,
     hasKimiToken:    !!cfg.kimi.token,
     hasMiniMaxToken: !!cfg.minimax.token,
     hasCopilotToken: !!cfg.copilot.token,
     hasProxy:        !!(cfg.proxy?.url),
-    kimiTokenExp: cfg.kimi.token ? decodeJwtExp(cfg.kimi.token) : null,
     copilotOAuth: isCopilotOAuthToken(cfg.copilot.token || ''),
     hasDeepseekToken: !!cfg.deepseek.token,
+    hasVolcengineCookie: !!cfg.volcengine.cookie,
+    hasVolcengineCsrfToken: !!cfg.volcengine.csrfToken,
     codexAutoAvailable: codexAuthAvailable(),
     hooks: {
       enabled: { ...cfg.hooks.enabled },
@@ -808,6 +823,17 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_SAVE, async (_event, partial: Record<string
     delete (next.proxy as Record<string, unknown>).urlChanged;
   }
 
+  // volcengine：cookie 与 csrfToken 各自的变更协议
+  if (next.volcengine && typeof next.volcengine === 'object') {
+    const v = next.volcengine as Record<string, unknown>;
+    if (v.cookieChanged) { v.cookie = (v.cookie as string) || ''; }
+    else { v.cookie = current.volcengine.cookie; }
+    if (v.csrfTokenChanged) { v.csrfToken = (v.csrfToken as string) || ''; }
+    else { v.csrfToken = current.volcengine.csrfToken; }
+    delete (next.volcengine as Record<string, unknown>).cookieChanged;
+    delete (next.volcengine as Record<string, unknown>).csrfTokenChanged;
+  }
+
   // LAN 模式：首次开启时自动生成 apiKey
   if (next.lanMode && typeof next.lanMode === 'object') {
     const lm = next.lanMode as Record<string, unknown>;
@@ -823,36 +849,6 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_SAVE, async (_event, partial: Record<string
   if (usageMonitor) usageMonitor.checkAll();
   // 悬浮球开关同步：启用即开窗口；关闭即隐藏
   syncFloatingBallFromConfig();
-  return { success: true };
-});
-
-function sendKimiLoginResult(r: { success: boolean; tokenExp?: number | null; error?: string }): void {
-  if (settingsWindow && !settingsWindow.isDestroyed()) {
-    settingsWindow.webContents.send(IPC_CHANNELS.KIMI_LOGIN_RESULT, r);
-  }
-}
-
-// Kimi 内嵌登录：打开 kimi.com，webRequest 拦截 apiv2 的 Authorization 头抓 token
-ipcMain.handle(IPC_CHANNELS.KIMI_LOGIN_START, async () => {
-  if (!configStore) return { success: false, error: 'no config' };
-  let captured = false;
-  openKimiLoginWindow(settingsWindow, (token) => {
-    const exp = decodeJwtExp(token);
-    // 忽略过期/非法 token，等网页端刷新后的下一个
-    if (!exp || exp * 1000 <= Date.now()) return;
-    captured = true;
-    const current = configStore!.get().kimi.token;
-    const currentExp = current ? decodeJwtExp(current) : null;
-    if (token !== current && (!currentExp || exp > currentExp)) {
-      configStore!.update({ kimi: { token } });
-      rebuildTray();
-      if (usageMonitor) usageMonitor.checkAll();
-    }
-    sendKimiLoginResult({ success: true, tokenExp: exp });
-    closeKimiLoginWindow();
-  }, () => {
-    if (!captured) sendKimiLoginResult({ success: false, error: '窗口已关闭，未获取到 Token' });
-  });
   return { success: true };
 });
 

@@ -4,6 +4,13 @@ export interface ProviderConfig {
   useProxy: boolean;
 }
 
+export interface VolcengineProviderConfig {
+  cookie: string;
+  csrfToken: string;
+  enabled: boolean;
+  useProxy: boolean;
+}
+
 export interface WindowConfig {
   width: number;
   height: number;
@@ -54,6 +61,7 @@ export interface AppConfig {
   copilot: ProviderConfig;
   deepseek: ProviderConfig;
   codex: ProviderConfig;
+  volcengine: VolcengineProviderConfig;
   proxy: { url: string };
   intervalMinutes: number;
   window: WindowConfig;
@@ -71,17 +79,19 @@ export interface MobileAppConfig {
   kimi: ProviderConfig;
   minimax: ProviderConfig;
   copilot: ProviderConfig;
+  volcengine: VolcengineProviderConfig;
   proxy: { url: string };
   intervalMinutes: number;
   thresholds: UsageThresholds;
 }
 
-export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex' | 'window' | 'proxy' | 'floatingBall' | 'thresholds' | 'lanMode'>> & {
+export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex' | 'volcengine' | 'window' | 'proxy' | 'floatingBall' | 'thresholds' | 'lanMode'>> & {
   kimi?: Partial<ProviderConfig>;
   minimax?: Partial<ProviderConfig>;
   copilot?: Partial<ProviderConfig>;
   deepseek?: Partial<ProviderConfig>;
   codex?: Partial<ProviderConfig>;
+  volcengine?: Partial<VolcengineProviderConfig>;
   proxy?: Partial<{ url: string }>;
   window?: Partial<WindowConfig>;
   hooks?: Partial<{
