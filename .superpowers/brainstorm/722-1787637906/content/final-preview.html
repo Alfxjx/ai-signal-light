@@ -1,0 +1,147 @@
+<h2>最终效果确认：两种模式整页预览</h2>
+<p class="subtitle">左边是双列网格模式（DeepSeek 余额块入格 + 一家一卡窗口堆叠），右边是单列详情模式（DeepSeek 变全宽余额条 + 完整详情卡）。标题栏右侧的按钮切换两种模式，选择会记住。没问题就回复确认，有要调的直接说。</p>
+
+<style>
+  .phone { background:#12141c; border-radius:14px; padding:8px; min-height:430px; display:flex; flex-direction:column; gap:6px; font-size:9px; color:#e8eaf0; }
+  .p-title { font-size:10px; font-weight:600; padding:2px 2px 0; display:flex; justify-content:space-between; align-items:center; }
+  .toggle-pill { background:#2a2f42; border-radius:8px; padding:2px 6px; font-size:8px; color:#cdd5f0; border:1px solid #3d4460; }
+  .p-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; align-items:start; }
+  .pc-name { font-size:8.5px; font-weight:600; color:#c6ccdf; }
+  .pc-sub { font-size:7px; color:#8f9bb8; }
+  .bar { height:3px; background:#2a2f42; border-radius:2px; overflow:hidden; }
+  .bar i { display:block; height:100%; border-radius:2px; }
+  .pace { font-size:6.5px; padding:1px 4px; border-radius:5px; font-weight:600; }
+  .pace-fast { background:rgba(244,67,54,.18); color:#ff8a80; }
+  .pace-slow { background:rgba(33,150,243,.18); color:#82b1ff; }
+  .pace-avg { background:rgba(255,255,255,.08); color:#9aa3c0; }
+
+  .ds-tile { background:linear-gradient(135deg,#1c2a4a,#241d3f); border-radius:8px; padding:8px; text-align:center; display:flex; flex-direction:column; justify-content:center; gap:1px; }
+  .ds-num-s { font-size:16px; font-weight:700; color:#fff; }
+
+  .g-card { background:#1e2230; border-radius:8px; padding:8px; display:flex; flex-direction:column; gap:6px; }
+  .g-head { display:flex; justify-content:space-between; align-items:center; }
+  .g-dot { width:5px; height:5px; border-radius:50%; background:#4caf50; }
+  .g-row { display:flex; flex-direction:column; gap:2px; }
+  .g-row-top { display:flex; justify-content:space-between; align-items:center; }
+  .g-lbl { font-size:7px; color:#8f9bb8; }
+  .g-pct { font-size:8.5px; font-weight:700; color:#fff; }
+
+  /* single column */
+  .ds-hero { background:linear-gradient(135deg,#1c2a4a,#241d3f); border-radius:10px; padding:12px; display:flex; justify-content:space-between; align-items:center; }
+  .ds-hero .l { display:flex; flex-direction:column; gap:1px; }
+  .ds-num { font-size:24px; font-weight:700; color:#fff; letter-spacing:-0.5px; }
+  .d-card { background:#1e2230; border-radius:10px; padding:9px 10px; display:flex; flex-direction:column; gap:6px; }
+  .d-head { display:flex; justify-content:space-between; align-items:center; }
+  .d-status { font-size:7px; color:#4caf50; }
+  .d-row-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:2px; }
+  .d-reset { font-size:6.5px; color:#6b7390; }
+  .bar-lg { height:5px; background:#2a2f42; border-radius:3px; overflow:hidden; }
+  .bar-lg i { display:block; height:100%; border-radius:3px; }
+  .d-foot { font-size:6.5px; color:#6b7390; }
+  .refresh-btn { background:#3d5af1; color:#fff; text-align:center; border-radius:8px; padding:5px; font-size:8px; font-weight:600; margin-top:2px; }
+</style>
+
+<div class="split">
+
+  <div class="mockup">
+    <div class="mockup-header">双列网格模式</div>
+    <div class="mockup-body" style="background:#0b0d13; padding:12px 8px;">
+      <div class="phone">
+        <div class="p-title">用量 <span class="toggle-pill">▦ 网格 ▾</span></div>
+        <div class="p-grid">
+          <div class="ds-tile"><div class="pc-sub">DeepSeek</div><div class="ds-num-s">¥86.20</div><div class="pc-sub">余额</div></div>
+          <div class="g-card">
+            <div class="g-head"><span class="pc-name">Kimi</span><span class="g-dot"></span></div>
+            <div class="g-row">
+              <div class="g-row-top"><span class="g-lbl">本周编码</span><span><span class="g-pct">32%</span> <span class="pace pace-avg">平均</span></span></div>
+              <div class="bar"><i style="width:32%; background:#4caf50"></i></div>
+            </div>
+            <div class="g-row">
+              <div class="g-row-top"><span class="g-lbl">5 小时窗口</span><span><span class="g-pct">45%</span> <span class="pace pace-fast">快</span></span></div>
+              <div class="bar"><i style="width:45%; background:#4caf50"></i></div>
+            </div>
+          </div>
+          <div class="g-card">
+            <div class="g-head"><span class="pc-name">MiniMax</span><span class="g-dot"></span></div>
+            <div class="g-row">
+              <div class="g-row-top"><span class="g-lbl">5 小时窗口</span><span><span class="g-pct">61%</span> <span class="pace pace-slow">慢</span></span></div>
+              <div class="bar"><i style="width:61%; background:#ffc107"></i></div>
+            </div>
+            <div class="g-row">
+              <div class="g-row-top"><span class="g-lbl">本周</span><span><span class="g-pct">38%</span> <span class="pace pace-avg">平均</span></span></div>
+              <div class="bar"><i style="width:38%; background:#4caf50"></i></div>
+            </div>
+          </div>
+          <div class="g-card">
+            <div class="g-head"><span class="pc-name">Copilot</span><span class="g-dot"></span></div>
+            <div class="g-row">
+              <div class="g-row-top"><span class="g-lbl">Premium</span><span><span class="g-pct">18%</span></span></div>
+              <div class="bar"><i style="width:18%; background:#4caf50"></i></div>
+            </div>
+          </div>
+          <div class="g-card">
+            <div class="g-head"><span class="pc-name">火山引擎</span><span class="g-dot"></span></div>
+            <div class="g-row">
+              <div class="g-row-top"><span class="g-lbl">会话</span><span><span class="g-pct">84%</span> <span class="pace pace-fast">快</span></span></div>
+              <div class="bar"><i style="width:84%; background:#f44336"></i></div>
+            </div>
+            <div class="g-row">
+              <div class="g-row-top"><span class="g-lbl">本周</span><span><span class="g-pct">52%</span> <span class="pace pace-avg">平均</span></span></div>
+              <div class="bar"><i style="width:52%; background:#ffc107"></i></div>
+            </div>
+            <div class="g-row">
+              <div class="g-row-top"><span class="g-lbl">本月</span><span><span class="g-pct">41%</span></span></div>
+              <div class="bar"><i style="width:41%; background:#4caf50"></i></div>
+            </div>
+          </div>
+        </div>
+        <div class="refresh-btn">刷新</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">单列详情模式</div>
+    <div class="mockup-body" style="background:#0b0d13; padding:12px 8px;">
+      <div class="phone">
+        <div class="p-title">用量 <span class="toggle-pill">☰ 列表 ▾</span></div>
+        <div class="ds-hero">
+          <div class="l">
+            <div class="pc-sub">DeepSeek 余额</div>
+            <div class="ds-num">¥86.20</div>
+            <div class="pc-sub">含赠送 ¥10.00</div>
+          </div>
+          <div class="pc-sub">12:30:05<br>更新</div>
+        </div>
+        <div class="d-card">
+          <div class="d-head"><span class="pc-name">Kimi</span><span class="d-status">● 正常</span></div>
+          <div>
+            <div class="d-row-top"><span><span class="g-lbl">本周编码</span> <span class="d-reset">Reset in 3d4h</span></span><span><span class="g-pct">32%</span> <span class="pace pace-avg">平均</span></span></div>
+            <div class="bar-lg"><i style="width:32%; background:#4caf50"></i></div>
+          </div>
+          <div>
+            <div class="d-row-top"><span><span class="g-lbl">5 小时窗口</span> <span class="d-reset">Reset in 2h15m</span></span><span><span class="g-pct">45%</span> <span class="pace pace-fast">快</span></span></div>
+            <div class="bar-lg"><i style="width:45%; background:#4caf50"></i></div>
+          </div>
+          <div class="d-foot">最后更新：12:30:05</div>
+        </div>
+        <div class="d-card">
+          <div class="d-head"><span class="pc-name">MiniMax</span><span class="d-status">● 正常</span></div>
+          <div>
+            <div class="d-row-top"><span><span class="g-lbl">5 小时窗口</span> <span class="d-reset">Reset in 1h40m</span></span><span><span class="g-pct">61%</span> <span class="pace pace-slow">慢</span></span></div>
+            <div class="bar-lg"><i style="width:61%; background:#ffc107"></i></div>
+          </div>
+          <div>
+            <div class="d-row-top"><span><span class="g-lbl">本周</span> <span class="d-reset">Reset in 4d2h</span></span><span><span class="g-pct">38%</span> <span class="pace pace-avg">平均</span></span></div>
+            <div class="bar-lg"><i style="width:38%; background:#4caf50"></i></div>
+          </div>
+          <div class="d-foot">最后更新：12:30:05</div>
+        </div>
+        <div class="refresh-btn">刷新</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px">细节说明：网格模式卡片右上角的状态点表示连接/Token 状态（绿正常 / 红异常）；单列模式的进度条更高、带重置时间；DeepSeek 在两种模式下都是渐变底色卡片，余额数字明显大于其他内容。</p>

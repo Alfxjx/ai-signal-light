@@ -7,6 +7,16 @@
 - 关联：相关模块/文件
 -->
 
+## [android-usage-tab-redesign](plans/android-usage-tab-redesign.md) | [history](history/android-usage-tab-redesign.md)
+- 时间：2026-08-25
+- 范围：安卓端用量页 UI 改版：双列网格/单列详情切换（SharedPreferences 持久化）、DeepSeek 余额放大（渐变 tile / 全宽余额条）、同心多环网格卡、节奏徽章化
+- 关联：`android-app/.../ui/components/{UsageBar,PaceBadge,ConcentricRings,GridProviderCard,DeepseekBalance,ProviderCard}.kt`、`android-app/.../ui/home/UsageTab.kt`
+
+## [kimi-coding-api-key](plans/kimi-coding-api-key.md) | [history](history/kimi-coding-api-key.md)
+- 时间：2026-08-25
+- 范围：Kimi 用量改开放平台 API Key + `coding/v1/usages`(GET)，移除网页登录窗口；两端 UI 从三行精简为两行
+- 关联：`src/main/{usage-monitor,main,preload}.ts`、`src/shared/types/{usage,ipc}.ts`、`src/renderer/src/{Settings.vue,components/UsageCard.vue}`、`android-app/.../{data/remote/KimiApi.kt,domain/model/UsageData.kt,ui/home/UsageTab.kt,data/notification/NotificationHelper.kt}`
+
 ## [usage-pace-indicator](plans/usage-pace-indicator.md) | [history](history/usage-pace-indicator.md)
 - 时间：2026-07-22
 - 范围：主界面 UsageCard 为 5h / 周限额模型增加"消耗节奏"提示（快/慢/平均），基于重置时间计算期望平均消耗

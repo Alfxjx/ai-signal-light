@@ -1,0 +1,167 @@
+<h2>多窗口 + 节奏标记，网格模式怎么放？</h2>
+<p class="subtitle">Kimi/MiniMax 有 2 个窗口、火山引擎有 3 个，每个窗口还有快/慢/平均节奏。三种组织方式，选一个。点卡片选择。</p>
+
+<style>
+  .phone { background:#12141c; border-radius:14px; padding:8px; min-height:360px; display:flex; flex-direction:column; gap:6px; font-size:9px; color:#e8eaf0; }
+  .p-title { font-size:10px; font-weight:600; padding:2px 2px 0; display:flex; justify-content:space-between; align-items:center; }
+  .toggle-pill { background:#2a2f42; border-radius:8px; padding:2px 6px; font-size:8px; color:#9aa3c0; }
+  .p-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; align-items:start; }
+  .pc-name { font-size:8.5px; font-weight:600; color:#c6ccdf; }
+  .pc-sub { font-size:7px; color:#8f9bb8; }
+  .bar { height:3px; background:#2a2f42; border-radius:2px; overflow:hidden; }
+  .bar i { display:block; height:100%; border-radius:2px; }
+  .pace { font-size:6.5px; padding:1px 4px; border-radius:5px; font-weight:600; }
+  .pace-fast { background:rgba(244,67,54,.18); color:#ff8a80; }
+  .pace-slow { background:rgba(33,150,243,.18); color:#82b1ff; }
+  .pace-avg { background:rgba(255,255,255,.08); color:#9aa3c0; }
+
+  .ds-tile { background:linear-gradient(135deg,#1c2a4a,#241d3f); border-radius:8px; padding:8px; text-align:center; display:flex; flex-direction:column; justify-content:center; gap:1px; }
+  .ds-num-s { font-size:16px; font-weight:700; color:#fff; }
+
+  /* A: one card per provider, stacked mini rows */
+  .a-card { background:#1e2230; border-radius:8px; padding:8px; display:flex; flex-direction:column; gap:6px; }
+  .a-head { display:flex; justify-content:space-between; align-items:center; }
+  .a-row { display:flex; flex-direction:column; gap:2px; }
+  .a-row-top { display:flex; justify-content:space-between; align-items:center; }
+  .a-lbl { font-size:7px; color:#8f9bb8; }
+  .a-pct { font-size:8.5px; font-weight:700; color:#fff; }
+
+  /* B: each window = one tile */
+  .b-card { background:#1e2230; border-radius:8px; padding:8px; display:flex; flex-direction:column; gap:4px; }
+  .b-head { display:flex; justify-content:space-between; align-items:flex-start; }
+  .b-num { font-size:17px; font-weight:700; color:#fff; line-height:1.1; }
+
+  /* C: primary metric + summary line */
+  .c-card { background:#1e2230; border-radius:8px; padding:8px; display:flex; flex-direction:column; gap:3px; }
+  .c-num { font-size:17px; font-weight:700; color:#fff; line-height:1.1; }
+  .c-sum { font-size:6.8px; color:#8f9bb8; line-height:1.5; }
+</style>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0d13; padding:14px 10px;">
+      <div class="phone">
+        <div class="p-title">用量 <span class="toggle-pill">▦ 网格</span></div>
+        <div class="p-grid">
+          <div class="ds-tile"><div class="pc-sub">DeepSeek</div><div class="ds-num-s">¥86.20</div><div class="pc-sub">余额</div></div>
+          <div class="a-card">
+            <div class="a-head"><span class="pc-name">Kimi</span></div>
+            <div class="a-row">
+              <div class="a-row-top"><span class="a-lbl">本周编码</span><span><span class="a-pct">32%</span> <span class="pace pace-avg">平均</span></span></div>
+              <div class="bar"><i style="width:32%; background:#4caf50"></i></div>
+            </div>
+            <div class="a-row">
+              <div class="a-row-top"><span class="a-lbl">5 小时窗口</span><span><span class="a-pct">45%</span> <span class="pace pace-fast">快</span></span></div>
+              <div class="bar"><i style="width:45%; background:#4caf50"></i></div>
+            </div>
+          </div>
+          <div class="a-card">
+            <div class="a-head"><span class="pc-name">MiniMax</span></div>
+            <div class="a-row">
+              <div class="a-row-top"><span class="a-lbl">5 小时窗口</span><span><span class="a-pct">61%</span> <span class="pace pace-slow">慢</span></span></div>
+              <div class="bar"><i style="width:61%; background:#ffc107"></i></div>
+            </div>
+            <div class="a-row">
+              <div class="a-row-top"><span class="a-lbl">本周</span><span><span class="a-pct">38%</span> <span class="pace pace-avg">平均</span></span></div>
+              <div class="bar"><i style="width:38%; background:#4caf50"></i></div>
+            </div>
+          </div>
+          <div class="a-card">
+            <div class="a-head"><span class="pc-name">Copilot</span></div>
+            <div class="a-row">
+              <div class="a-row-top"><span class="a-lbl">Premium</span><span><span class="a-pct">18%</span></span></div>
+              <div class="bar"><i style="width:18%; background:#4caf50"></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · 一家一卡，窗口堆叠</h3>
+      <p>每个 provider 一张卡，多窗口在卡内竖排小行（标签 + 百分比 + 节奏小徽章 + 细条）。信息全保留，但卡片高矮不一，网格会有错落。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0d13; padding:14px 10px;">
+      <div class="phone">
+        <div class="p-title">用量 <span class="toggle-pill">▦ 网格</span></div>
+        <div class="p-grid">
+          <div class="ds-tile"><div class="pc-sub">DeepSeek</div><div class="ds-num-s">¥86.20</div><div class="pc-sub">余额</div></div>
+          <div class="b-card">
+            <div class="b-head"><div><div class="pc-name">Kimi</div><div class="pc-sub">本周编码</div></div><span class="pace pace-avg">平均</span></div>
+            <div class="b-num">32%</div>
+            <div class="bar"><i style="width:32%; background:#4caf50"></i></div>
+          </div>
+          <div class="b-card">
+            <div class="b-head"><div><div class="pc-name">Kimi</div><div class="pc-sub">5 小时窗口</div></div><span class="pace pace-fast">快</span></div>
+            <div class="b-num">45%</div>
+            <div class="bar"><i style="width:45%; background:#4caf50"></i></div>
+          </div>
+          <div class="b-card">
+            <div class="b-head"><div><div class="pc-name">MiniMax</div><div class="pc-sub">5 小时窗口</div></div><span class="pace pace-slow">慢</span></div>
+            <div class="b-num">61%</div>
+            <div class="bar"><i style="width:61%; background:#ffc107"></i></div>
+          </div>
+          <div class="b-card">
+            <div class="b-head"><div><div class="pc-name">MiniMax</div><div class="pc-sub">本周</div></div><span class="pace pace-avg">平均</span></div>
+            <div class="b-num">38%</div>
+            <div class="bar"><i style="width:38%; background:#4caf50"></i></div>
+          </div>
+          <div class="b-card">
+            <div class="b-head"><div><div class="pc-name">Copilot</div><div class="pc-sub">Premium</div></div></div>
+            <div class="b-num">18%</div>
+            <div class="bar"><i style="width:18%; background:#4caf50"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · 每窗口独立成格（推荐）</h3>
+      <p>每个限额窗口一张卡：provider 名 + 窗口名、大号百分比、节奏徽章、细进度条。网格完全整齐、卡片等高，火山 3 个窗口也能自然铺开；窗口多时向下滑即可。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0d13; padding:14px 10px;">
+      <div class="phone">
+        <div class="p-title">用量 <span class="toggle-pill">▦ 网格</span></div>
+        <div class="p-grid">
+          <div class="ds-tile"><div class="pc-sub">DeepSeek</div><div class="ds-num-s">¥86.20</div><div class="pc-sub">余额</div></div>
+          <div class="c-card">
+            <div class="b-head"><span class="pc-name">Kimi</span><span class="pace pace-fast">快</span></div>
+            <div class="c-num">45%</div>
+            <div class="bar"><i style="width:45%; background:#4caf50"></i></div>
+            <div class="c-sum">5h 窗口 45% 快 · 本周 32% 平均</div>
+          </div>
+          <div class="c-card">
+            <div class="b-head"><span class="pc-name">MiniMax</span><span class="pace pace-slow">慢</span></div>
+            <div class="c-num">61%</div>
+            <div class="bar"><i style="width:61%; background:#ffc107"></i></div>
+            <div class="c-sum">5h 窗口 61% 慢 · 本周 38% 平均</div>
+          </div>
+          <div class="c-card">
+            <div class="b-head"><span class="pc-name">Copilot</span></div>
+            <div class="c-num">18%</div>
+            <div class="bar"><i style="width:18%; background:#4caf50"></i></div>
+            <div class="c-sum">Premium · 月底重置</div>
+          </div>
+          <div class="c-card">
+            <div class="b-head"><span class="pc-name">火山引擎</span><span class="pace pace-avg">平均</span></div>
+            <div class="c-num">84%</div>
+            <div class="bar"><i style="width:84%; background:#f44336"></i></div>
+            <div class="c-sum">会话 84% · 本周 52% · 本月 41%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C · 主指标 + 摘要行</h3>
+      <p>卡片大号显示<b>用量最高的窗口</b>（最需要关注的），其他窗口缩成一行小字摘要。卡片最少最整齐，但次要窗口信息被弱化，且需要定义「最高」规则。</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px">单列模式不受影响：仍然是现在那种完整详情卡（所有窗口 + 重置时间 + 节奏）。这屏只决定双列网格怎么组织。推荐 <b>B</b>：整齐、规则简单、信息不丢。</p>

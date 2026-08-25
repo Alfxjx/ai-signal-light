@@ -1,0 +1,149 @@
+<h2>用量页整体布局，选哪个方向？</h2>
+<p class="subtitle">三个方案都满足「双列/单列切换 + DeepSeek 余额放大」，区别在 DeepSeek 卡片的位置和形态。点卡片选择，或直接在终端回复。</p>
+
+<style>
+  .phone { background:#12141c; border-radius:14px; padding:8px; height:400px; overflow:hidden; display:flex; flex-direction:column; gap:6px; font-size:9px; color:#e8eaf0; }
+  .p-title { font-size:10px; font-weight:600; padding:2px 2px 0; display:flex; justify-content:space-between; align-items:center; }
+  .toggle-pill { background:#2a2f42; border-radius:8px; padding:2px 6px; font-size:8px; color:#9aa3c0; }
+  .ds-hero { background:linear-gradient(135deg,#1c2a4a,#241d3f); border-radius:10px; padding:10px 12px; }
+  .ds-hero .ds-label { font-size:8px; color:#8f9bb8; }
+  .ds-hero .ds-num { font-size:26px; font-weight:700; color:#fff; letter-spacing:-0.5px; }
+  .ds-hero .ds-sub { font-size:7px; color:#8f9bb8; margin-top:2px; }
+  .p-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .p-card { background:#1e2230; border-radius:8px; padding:7px 8px; display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
+  .p-card .pc-name { font-size:8.5px; font-weight:600; color:#c6ccdf; }
+  .ring { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; align-self:center; }
+  .ring span { font-size:8px; font-weight:700; color:#fff; }
+  .ring-in { width:26px; height:26px; border-radius:50%; background:#1e2230; display:flex; align-items:center; justify-content:center; }
+  .p-bar { height:3px; background:#2a2f42; border-radius:2px; overflow:hidden; }
+  .p-bar i { display:block; height:100%; border-radius:2px; }
+  .p-row-card { background:#1e2230; border-radius:8px; padding:8px; }
+  .p-row-top { display:flex; justify-content:space-between; margin-bottom:5px; font-size:8.5px; font-weight:600; color:#c6ccdf; }
+  .p-row-top .pct { color:#fff; }
+  .ds-tile { background:linear-gradient(135deg,#1c2a4a,#241d3f); border-radius:8px; padding:8px; text-align:center; }
+  .ds-tile .ds-num-s { font-size:16px; font-weight:700; color:#fff; }
+  .ds-tile .ds-label { font-size:7px; color:#8f9bb8; }
+</style>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0d13; padding:14px 10px;">
+      <div class="phone">
+        <div class="p-title">用量</div>
+        <div class="ds-hero">
+          <div class="ds-label">DeepSeek 余额</div>
+          <div class="ds-num">¥86.20</div>
+          <div class="ds-sub">含赠送 ¥10.00 · 12:30:05 更新</div>
+        </div>
+        <div class="p-grid">
+          <div class="p-card">
+            <div class="pc-name">Kimi</div>
+            <div class="ring" style="background:conic-gradient(#4caf50 0 32%, #2a2f42 32% 100%)"><div class="ring-in"><span>32%</span></div></div>
+            <div class="pc-name" style="font-size:7px; color:#8f9bb8; align-self:center">本周编码</div>
+          </div>
+          <div class="p-card">
+            <div class="pc-name">MiniMax</div>
+            <div class="ring" style="background:conic-gradient(#ffc107 0 61%, #2a2f42 61% 100%)"><div class="ring-in"><span>61%</span></div></div>
+            <div class="pc-name" style="font-size:7px; color:#8f9bb8; align-self:center">5 小时窗口</div>
+          </div>
+          <div class="p-card">
+            <div class="pc-name">Copilot</div>
+            <div class="ring" style="background:conic-gradient(#4caf50 0 18%, #2a2f42 18% 100%)"><div class="ring-in"><span>18%</span></div></div>
+            <div class="pc-name" style="font-size:7px; color:#8f9bb8; align-self:center">Premium</div>
+          </div>
+          <div class="p-card">
+            <div class="pc-name">火山引擎</div>
+            <div class="ring" style="background:conic-gradient(#f44336 0 84%, #2a2f42 84% 100%)"><div class="ring-in"><span>84%</span></div></div>
+            <div class="pc-name" style="font-size:7px; color:#8f9bb8; align-self:center">会话</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · 固定混合布局</h3>
+      <p>DeepSeek 大余额卡全宽置顶，其余 provider 固定双列网格（环形百分比）。没有切换，布局简单稳定，但网格模式信息密度固定。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0d13; padding:14px 10px;">
+      <div class="phone">
+        <div class="p-title">用量 <span class="toggle-pill">▦ 网格</span></div>
+        <div class="ds-hero">
+          <div class="ds-label">DeepSeek 余额</div>
+          <div class="ds-num">¥86.20</div>
+          <div class="ds-sub">含赠送 ¥10.00 · 12:30:05 更新</div>
+        </div>
+        <div class="p-grid">
+          <div class="p-card">
+            <div class="pc-name">Kimi</div>
+            <div class="ring" style="background:conic-gradient(#4caf50 0 32%, #2a2f42 32% 100%)"><div class="ring-in"><span>32%</span></div></div>
+            <div class="pc-name" style="font-size:7px; color:#8f9bb8; align-self:center">本周编码</div>
+          </div>
+          <div class="p-card">
+            <div class="pc-name">MiniMax</div>
+            <div class="ring" style="background:conic-gradient(#ffc107 0 61%, #2a2f42 61% 100%)"><div class="ring-in"><span>61%</span></div></div>
+            <div class="pc-name" style="font-size:7px; color:#8f9bb8; align-self:center">5 小时窗口</div>
+          </div>
+          <div class="p-card">
+            <div class="pc-name">Copilot</div>
+            <div class="ring" style="background:conic-gradient(#4caf50 0 18%, #2a2f42 18% 100%)"><div class="ring-in"><span>18%</span></div></div>
+            <div class="pc-name" style="font-size:7px; color:#8f9bb8; align-self:center">Premium</div>
+          </div>
+          <div class="p-card">
+            <div class="pc-name">火山引擎</div>
+            <div class="ring" style="background:conic-gradient(#f44336 0 84%, #2a2f42 84% 100%)"><div class="ring-in"><span>84%</span></div></div>
+            <div class="pc-name" style="font-size:7px; color:#8f9bb8; align-self:center">会话</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · 切换 + DeepSeek 置顶（推荐）</h3>
+      <p>标题栏右侧放网格/列表切换按钮。DeepSeek 余额大卡<b>始终全宽置顶</b>，其余 provider 在双列网格和单列详情卡之间切换。单列模式保留现在的进度条+重置时间+节奏等全部细节。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0d13; padding:14px 10px;">
+      <div class="phone">
+        <div class="p-title">用量 <span class="toggle-pill">▦ 网格</span></div>
+        <div class="p-grid">
+          <div class="ds-tile">
+            <div class="ds-label">DeepSeek</div>
+            <div class="ds-num-s">¥86.20</div>
+            <div class="ds-label">余额</div>
+          </div>
+          <div class="p-card">
+            <div class="pc-name">Kimi</div>
+            <div class="ring" style="background:conic-gradient(#4caf50 0 32%, #2a2f42 32% 100%)"><div class="ring-in"><span>32%</span></div></div>
+          </div>
+          <div class="p-card">
+            <div class="pc-name">MiniMax</div>
+            <div class="ring" style="background:conic-gradient(#ffc107 0 61%, #2a2f42 61% 100%)"><div class="ring-in"><span>61%</span></div></div>
+          </div>
+          <div class="p-card">
+            <div class="pc-name">Copilot</div>
+            <div class="ring" style="background:conic-gradient(#4caf50 0 18%, #2a2f42 18% 100%)"><div class="ring-in"><span>18%</span></div></div>
+          </div>
+          <div class="p-card">
+            <div class="pc-name">火山引擎</div>
+            <div class="ring" style="background:conic-gradient(#f44336 0 84%, #2a2f42 84% 100%)"><div class="ring-in"><span>84%</span></div></div>
+          </div>
+        </div>
+        <div class="p-row-card" style="margin-top:2px">
+          <div class="p-row-top"><span>切换到单列时 DeepSeek 变长条余额卡</span></div>
+          <div class="p-bar"><i style="width:100%; background:linear-gradient(90deg,#3d5af1,#7b5cf0)"></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C · 切换，DeepSeek 也入格</h3>
+      <p>所有卡片一视同仁：双列时 DeepSeek 是网格里的一块（数字放大居中），单列时变成全宽余额条。视觉上最整齐，但余额不如 B 醒目。</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px">说明：三个方案的「单列模式」都是现在详情长卡的精致版；区别只在网格模式和 DeepSeek 的位置。推荐 <b>B</b>——余额一眼可见，切换逻辑也最清晰。</p>

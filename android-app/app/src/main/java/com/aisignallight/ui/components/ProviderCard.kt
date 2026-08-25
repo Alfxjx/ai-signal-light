@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -31,8 +32,9 @@ fun ProviderCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -70,15 +72,7 @@ fun ProviderCard(
                         )
                         if (!bar.paceLabel.isNullOrEmpty()) {
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = bar.paceLabel,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = when {
-                                    bar.paceLabel.startsWith("快") -> Color(0xFFF44336)
-                                    bar.paceLabel.startsWith("慢") -> Color(0xFF2196F3)
-                                    else -> MaterialTheme.colorScheme.outline
-                                }
-                            )
+                            PaceBadge(label = bar.paceLabel)
                         }
                     }
                 }

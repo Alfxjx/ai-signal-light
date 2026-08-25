@@ -1,0 +1,131 @@
+<h2>双列网格里，每张卡片长什么样？</h2>
+<p class="subtitle">网格模式只放核心信息（名称 + 百分比），细节留给单列模式。下面三种卡片样式，选一个。点卡片选择。</p>
+
+<style>
+  .phone { background:#12141c; border-radius:14px; padding:8px; min-height:330px; display:flex; flex-direction:column; gap:6px; font-size:9px; color:#e8eaf0; }
+  .p-title { font-size:10px; font-weight:600; padding:2px 2px 0; display:flex; justify-content:space-between; align-items:center; }
+  .toggle-pill { background:#2a2f42; border-radius:8px; padding:2px 6px; font-size:8px; color:#9aa3c0; }
+  .p-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .pc-name { font-size:8.5px; font-weight:600; color:#c6ccdf; }
+  .pc-sub { font-size:7px; color:#8f9bb8; }
+
+  /* A: ring */
+  .a-card { background:#1e2230; border-radius:8px; padding:8px; display:flex; flex-direction:column; gap:4px; }
+  .ring { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; align-self:center; }
+  .ring-in { width:27px; height:27px; border-radius:50%; background:#1e2230; display:flex; align-items:center; justify-content:center; }
+  .ring span { font-size:8px; font-weight:700; color:#fff; }
+  .a-center { text-align:center; }
+
+  /* B: big number + thin bar */
+  .b-card { background:#1e2230; border-radius:8px; padding:8px; display:flex; flex-direction:column; gap:5px; }
+  .b-num { font-size:19px; font-weight:700; color:#fff; letter-spacing:-0.5px; line-height:1; }
+  .b-num small { font-size:9px; font-weight:500; color:#8f9bb8; }
+  .b-bar { height:4px; background:#2a2f42; border-radius:2px; overflow:hidden; }
+  .b-bar i { display:block; height:100%; border-radius:2px; }
+
+  /* C: number + status dot + tinted bg */
+  .c-card { background:#1e2230; border-radius:8px; padding:8px; display:flex; flex-direction:column; gap:3px; border-left:3px solid; }
+  .c-head { display:flex; justify-content:space-between; align-items:center; }
+  .c-dot { width:6px; height:6px; border-radius:50%; }
+  .c-num { font-size:19px; font-weight:700; color:#fff; line-height:1.1; }
+
+  .ds-tile { background:linear-gradient(135deg,#1c2a4a,#241d3f); border-radius:8px; padding:8px; text-align:center; display:flex; flex-direction:column; justify-content:center; gap:1px; }
+  .ds-num-s { font-size:16px; font-weight:700; color:#fff; }
+</style>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0d13; padding:14px 10px;">
+      <div class="phone">
+        <div class="p-title">用量 <span class="toggle-pill">▦ 网格</span></div>
+        <div class="p-grid">
+          <div class="ds-tile"><div class="pc-sub">DeepSeek</div><div class="ds-num-s">¥86.20</div><div class="pc-sub">余额</div></div>
+          <div class="a-card">
+            <div class="pc-name">Kimi</div>
+            <div class="ring" style="background:conic-gradient(#4caf50 0 32%, #2a2f42 32% 100%)"><div class="ring-in"><span>32%</span></div></div>
+            <div class="pc-sub a-center">本周编码</div>
+          </div>
+          <div class="a-card">
+            <div class="pc-name">MiniMax</div>
+            <div class="ring" style="background:conic-gradient(#ffc107 0 61%, #2a2f42 61% 100%)"><div class="ring-in"><span>61%</span></div></div>
+            <div class="pc-sub a-center">5 小时窗口</div>
+          </div>
+          <div class="a-card">
+            <div class="pc-name">Copilot</div>
+            <div class="ring" style="background:conic-gradient(#4caf50 0 18%, #2a2f42 18% 100%)"><div class="ring-in"><span>18%</span></div></div>
+            <div class="pc-sub a-center">Premium</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · 环形百分比</h3>
+      <p>圆环直观、颜色直接表达健康度，扫一眼就知道哪家快用完了。多窗口的 provider（如 Kimi）只显示最重要的一个环。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0d13; padding:14px 10px;">
+      <div class="phone">
+        <div class="p-title">用量 <span class="toggle-pill">▦ 网格</span></div>
+        <div class="p-grid">
+          <div class="ds-tile"><div class="pc-sub">DeepSeek</div><div class="ds-num-s">¥86.20</div><div class="pc-sub">余额</div></div>
+          <div class="b-card">
+            <div class="pc-name">Kimi</div>
+            <div class="b-num">32<small>%</small></div>
+            <div class="b-bar"><i style="width:32%; background:#4caf50"></i></div>
+            <div class="pc-sub">本周编码</div>
+          </div>
+          <div class="b-card">
+            <div class="pc-name">MiniMax</div>
+            <div class="b-num">61<small>%</small></div>
+            <div class="b-bar"><i style="width:61%; background:#ffc107"></i></div>
+            <div class="pc-sub">5 小时窗口</div>
+          </div>
+          <div class="b-card">
+            <div class="pc-name">Copilot</div>
+            <div class="b-num">18<small>%</small></div>
+            <div class="b-bar"><i style="width:18%; background:#4caf50"></i></div>
+            <div class="pc-sub">Premium</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · 大数字 + 细进度条</h3>
+      <p>数字是主角，和 DeepSeek 余额卡风格最统一（都是大数字），整体更「数据面板」。实现也最简单。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0d13; padding:14px 10px;">
+      <div class="phone">
+        <div class="p-title">用量 <span class="toggle-pill">▦ 网格</span></div>
+        <div class="p-grid">
+          <div class="ds-tile"><div class="pc-sub">DeepSeek</div><div class="ds-num-s">¥86.20</div><div class="pc-sub">余额</div></div>
+          <div class="c-card" style="border-left-color:#4caf50">
+            <div class="c-head"><span class="pc-name">Kimi</span><span class="c-dot" style="background:#4caf50"></span></div>
+            <div class="c-num">32%</div>
+            <div class="pc-sub">本周编码 · 正常</div>
+          </div>
+          <div class="c-card" style="border-left-color:#ffc107">
+            <div class="c-head"><span class="pc-name">MiniMax</span><span class="c-dot" style="background:#ffc107"></span></div>
+            <div class="c-num">61%</div>
+            <div class="pc-sub">5 小时窗口 · 注意</div>
+          </div>
+          <div class="c-card" style="border-left-color:#4caf50">
+            <div class="c-head"><span class="pc-name">Copilot</span><span class="c-dot" style="background:#4caf50"></span></div>
+            <div class="c-num">18%</div>
+            <div class="pc-sub">Premium · 正常</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C · 左侧色条 + 大数字</h3>
+      <p>左边一条状态色贯穿卡片，配合状态点，告警时最醒目（整卡红边）。偏「监控告警」气质，数字同样突出。</p>
+    </div>
+  </div>
+
+</div>

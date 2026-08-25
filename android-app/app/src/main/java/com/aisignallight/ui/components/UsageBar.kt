@@ -13,6 +13,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
+/** 按用量阈值返回健康色：danger 红 / warn 黄 / 正常绿（进度条与同心环共用） */
+fun usageBarColor(percent: Int, warnThreshold: Int, dangerThreshold: Int): Color = when {
+    percent >= dangerThreshold -> Color(0xFFF44336) // danger red
+    percent >= warnThreshold -> Color(0xFFFFC107)  // warn yellow
+    else -> Color(0xFF4CAF50)                        // fresh green
+}
+
 @Composable
 fun UsageBar(
     percent: Int,
@@ -21,11 +28,7 @@ fun UsageBar(
     modifier: Modifier = Modifier,
     height: Int = 8
 ) {
-    val color = when {
-        percent >= dangerThreshold -> Color(0xFFF44336) // danger red
-        percent >= warnThreshold -> Color(0xFFFFC107)  // warn yellow
-        else -> Color(0xFF4CAF50)                        // fresh green
-    }
+    val color = usageBarColor(percent, warnThreshold, dangerThreshold)
 
     Box(
         modifier = modifier

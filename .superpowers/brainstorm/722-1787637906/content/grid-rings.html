@@ -1,0 +1,168 @@
+<h2>多层环形进度条：两种卡片排布</h2>
+<p class="subtitle">每个窗口一圈同心环（外圈 → 内圈 = 列表顺序），颜色仍代表健康度（绿/黄/红），环旁边的图例行标明窗口名 + 百分比 + 快慢。选一种排布。</p>
+
+<style>
+  .phone { background:#12141c; border-radius:14px; padding:8px; min-height:380px; display:flex; flex-direction:column; gap:6px; font-size:9px; color:#e8eaf0; }
+  .p-title { font-size:10px; font-weight:600; padding:2px 2px 0; display:flex; justify-content:space-between; align-items:center; }
+  .toggle-pill { background:#2a2f42; border-radius:8px; padding:2px 6px; font-size:8px; color:#cdd5f0; border:1px solid #3d4460; }
+  .p-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; align-items:start; }
+  .pc-name { font-size:8.5px; font-weight:600; color:#c6ccdf; }
+  .pc-sub { font-size:7px; color:#8f9bb8; }
+  .pace { font-size:6.5px; padding:1px 4px; border-radius:5px; font-weight:600; }
+  .pace-fast { background:rgba(244,67,54,.18); color:#ff8a80; }
+  .pace-slow { background:rgba(33,150,243,.18); color:#82b1ff; }
+  .pace-avg { background:rgba(255,255,255,.08); color:#9aa3c0; }
+  .ds-tile { background:linear-gradient(135deg,#1c2a4a,#241d3f); border-radius:8px; padding:8px; text-align:center; display:flex; flex-direction:column; justify-content:center; gap:1px; }
+  .ds-num-s { font-size:16px; font-weight:700; color:#fff; }
+
+  .rc { border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .hole { border-radius:50%; background:#1e2230; display:flex; align-items:center; justify-content:center; }
+
+  /* A: ring top, legend below */
+  .a-card { background:#1e2230; border-radius:8px; padding:8px; display:flex; flex-direction:column; gap:6px; }
+  .a-head { display:flex; justify-content:space-between; align-items:center; }
+  .a-dot { width:5px; height:5px; border-radius:50%; background:#4caf50; }
+  .a-ringwrap { align-self:center; padding:2px 0; }
+  .a-center { font-size:8px; font-weight:700; color:#fff; }
+  .legend { display:flex; flex-direction:column; gap:2px; }
+  .lg-row { display:flex; align-items:center; gap:4px; font-size:7px; color:#8f9bb8; }
+  .lg-dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+  .lg-pct { color:#fff; font-weight:700; margin-left:auto; }
+
+  /* B: ring left, legend right */
+  .b-card { background:#1e2230; border-radius:8px; padding:8px; display:flex; flex-direction:column; gap:5px; }
+  .b-body { display:flex; gap:7px; align-items:center; }
+  .b-legend { flex:1; display:flex; flex-direction:column; gap:2px; min-width:0; }
+</style>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0d13; padding:14px 10px;">
+      <div class="phone">
+        <div class="p-title">用量 <span class="toggle-pill">▦ 网格</span></div>
+        <div class="p-grid">
+          <div class="ds-tile"><div class="pc-sub">DeepSeek</div><div class="ds-num-s">¥86.20</div><div class="pc-sub">余额</div></div>
+          <div class="a-card">
+            <div class="a-head"><span class="pc-name">Kimi</span><span class="a-dot"></span></div>
+            <div class="a-ringwrap">
+              <div class="rc" style="width:46px;height:46px;background:conic-gradient(#4caf50 0 45%,#2a2f42 45%)">
+                <div class="hole" style="width:38px;height:38px">
+                  <div class="rc" style="width:30px;height:30px;background:conic-gradient(#4caf50 0 32%,#2a2f42 32%)">
+                    <div class="hole" style="width:22px;height:22px"><span class="a-center">45%</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="legend">
+              <div class="lg-row"><span class="lg-dot" style="background:#4caf50"></span>5 小时窗口 <span class="pace pace-fast">快</span><span class="lg-pct">45%</span></div>
+              <div class="lg-row"><span class="lg-dot" style="background:#4caf50"></span>本周编码 <span class="pace pace-avg">平均</span><span class="lg-pct">32%</span></div>
+            </div>
+          </div>
+          <div class="a-card">
+            <div class="a-head"><span class="pc-name">火山引擎</span><span class="a-dot" style="background:#f44336"></span></div>
+            <div class="a-ringwrap">
+              <div class="rc" style="width:46px;height:46px;background:conic-gradient(#f44336 0 84%,#2a2f42 84%)">
+                <div class="hole" style="width:38px;height:38px">
+                  <div class="rc" style="width:30px;height:30px;background:conic-gradient(#ffc107 0 52%,#2a2f42 52%)">
+                    <div class="hole" style="width:22px;height:22px">
+                      <div class="rc" style="width:14px;height:14px;background:conic-gradient(#4caf50 0 41%,#2a2f42 41%)">
+                        <div class="hole" style="width:7px;height:7px"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="legend">
+              <div class="lg-row"><span class="lg-dot" style="background:#f44336"></span>会话 <span class="pace pace-fast">快</span><span class="lg-pct">84%</span></div>
+              <div class="lg-row"><span class="lg-dot" style="background:#ffc107"></span>本周<span class="lg-pct">52%</span></div>
+              <div class="lg-row"><span class="lg-dot" style="background:#4caf50"></span>本月<span class="lg-pct">41%</span></div>
+            </div>
+          </div>
+          <div class="a-card">
+            <div class="a-head"><span class="pc-name">Copilot</span><span class="a-dot"></span></div>
+            <div class="a-ringwrap">
+              <div class="rc" style="width:46px;height:46px;background:conic-gradient(#4caf50 0 18%,#2a2f42 18%)">
+                <div class="hole" style="width:34px;height:34px"><span class="a-center">18%</span></div>
+              </div>
+            </div>
+            <div class="legend">
+              <div class="lg-row"><span class="lg-dot" style="background:#4caf50"></span>Premium<span class="lg-pct">18%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · 环在上，图例在下</h3>
+      <p>圆环居中当视觉焦点，下方图例行对齐「环的顺序」标窗口名 + 快慢徽章 + 百分比。卡片偏方正，和 DeepSeek 块高度协调。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0b0d13; padding:14px 10px;">
+      <div class="phone">
+        <div class="p-title">用量 <span class="toggle-pill">▦ 网格</span></div>
+        <div class="p-grid">
+          <div class="ds-tile"><div class="pc-sub">DeepSeek</div><div class="ds-num-s">¥86.20</div><div class="pc-sub">余额</div></div>
+          <div class="b-card">
+            <div class="a-head"><span class="pc-name">Kimi</span><span class="a-dot"></span></div>
+            <div class="b-body">
+              <div class="rc" style="width:40px;height:40px;background:conic-gradient(#4caf50 0 45%,#2a2f42 45%)">
+                <div class="hole" style="width:33px;height:33px">
+                  <div class="rc" style="width:26px;height:26px;background:conic-gradient(#4caf50 0 32%,#2a2f42 32%)">
+                    <div class="hole" style="width:19px;height:19px"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="b-legend">
+                <div class="lg-row">5h <span class="pace pace-fast">快</span><span class="lg-pct">45%</span></div>
+                <div class="lg-row">本周 <span class="pace pace-avg">平均</span><span class="lg-pct">32%</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="b-card">
+            <div class="a-head"><span class="pc-name">火山引擎</span><span class="a-dot" style="background:#f44336"></span></div>
+            <div class="b-body">
+              <div class="rc" style="width:40px;height:40px;background:conic-gradient(#f44336 0 84%,#2a2f42 84%)">
+                <div class="hole" style="width:33px;height:33px">
+                  <div class="rc" style="width:26px;height:26px;background:conic-gradient(#ffc107 0 52%,#2a2f42 52%)">
+                    <div class="hole" style="width:19px;height:19px">
+                      <div class="rc" style="width:12px;height:12px;background:conic-gradient(#4caf50 0 41%,#2a2f42 41%)">
+                        <div class="hole" style="width:6px;height:6px"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="b-legend">
+                <div class="lg-row">会话 <span class="pace pace-fast">快</span><span class="lg-pct">84%</span></div>
+                <div class="lg-row">本周<span class="lg-pct">52%</span></div>
+                <div class="lg-row">本月<span class="lg-pct">41%</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="b-card">
+            <div class="a-head"><span class="pc-name">Copilot</span><span class="a-dot"></span></div>
+            <div class="b-body">
+              <div class="rc" style="width:40px;height:40px;background:conic-gradient(#4caf50 0 18%,#2a2f42 18%)">
+                <div class="hole" style="width:29px;height:29px"></div>
+              </div>
+              <div class="b-legend">
+                <div class="lg-row">Premium<span class="lg-pct">18%</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · 环在左，图例在右（推荐）</h3>
+      <p>横向排布更紧凑：左边同心环，右边直接列出每个窗口的百分比和快慢，<b>不用靠颜色对应环</b>，可读性更好，卡片也更矮。</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px">说明：环的配色仍走「已用量阈值」语义（绿 → 黄 → 红），外圈到内圈对应图例从上到下的顺序；中心可放最紧急窗口的百分比（方案 A）。单列模式保持之前的完整详情卡不变。</p>
