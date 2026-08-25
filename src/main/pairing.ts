@@ -61,6 +61,7 @@ export function toMobileConfig(config: AppConfig): MobileAppConfig {
     minimax: { ...config.minimax },
     copilot: { ...config.copilot },
     volcengine: { ...config.volcengine },
+    deepseek: { ...config.deepseek },
     proxy: { ...config.proxy },
     intervalMinutes: config.intervalMinutes,
     thresholds: { ...config.thresholds }

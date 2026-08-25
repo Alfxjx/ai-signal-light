@@ -28,6 +28,7 @@ import com.aisignallight.domain.model.MinimaxUsageData
 import com.aisignallight.domain.model.UsageProviderState
 import com.aisignallight.domain.model.UsageSnapshot
 import com.aisignallight.domain.model.VolcengineUsageData
+import com.aisignallight.domain.model.DeepseekUsageData
 import com.aisignallight.ui.components.ProviderCard
 import com.aisignallight.ui.components.UsageBarItem
 import com.aisignallight.ui.components.toBarItem
@@ -100,6 +101,7 @@ fun UsageTab(
         if (config.minimax.enabled) MinimaxCard(usage.minimax, config)
         if (config.copilot.enabled) CopilotCard(usage.copilot, config)
         if (config.volcengine.enabled) VolcengineCard(usage.volcengine, config)
+        if (config.deepseek.enabled) DeepseekCard(usage.deepseek, config)
 
         if (allNoToken(usage, config)) {
             Text(
@@ -249,6 +251,7 @@ private fun allEmpty(usage: UsageSnapshot, config: AppConfig): Boolean {
         && (!config.minimax.enabled || usage.minimax == null)
         && (!config.copilot.enabled || usage.copilot == null)
         && (!config.volcengine.enabled || usage.volcengine == null)
+        && (!config.deepseek.enabled || usage.deepseek == null)
 }
 
 private fun allNoToken(usage: UsageSnapshot, config: AppConfig): Boolean {
@@ -257,6 +260,7 @@ private fun allNoToken(usage: UsageSnapshot, config: AppConfig): Boolean {
         config.minimax.enabled to usage.minimax,
         config.copilot.enabled to usage.copilot,
         config.volcengine.enabled to usage.volcengine,
+        config.deepseek.enabled to usage.deepseek,
     ).filter { it.first } // 只看已启用的
     if (enabledAndMissing.isEmpty()) return false // 全部禁用时不该显示"未配置"
     return enabledAndMissing.all { it.second?.error == "no_token" }
@@ -306,6 +310,41 @@ private fun VolcengineCard(state: UsageProviderState<VolcengineUsageData>?, conf
         statusColor = statusColor,
         bars = bars,
         footer = state?.lastUpdated?.let { "最后更新：${formatIso(it)}" }
+    )
+}
+
+@Composable
+private fun DeepseekCard(state: UsageProviderState<DeepseekUsageData>?, config: AppConfig) {
+    val data = state?.data
+    val error = state?.error
+    val statusText = when (error) {
+        "disabled" -> stringResource(R.string.error_disabled)
+        "no_token" -> stringResource(R.string.error_no_token)
+        null -> if (data != null) "正常" else stringResource(R.string.loading)
+        else -> error
+    }
+    val statusColor = when (error) {
+        null -> if (data != null) Color(0xFF4CAF50) else MaterialTheme.colorScheme.outline
+        else -> Color(0xFFF44336)
+    }
+
+    val footer = if (data != null) buildString {
+        val symbol = when (data.currency) {
+            "CNY" -> "¥"
+            "USD" -> "$"
+            else -> data.currency?.let { "$it " } ?: ""
+        }
+        append("余额 $symbol${"%.2f".format(data.totalBalance)}")
+        if (data.grantedBalance > 0) append(" · 含赠送 ${"%.2f".format(data.grantedBalance)}")
+        state?.lastUpdated?.let { append(" · 最后更新：${formatIso(it)}") }
+    } else null
+
+    ProviderCard(
+        title = "DeepSeek",
+        statusText = statusText,
+        statusColor = statusColor,
+        bars = emptyList(),
+        footer = footer
     )
 }
 

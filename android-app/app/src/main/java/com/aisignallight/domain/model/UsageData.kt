@@ -47,6 +47,14 @@ data class VolcengineUsageData(
     val monthly: UsageMetric = UsageMetric()
 )
 
+data class DeepseekUsageData(
+    val isAvailable: Boolean = false,
+    val currency: String? = null,
+    val totalBalance: Double = 0.0,
+    val grantedBalance: Double = 0.0,
+    val toppedUpBalance: Double = 0.0
+)
+
 data class UsageProviderState<T>(
     val data: T? = null,
     val lastUpdated: String? = null,
@@ -57,14 +65,16 @@ data class UsageSnapshot(
     val kimi: UsageProviderState<KimiUsageData>? = null,
     val minimax: UsageProviderState<MinimaxUsageData>? = null,
     val copilot: UsageProviderState<CopilotUsageData>? = null,
-    val volcengine: UsageProviderState<VolcengineUsageData>? = null
+    val volcengine: UsageProviderState<VolcengineUsageData>? = null,
+    val deepseek: UsageProviderState<DeepseekUsageData>? = null
 )
 
 enum class ProviderId(val value: String) {
     KIMI("kimi"),
     MINIMAX("minimax"),
     COPILOT("copilot"),
-    VOLCENGINE("volcengine")
+    VOLCENGINE("volcengine"),
+    DEEPSEEK("deepseek")
 }
 
 sealed class ProviderUsageData {
@@ -84,5 +94,9 @@ sealed class ProviderUsageData {
 
     data class VolcengineData(val data: VolcengineUsageData) : ProviderUsageData() {
         override val providerId: ProviderId = ProviderId.VOLCENGINE
+    }
+
+    data class DeepseekData(val data: DeepseekUsageData) : ProviderUsageData() {
+        override val providerId: ProviderId = ProviderId.DEEPSEEK
     }
 }

@@ -80,6 +80,7 @@ export interface MobileAppConfig {
   minimax: ProviderConfig;
   copilot: ProviderConfig;
   volcengine: VolcengineProviderConfig;
+  deepseek: ProviderConfig;
   proxy: { url: string };
   intervalMinutes: number;
   thresholds: UsageThresholds;

@@ -138,6 +138,12 @@ fun SettingsScreen(
                 onChange = { viewModel.updateVolcengine(it) }
             )
 
+            ProviderSection(
+                title = "DeepSeek",
+                config = uiState.deepseek,
+                onChange = { viewModel.updateDeepseek(it) }
+            )
+
             OutlinedTextField(
                 value = uiState.proxyUrl,
                 onValueChange = { viewModel.updateProxy(it) },

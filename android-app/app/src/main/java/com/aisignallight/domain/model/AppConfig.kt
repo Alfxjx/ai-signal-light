@@ -41,6 +41,7 @@ data class AppConfig(
     val minimax: ProviderConfig = ProviderConfig(),
     val copilot: ProviderConfig = ProviderConfig(),
     val volcengine: VolcengineProviderConfig = VolcengineProviderConfig(),
+    val deepseek: ProviderConfig = ProviderConfig(),
     val proxy: ProxyConfig = ProxyConfig(),
     val intervalMinutes: Int = 10,
     val thresholds: UsageThresholds = UsageThresholds(),
