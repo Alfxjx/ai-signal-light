@@ -102,6 +102,10 @@ export interface ElectronAPI {
     openMain: () => Promise<void>;
     getState: () => Promise<FloatingBallState>;
     notifyCleared: (cwd: string) => Promise<void>;
+    /** 悬浮球短按：切换下方的下拉窗口可见性 */
+    toggleDropdown: () => Promise<void>;
+    /** 浮球自绘拖动：回报位移增量（dx/dy 像素） */
+    moveBy: (dx: number, dy: number) => void;
   };
   trayHover: {
     // 弹窗渲染层回报指针当前位置：用于决定是否取消关闭 timer
@@ -131,6 +135,8 @@ export const IPC_CHANNELS = {
   FLOATING_BALL_OPEN_MAIN: 'floating-ball:open-main',
   FLOATING_BALL_GET_STATE: 'floating-ball:get-state',
   FLOATING_BALL_NOTIFY_CLEARED: 'floating-ball:notify-cleared',
+  FLOATING_BALL_TOGGLE_DROPDOWN: 'floating-ball:toggle-dropdown',
+  FLOATING_BALL_MOVE: 'floating-ball:move',
   WINDOW_DOCK_STATE: 'window:dock-state',
   WINDOW_DOCK_ANIM: 'window:dock-anim',
   TRAY_HOVER_POINTER: 'tray-hover:pointer',

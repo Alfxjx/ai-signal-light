@@ -13,9 +13,11 @@ import type {
   MinimaxUsageData,
   CopilotUsageData,
   CodexUsageData,
+  KimiStatus,
 } from '../types/messages';
 import { DEFAULT_USAGE_THRESHOLDS } from '../types/messages';
 import { calcUsagePace } from '../utils/usage';
+import { filterRecentProjects } from '../utils/kimiFilter';
 
 export interface FiveHourSlot {
   /** 剩余百分比 0-100（用于填充 mini bar） */
@@ -49,6 +51,8 @@ export function useUsageState() {
   const enabled = reactive<Record<string, boolean>>({});
   const pendingByCwd = reactive<Record<string, PendingHook>>({});
   const thresholds = reactive<{ warn: number; danger: number }>({ ...DEFAULT_USAGE_THRESHOLDS });
+  // Kimi Code (web) 实时状态（悬浮球 LED + 下拉项目列表的数据源）
+  const kimiStatus = ref<KimiStatus | null>(null);
 
   // 1s tick 用于 5h 倒计时秒级刷新
   const now = ref<number>(Date.now());
@@ -56,6 +60,7 @@ export function useUsageState() {
 
   function handleMessage(msg: WsMessage) {
     if (msg.type === 'init') {
+      if (msg.data.kimi) kimiStatus.value = msg.data.kimi;
       if (msg.data.usage) {
         if (msg.data.usage.kimi)    kimi.value    = msg.data.usage.kimi;
         if (msg.data.usage.minimax) minimax.value = msg.data.usage.minimax;
@@ -98,6 +103,8 @@ export function useUsageState() {
     } else if (msg.type === 'pendingChanged') {
       for (const k of Object.keys(pendingByCwd)) delete pendingByCwd[k];
       Object.assign(pendingByCwd, msg.byCwd);
+    } else if (msg.type === 'kimiStatus') {
+      kimiStatus.value = msg.data;
     }
   }
 
@@ -262,6 +269,14 @@ export function useUsageState() {
 
   const pendingCount = computed<number>(() => Object.keys(pendingByCwd).length);
 
+  // 悬浮球 LED 聚合状态（approval > editing > thinking > idle > offline）
+  const kimiState = computed<KimiStatus['state']>(() => kimiStatus.value?.state ?? 'offline');
+  // 服务是否可连（离线时也可显示灰灯）
+  const kimiAvailable = computed<boolean>(() => kimiStatus.value?.available ?? false);
+  // 下拉菜单项目列表：套用裁剪规则（当前非空闲强留 / 3 天内动过）
+  const kimiRecentProjects = computed(() =>
+    filterRecentProjects(kimiStatus.value?.projects ?? [], Date.now()));
+
   // 最近一次用量刷新时间戳（5 个 provider 取最新），用于顶部"X 分钟前更新"展示
   const lastUpdatedTs = computed<number | null>(() => {
     const ts = [
@@ -290,6 +305,10 @@ export function useUsageState() {
     pendingCount,
     pendingByCwd,
     lastUpdatedTs,
+    kimiStatus,
+    kimiState,
+    kimiAvailable,
+    kimiRecentProjects,
     // 原始 state refs：tray-hover 弹窗需要 deepseek 余额 + codex primary windowSeconds 展示
     deepseek,
     codex,

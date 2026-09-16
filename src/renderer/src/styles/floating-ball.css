@@ -1,5 +1,4 @@
-/* 悬浮条（输入法浮窗风格）样式 - 纵向模型用量 */
-
+/* 悬浮球：拟物化像素 LED 圆灯 */
 * {
   margin: 0;
   padding: 0;
@@ -7,8 +6,8 @@
 }
 
 html, body {
-  width: 140px;
-  height: 104px;
+  width: 72px;
+  height: 72px;
   background: transparent;
   overflow: hidden;
   user-select: none;
@@ -18,20 +17,13 @@ html, body {
 
 .fb {
   position: relative;
-  width: 140px;
-  height: 104px;
-  background: rgba(20, 20, 30, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  width: 72px;
+  height: 72px;
   display: flex;
-  flex-direction: column;
-  padding: 6px 10px;
-  gap: 5px;
-  /* 整块是 drag 区域 */
-  -webkit-app-region: drag;
+  align-items: center;
+  justify-content: center;
+  /* 拖动由渲染层自绘实现（见 FloatingBall.vue），这里不再设 drag 区域 */
+  -webkit-app-region: no-drag;
   cursor: grab;
   cursor: -webkit-grab;
 }
@@ -39,176 +31,107 @@ html, body {
 .fb:active {
   cursor: grabbing;
   cursor: -webkit-grabbing;
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 
-.fb:hover {
-  border-color: rgba(255, 255, 255, 0.14);
-}
-
-/* ===== 顶部：指示灯 + 项目名 ===== */
-.fb-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  min-width: 0;
-}
-
-.fb-dot {
-  width: 12px;
-  height: 12px;
+/* ===== 拟物 LED 圆灯（像素风灯罩 + 内罩高光 + 发光） =====
+   LED 是可点击区：标 no-drag，脱离整块 drag，让鼠标事件正常派发 */
+.led {
+  position: relative;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: rgba(148, 163, 184, 0.25);
-  transition: background 0.2s, box-shadow 0.2s;
-  flex-shrink: 0;
-}
-
-.fb-dot--active {
-  background: #ef4444;
-  box-shadow: 0 0 4px rgba(239, 68, 68, 0.7);
-  animation: fb-pulse 1.6s ease-in-out infinite;
-}
-
-.fb-dot--clickable {
-  cursor: pointer;
-}
-
-@keyframes fb-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
-}
-
-.fb-name {
-  font-size: 11px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.1px;
-  flex: 1;
-  min-width: 0;
-}
-
-.fb-name--idle {
-  color: rgba(255, 255, 255, 0.4);
-  font-weight: 400;
-}
-
-/* ===== 右上角：打开主界面按钮 ===== */
-.fb-open {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 14px;
-  height: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 3px;
-  color: rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.06);
+  /* 可点击 + 可拖动由渲染层自绘处理，这里只需不阻 events */
   -webkit-app-region: no-drag;
   cursor: pointer;
-  pointer-events: auto;
-  transition: color 0.2s, background 0.2s;
+  /* 金属灯罩外圈：从外到内 深色描边 → 灯槽 */
+  background:
+    radial-gradient(circle at 50% 28%, #5a5f6b 0%, #34373f 38%, #1b1d23 52%, #0c0d11 100%);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.25),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.6),
+    0 3px 6px rgba(0, 0, 0, 0.45);
 }
 
-.fb-open:hover {
-  color: rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.14);
+/* 灯芯：像素点阵拼出的发光圆，中间亮、边缘带锯齿感 */
+.led-lens {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 30px;
+  height: 30px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  /* 像素感：用 repeating-conic 光晕 + 网点点阵模拟 CRT/像素发光 */
+  background-color: #1a1c20; /* 熄灭基色 */
+  /* 外部柔光 */
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 100%);
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  /* 像素锯齿：放大一圈用硬边让边缘呈方块台阶 */
+  image-rendering: pixelated;
 }
 
-.fb-open-icon {
-  width: 10px;
-  height: 10px;
+/* 像素点阵纹理层：叠加在灯芯上的细点，强化"像素灯"观感 */
+.led::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 30px;
+  height: 30px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background-image: radial-gradient(rgba(0,0,0,0) 45%, rgba(0,0,0,0.28) 50%);
+  background-size: 4px 4px;
+  background-repeat: repeat;
+  pointer-events: none;
 }
 
-/* ===== 中部：纵向 mini bar 堆叠 ===== */
-.fb-bars {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  min-width: 0;
+/* ===== LED 各状态 ===== */
+
+/* 离线：熄灭，灰暗无光 */
+.led--offline .led-lens {
+  background-color: #23252b;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.8);
 }
 
-.fb-row {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  flex: none;
-  min-width: 0;
+/* 空闲：绿色微光 */
+.led--idle .led-lens {
+  background-color: #1c3322;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4), inset 0 0 5px rgba(34, 197, 94, 0.5);
 }
 
-.fb-bar-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex: none;
-  min-width: 0;
+/* 思考中：黄色缓慢呼吸 */
+.led--thinking .led-lens {
+  background-color: #a16207;
+  animation: led-breath-yellow 2.4s ease-in-out infinite;
 }
 
-.fb-bar-label {
-  font-size: 9px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
-  width: 9px;
-  text-align: center;
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
+@keyframes led-breath-yellow {
+  0%, 100% { box-shadow: 0 0 6px rgba(250, 204, 21, 0.35), inset 0 0 6px rgba(250, 204, 21, 0.6); }
+  50%      { box-shadow: 0 0 18px rgba(250, 204, 21, 0.85), inset 0 0 10px rgba(250, 204, 21, 1); }
 }
 
-.fb-bar {
-  flex: 1;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 2px;
-  overflow: hidden;
-  min-width: 16px;
+/* 编辑中：黄色常亮 */
+.led--editing .led-lens {
+  background-color: #a16207;
+  box-shadow: 0 0 16px rgba(250, 204, 21, 0.9), inset 0 0 8px rgba(250, 204, 21, 1);
 }
 
-.fb-bar-fill {
-  height: 100%;
-  width: 0%;
-  border-radius: 2px;
-  transition: width 0.5s ease, background 0.3s ease;
+/* 待审核：红色闪烁 */
+.led--approval .led-lens {
+  background-color: #7f1d1d;
+  animation: led-blink-red 1s steps(1, end) infinite;
 }
 
-.fb-bar-fill--fresh  { background: #22a150; }
-.fb-bar-fill--warn   { background: #a78d25; }
-.fb-bar-fill--danger { background: #ef4444; }
-.fb-bar-fill--muted  { background: rgba(255, 255, 255, 0.2); }
-
-.fb-bar-pct {
-  font-size: 9px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.65);
-  width: 24px;
-  text-align: right;
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
-}
-
-.fb-bar-row--secondary {
-  margin-top: 1px;
-}
-
-.fb-bar-row--secondary .fb-bar-label {
-  color: rgba(255, 255, 255, 0.35);
-}
-
-.fb-reset {
-  font-size: 8px;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.35);
-  padding-left: 14px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+@keyframes led-blink-red {
+  0%, 49% {
+    background-color: #ef4444;
+    box-shadow: 0 0 20px rgba(239, 68, 68, 1), inset 0 0 10px rgba(248, 113, 113, 1);
+  }
+  50%, 100% {
+    background-color: #3f1414;
+    box-shadow: 0 0 4px rgba(239, 68, 68, 0.3);
+  }
 }

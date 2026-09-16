@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [kimi-web-status](plans/kimi-web-status.md) | [history](history/kimi-web-status.md)
+- 时间：2026-09-16
+- 范围：主面板新增「Kimi Code (web)」实时状态卡：连本机 kimi web 服务（WS 订阅 + REST 校准），会话按 metadata.cwd 归并成目录行，头部四态聚合（待审核>编辑>思考>空闲），离线整卡隐藏
+- 关联：`src/shared/types/kimi.ts`、`src/main/{kimi-monitor,kimi-monitor.test,server,main}.ts`、`src/shared/types/websocket.ts`、`src/renderer/src/{components/KimiCard.vue,App.vue,types/messages.ts,styles/main.css}`
+
 ## [android-usage-tab-redesign](plans/android-usage-tab-redesign.md) | [history](history/android-usage-tab-redesign.md)
 - 时间：2026-08-25
 - 范围：安卓端用量页 UI 改版：双列网格/单列详情切换（SharedPreferences 持久化）、DeepSeek 余额放大（渐变 tile / 全宽余额条）、同心多环网格卡、节奏徽章化

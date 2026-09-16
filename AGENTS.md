@@ -40,6 +40,7 @@ src/
 │   ├── server.ts              # StatusServer: HTTP static + REST (/api/status, /api/hooks/claude) + WS push,
 │   │                          # maintains pendingByCwd from Claude hooks, getConfig handler for mobile
 │   ├── detector.ts            # Scans ~/.claude/projects/**/*.jsonl every 30s for last assistant timestamp
+│   ├── kimi-monitor.ts        # Kimi Code (web) 实时状态：连本机 kimi web 服务（REST+WS），会话忙态按 cwd 归并
 │   ├── usage-monitor.ts       # Polls Kimi / MiniMax / Copilot / DeepSeek / Codex quota APIs on configured interval
 │   ├── copilot-auth.ts        # GitHub Device Flow OAuth + copilot_internal session token + quota mapping
 │   ├── codex-credentials.ts   # Reads/refreshes ~/.codex/auth.json (OpenAI OAuth) for wham/usage API
@@ -47,18 +48,20 @@ src/
 │   ├── pairing.ts             # QR payload (v/host/port/apiKey) + LAN IP detection + MobileAppConfig projection
 │   ├── edge-dock.ts           # TopEdgeDock: 主面板顶部吸附/收起/滑出状态机（依赖注入，不 import electron）
 │   ├── edge-dock.test.ts      # Vitest, colocated
-│   └── usage-monitor.test.ts  # Vitest, colocated
+│   ├── usage-monitor.test.ts  # Vitest, colocated
+│   └── kimi-monitor.test.ts   # Vitest, colocated（mapPhase/aggregateState/buildProjects/reconcile 纯函数）
 ├── renderer/src/              # Vue 3 + TS (vite build → dist/renderer)
 │   ├── main.ts / App.vue                  # Main panel entry + root
 │   ├── settings.ts / Settings.vue         # Settings window entry + root
-│   ├── floating-ball.ts / FloatingBall.vue  # Floating status ball entry + root
-│   ├── components/            # TitleBar, ClaudeCard (project list), UsageCard (quota bars)
+│   ├── floating-ball.ts / FloatingBall.vue  # 悬浮球入口：拟物像素 LED，显示 Kimi 聚合状态；短按弹下拉
+│   ├── dropdown.ts / Dropdown.vue           # 悬浮球下拉窗口：最近活跃项目 + Kimi 5h 用量
+│   ├── components/            # TitleBar, ClaudeCard (project list), KimiCard (web 状态), UsageCard (quota bars)
 │   ├── composables/           # useWebSocket (reconnect), useUsageState
-│   ├── utils/                 # time.ts, cwd.ts (+ colocated *.test.ts)
+│   ├── utils/                 # time.ts, cwd.ts, kimiFilter.ts (+ colocated *.test.ts)
 │   └── styles/
 ├── shared/                    # Imported by both main and renderer
 │   ├── constants.ts           # WS_PORT = 3456 (single source of truth)
-│   ├── types/                 # websocket / config / ipc / usage / detector types
+│   ├── types/                 # websocket / config / ipc / usage / detector / kimi types
 │   └── utils/cwd.ts           # normalizeCwd — Windows case-insensitive path handling
 scripts/
 └── copy-renderer-assets.js    # Copies PNG icons into dist/renderer after vite build
@@ -77,6 +80,7 @@ landing/                       # Vue 3 + Tailwind landing page (own package.json
 ## State Model
 
 - **Claude Code status**: time since last `type=assistant` (non-sidechain) record in `~/.claude/projects/**/*.jsonl`. Detector reads the file tail (8KB) backwards. Rendered with age-based colors: `<5min` green, `<1h` yellow, older gray. Project display name priority: `cwd` last segment > `slug` > project dir id.
+- **Kimi Code (web) 状态 (`kimi-monitor.ts`)**: 连本机 `kimi web` 服务读实时状态——token 读 `~/.kimi-code/server.token`，端口读 `~/.kimi-code/server/instances/*.json` 自报 port（兜底 58627 起探 100 个端口）；WS `/api/v1/ws`（`Sec-WebSocket-Protocol: kimi-code.bearer.<token>` 鉴权、`ping` 回 `pong`）+ 每 3s REST `/api/v1/sessions` 校准。会话忙态按 `metadata.cwd` 归并成目录行，头部聚合四态：待审核 > 编辑中 > 思考中 > 空闲（离线）。Kimi 用量走的是 **实验性 API**，字段随版本可能变化。状态经 `StatusServer` 以 `kimiStatus` 消息推 WS 送，卡片在服务不可达时隐藏。注意与底下的 **Kimi 用量配额** 是两回事。
 - **Pending notifications (red dot)**: Claude Code hooks (`Notification` / `Stop` / `PreToolUse`) are installed as `~/.ai-status-monitor/claude-hook.js` + entries in `~/.claude/settings.json`; the hook POSTs to `http://127.0.0.1:3456/api/hooks/claude`. `StatusServer` keeps a `pendingByCwd` map and broadcasts `pendingChanged` over WS. The renderer clears a pending entry when the user clicks the project or a newer assistant response arrives.
 - **Usage quotas**: `UsageMonitor` polls provider APIs every `intervalMinutes` (5/10/15/30/60), pushes `usageInit` / `usageUpdate` over WS. Progress bar width and label percent both represent **used %** for all providers (bar wider = closer to limit); warn/danger thresholds are configurable in settings. Auth per provider: **Kimi** — manual openplatform API key, queries `GET https://api.kimi.com/coding/v1/usages` (7d + 5h windows, `codingWeekly` / `codingFiveHour`); **MiniMax** — manual openplatform API key; **Copilot** — GitHub Device Flow OAuth (`copilot-auth.ts`, `gho_` token in `copilot.token`; legacy cookie paste still works, distinguished by prefix); **DeepSeek** — manual platform API key (balance only, no rate windows); **Codex** — auto-reads `~/.codex/auth.json`, refreshes via auth.openai.com when expired (`codex-credentials.ts`). `UsageMonitor._safeRun` accepts an optional `resolveToken` for auto credential sources (currently only Codex).
 - **QR pairing (Android)**: desktop shows a QR containing only `{v, host, port, apiKey}` (`src/main/pairing.ts`); the Android app scans it, connects to the WS server with the apiKey, and pulls a trimmed `MobileAppConfig` via the server's `getConfig` handler, then keeps syncing over LAN WebSocket.
@@ -91,7 +95,7 @@ landing/                       # Vue 3 + Tailwind landing page (own package.json
 - WebSocket reconnection in `useWebSocket.ts` uses exponential backoff capped at 30s.
 - Dev vs packaged config is isolated via `app.setName('AI状态监控-dev')` in dev mode (separate userData dirs).
 - Tests are Vitest, colocated with sources as `*.test.ts` (`src/main/`, `src/renderer/src/utils/`). Run with `npm test`.
-- The floating ball window is intentionally `focusable: false` so it does not steal focus from the IDE when clicked.
+- The floating ball window is intentionally `focusable: false` so it does not steal focus from the IDE when clicked. It renders a single pixel-art skeuomorphic LED reflecting the **Kimi Code aggregate state** (`approval`=红闪 / `editing`=黄常亮 / `thinking`=黄呼吸 / `idle`=绿微光 / `offline`=灰灭); short-press toggles a sibling **dropdown** window anchored below it (focusable, hidden on blur/Esc), which lists recent active projects (`kimiFilter.filterRecentProjects`: keep busy or active within 3 days) plus the Kimi 5h usage bar.
 - The deprecated `Status` enum (IDLE/EXECUTING/WAITING) still exists in some type casts for historical compatibility; new code should not rely on it.
 
 ## Harness Conventions

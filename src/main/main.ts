@@ -6,6 +6,7 @@ import QRCode from 'qrcode';
 import { StatusServer } from './server';
 import { ConfigStore, VALID_INTERVALS, HOOK_EVENTS } from './config';
 import { UsageMonitor, parseProxyUrl } from './usage-monitor';
+import { KimiMonitor } from './kimi-monitor';
 import { startDeviceFlow, pollDeviceFlow, isCopilotOAuthToken } from './copilot-auth';
 import { codexAuthAvailable } from './codex-credentials';
 import { TopEdgeDock, type DockState } from './edge-dock';
@@ -26,12 +27,14 @@ app.setName(_isDevForName ? 'AI状态监控-dev' : 'AI状态监控');
 let mainWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let floatingBallWindow: BrowserWindow | null = null;
+let floatingBallDropdownWindow: BrowserWindow | null = null;
 let qrWindow: BrowserWindow | null = null;
 let trayHoverWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let server: StatusServer | null = null;
 let configStore: ConfigStore | null = null;
 let usageMonitor: UsageMonitor | null = null;
+let kimiMonitor: KimiMonitor | null = null;
 let copilotDeviceCancelled = false;
 let isQuitting = false;
 let dock: TopEdgeDock | null = null;
@@ -627,8 +630,8 @@ function toggleWindow(): void {
 
 // ==================== Floating Bar（输入法浮窗风格小方块） ====================
 
-const FB_WIDTH = 140;
-const FB_HEIGHT = 104;
+const FB_WIDTH = 72;
+const FB_HEIGHT = 72;
 
 // 创建悬浮球窗口（不可拖动标题栏/工具栏样式，整球可拖）
 function createFloatingBallWindow(): void {
@@ -716,6 +719,7 @@ function toggleFloatingBall(): void {
   if (floatingBallWindow.isVisible()) {
     floatingBallWindow.hide();
     if (configStore) configStore.update({ floatingBall: { isVisible: false } });
+    hideFloatingBallDropdown();
   } else {
     floatingBallWindow.show();
     if (configStore) configStore.update({ floatingBall: { isVisible: true } });
@@ -726,6 +730,14 @@ function hideFloatingBall(): void {
   if (floatingBallWindow && !floatingBallWindow.isDestroyed() && floatingBallWindow.isVisible()) {
     floatingBallWindow.hide();
     if (configStore) configStore.update({ floatingBall: { isVisible: false } });
+  }
+  // 球收起时连带关掉下拉
+  hideFloatingBallDropdown();
+}
+
+function hideFloatingBallDropdown(): void {
+  if (floatingBallDropdownWindow && !floatingBallDropdownWindow.isDestroyed() && floatingBallDropdownWindow.isVisible()) {
+    floatingBallDropdownWindow.hide();
   }
 }
 
@@ -746,6 +758,81 @@ function syncFloatingBallFromConfig(): void {
   }
 }
 
+// ==================== 悬浮球下拉窗口（Kimi 状态 + 用量） ====================
+
+const DD_WIDTH = 260;
+const DD_HEIGHT = 400;
+
+function createFloatingBallDropdown(): void {
+  if (floatingBallDropdownWindow && !floatingBallDropdownWindow.isDestroyed()) return;
+  floatingBallDropdownWindow = new BrowserWindow({
+    width: DD_WIDTH,
+    height: DD_HEIGHT,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    // 下拉要能点、要失焦关闭，所以必须可聚焦
+    focusable: true,
+    hasShadow: false,
+    show: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    }
+  });
+
+  // 失焦（点到球外）自动关闭
+  floatingBallDropdownWindow.on('blur', () => {
+    if (floatingBallDropdownWindow && !floatingBallDropdownWindow.isDestroyed() && floatingBallDropdownWindow.isVisible()) {
+      floatingBallDropdownWindow.hide();
+    }
+  });
+
+  floatingBallDropdownWindow.loadURL(`${RENDERER_BASE}/dropdown.html`);
+  floatingBallDropdownWindow.on('closed', () => { floatingBallDropdownWindow = null; });
+}
+
+// 把下拉窗口锚定到悬浮球正下方：水平居中于球，顶部贴球底部；越界时夹进工作区
+function positionFloatingBallDropdown(): void {
+  if (!floatingBallDropdownWindow || floatingBallDropdownWindow.isDestroyed()) return;
+  if (!floatingBallWindow || floatingBallWindow.isDestroyed()) return;
+
+  const ball = floatingBallWindow.getBounds();
+  const display = screen.getDisplayNearestPoint({ x: ball.x, y: ball.y }) || screen.getPrimaryDisplay();
+  const wa = display.workArea;
+
+  let x = Math.round(ball.x + ball.width / 2 - DD_WIDTH / 2);
+  let y = ball.y + ball.height + 6; // 球正下方 + 6px 间隙
+
+  if (x < wa.x) x = wa.x;
+  if (x + DD_WIDTH > wa.x + wa.width) x = wa.x + wa.width - DD_WIDTH;
+  if (y < wa.y) y = wa.y;
+  if (y + DD_HEIGHT > wa.y + wa.height) y = wa.y + wa.height - DD_HEIGHT;
+
+  floatingBallDropdownWindow.setBounds({ x, y, width: DD_WIDTH, height: DD_HEIGHT });
+}
+
+function toggleFloatingBallDropdown(): void {
+  if (!floatingBallWindow || floatingBallWindow.isDestroyed() || !floatingBallWindow.isVisible()) return;
+  if (!floatingBallDropdownWindow || floatingBallDropdownWindow.isDestroyed()) {
+    createFloatingBallDropdown();
+  }
+  if (floatingBallDropdownWindow!.isVisible()) {
+    floatingBallDropdownWindow!.hide();
+  } else {
+    positionFloatingBallDropdown();
+    floatingBallDropdownWindow!.show();
+    floatingBallDropdownWindow!.focus();
+  }
+}
+
 // 应用就绪
 app.whenReady().then(() => {
   // 1. 加载配置
@@ -754,8 +841,11 @@ app.whenReady().then(() => {
   // 2. 创建用量监控（注入到 server 中以便广播）
   usageMonitor = new UsageMonitor(configStore);
 
+  // 2.1 创建 Kimi Code (web) 状态监控（注入到 server 中以便广播 + 走 refresh）
+  kimiMonitor = new KimiMonitor();
+
   // 3. 启动状态服务器（注入 configStore + usageMonitor 让它能广播用量）
-  server = new StatusServer(WS_PORT, { configStore, usageMonitor });
+  server = new StatusServer(WS_PORT, { configStore, usageMonitor, kimiMonitor });
   server.start();
 
   // 监听 LAN 模式变化，自动重启服务器以切换绑定地址
@@ -1001,6 +1091,19 @@ ipcMain.handle(IPC_CHANNELS.FLOATING_BALL_OPEN_MAIN, async () => {
   } else {
     mainWindow.show();
     mainWindow.focus();
+  }
+});
+
+// 悬浮球短按：切换下方下拉窗口
+ipcMain.handle(IPC_CHANNELS.FLOATING_BALL_TOGGLE_DROPDOWN, async () => {
+  toggleFloatingBallDropdown();
+});
+
+// 浮球窗口自绘拖动：渲染层回报位移增量（dx/dy）
+ipcMain.on(IPC_CHANNELS.FLOATING_BALL_MOVE, (_event, dx: number, dy: number) => {
+  if (floatingBallWindow && !floatingBallWindow.isDestroyed() && (Number.isFinite(dx) && Number.isFinite(dy))) {
+    const b = floatingBallWindow.getBounds();
+    floatingBallWindow.setBounds({ x: b.x + dx, y: b.y + dy, width: b.width, height: b.height });
   }
 });
 

@@ -1,190 +1,88 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useUsageState } from './composables/useUsageState';
+import type { KimiAggregateState } from './types/messages';
 
-// 整块是 -webkit-app-region: drag，所以普通 click 事件被 OS 消费。
-// 改为监听 mousedown/mouseup：距离+时间短视为 click，长/移动视为 drag（已交给 OS）
-const {
-  kimiFiveHour,
-  minimaxFiveHour,
-  copilotSlot,
-  codexSlot,
-  isProviderVisible,
-  pendingByCwd
-} = useUsageState();
+const { kimiState, kimiAvailable } = useUsageState();
 
-const kimiVisible = computed<boolean>(() => isProviderVisible('kimi'));
-const minimaxVisible = computed<boolean>(() => isProviderVisible('minimax'));
-const copilotVisible = computed<boolean>(() => isProviderVisible('copilot'));
-const codexVisible = computed<boolean>(() => isProviderVisible('codex'));
-
-const pendingCount = computed<number>(() => Object.keys(pendingByCwd).length);
-
-// function basenameOf(p: string): string {
-//   return p.split(/[\\/]/).filter(Boolean).pop() || p;
-// }
-
-// const projectName = computed<string>(() => {
-//   const keys = Object.keys(pendingByCwd);
-//   if (keys.length === 0) return '空闲';
-//   if (keys.length === 1) return basenameOf(keys[0]);
-//   return `${keys.length} 项待处理`;
-// });
-
-// ===== 短按 vs 拖动 判定 =====
+// 窗口不再用 -webkit-app-region: drag（drag 区会吞点击事件，且与"点击弹下拉"互斥）。
+// 改为自绘拖动：mousedown 记录起点，mousemove 通过 IPC moveBy 移动窗口，
+// 移动距离小且时间短视为点击（弹下拉），否则视为拖动。
 const CLICK_DISTANCE = 4;   // px
 const CLICK_DURATION = 300; // ms
 let downX = 0;
 let downY = 0;
 let downTs = 0;
 let downValid = false;
+let moved = false;
 
 function onMouseDown(e: MouseEvent) {
-  downX = e.clientX;
-  downY = e.clientY;
+  downX = e.screenX;
+  downY = e.screenY;
   downTs = Date.now();
   downValid = true;
+  moved = false;
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp, { once: true });
+}
+
+function onMouseMove(e: MouseEvent) {
+  if (!downValid) return;
+  const dx = e.screenX - downX;
+  const dy = e.screenY - downY;
+  if (dx !== 0 || dy !== 0) {
+    moved = true;
+    window.electronAPI?.floatingBall?.moveBy(dx, dy);
+    downX = e.screenX;
+    downY = e.screenY;
+  }
 }
 
 function onMouseUp(e: MouseEvent) {
   if (!downValid) return;
   downValid = false;
-  const dx = Math.abs(e.clientX - downX);
-  const dy = Math.abs(e.clientY - downY);
+  window.removeEventListener('mousemove', onMouseMove);
+  const dx = Math.abs(e.screenX - downX);
+  const dy = Math.abs(e.screenY - downY);
   const dt = Date.now() - downTs;
-  if (dx <= CLICK_DISTANCE && dy <= CLICK_DISTANCE && dt <= CLICK_DURATION) {
-    onClickBar();
+  // 仅当没有实际拖动才算点击
+  if (!moved && dx <= CLICK_DISTANCE && dy <= CLICK_DISTANCE && dt <= CLICK_DURATION) {
+    onBallClick();
   }
 }
 
-function onClickBar() {
-  if (window.electronAPI?.floatingBall) {
-    window.electronAPI.floatingBall.openMain();
+function onBallClick() {
+  if (window.electronAPI?.floatingBall?.toggleDropdown) {
+    window.electronAPI.floatingBall.toggleDropdown().catch((e: unknown) => {
+      console.error('[FloatingBall] toggleDropdown failed:', e);
+    });
   } else {
-    console.log('[FloatingBar] click → open main (mock)');
+    console.log('[FloatingBall] click → toggle dropdown (mock)');
   }
 }
 
-// ===== 指示灯点击灭灯（仅亮灯时可点，复用同一套短按/拖动阈值） =====
-let dotDownX = 0;
-let dotDownY = 0;
-let dotDownTs = 0;
-let dotDownValid = false;
+// LED 状态类：待审核=红闪 / 编辑=黄常亮 / 思考=黄呼吸 / 空闲=绿微光 / 离线=灰灭
+const ledStateClass = computed<string>(() => {
+  if (!kimiAvailable.value) return 'offline';
+  return kimiState.value;
+});
 
-function onDotMouseDown(e: MouseEvent) {
-  dotDownX = e.clientX;
-  dotDownY = e.clientY;
-  dotDownTs = Date.now();
-  dotDownValid = true;
-}
-
-function onDotMouseUp(e: MouseEvent) {
-  if (!dotDownValid || pendingCount.value === 0) {
-    dotDownValid = false;
-    return;
-  }
-  dotDownValid = false;
-  const dx = Math.abs(e.clientX - dotDownX);
-  const dy = Math.abs(e.clientY - dotDownY);
-  const dt = Date.now() - dotDownTs;
-  if (dx > CLICK_DISTANCE || dy > CLICK_DISTANCE || dt > CLICK_DURATION) return;
-  onDotClick();
-}
-
-function onDotClick() {
-  const keys = Object.keys(pendingByCwd);
-  if (keys.length === 0) return;
-  if (window.electronAPI?.floatingBall) {
-    for (const k of keys) {
-      window.electronAPI.floatingBall.notifyCleared(k);
-    }
-  } else {
-    console.log('[FloatingBar] dot click → clear pending (mock)', keys);
-  }
-}
+const STATE_TEXT: Record<KimiAggregateState, string> = {
+  approval: '待审核',
+  editing: '编辑中',
+  thinking: '思考中',
+  idle: '空闲',
+  offline: '离线',
+};
+const ledTitle = computed(() => `Kimi · ${STATE_TEXT[kimiState.value]}`);
 </script>
 
 <template>
-  <div class="fb" title="拖动可移动位置，短按切到主窗口"
-       @mousedown="onMouseDown" @mouseup="onMouseUp">
-    <!-- 右上角：打开主界面按钮 -->
-    <div class="fb-open" title="打开主界面" @click.stop="onClickBar">
-      <svg viewBox="0 0 16 16" class="fb-open-icon">
-        <path d="M3 3h10v10H3z" fill="none" stroke="currentColor" stroke-width="1.5"/>
-        <path d="M6 8h4M8 6v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-    </div>
-
-    <!-- 顶部：通知指示灯（亮灯时点击可灭灯） -->
-    <div class="fb-header">
-      <div class="fb-dot"
-           :class="{ 'fb-dot--active': pendingCount > 0, 'fb-dot--clickable': pendingCount > 0 }"
-           :title="pendingCount > 0 ? '点击熄灭指示灯' : ''"
-           @mousedown.stop="onDotMouseDown"
-           @mouseup.stop="onDotMouseUp"></div>
-      <!-- <div class="fb-name" :class="{ 'fb-name--idle': pendingCount === 0 }">{{ projectName }}</div> -->
-    </div>
-
-    <!-- 模型用量：纵向堆叠（disabled 不画整行） -->
-    <div class="fb-bars">
-      <div class="fb-row" v-if="kimiVisible">
-        <div class="fb-bar-row">
-          <span class="fb-bar-label">K</span>
-          <div class="fb-bar">
-            <div class="fb-bar-fill"
-                 :class="`fb-bar-fill--${kimiFiveHour.level}`"
-                 :style="{ width: kimiFiveHour.percent + '%' }"></div>
-          </div>
-          <span class="fb-bar-pct">{{ kimiFiveHour.percent }}%</span>
-        </div>
-        <div class="fb-reset" v-if="kimiFiveHour.resetText">{{ kimiFiveHour.resetText }}</div>
-      </div>
-      <div class="fb-row" v-if="minimaxVisible">
-        <div class="fb-bar-row">
-          <span class="fb-bar-label">M</span>
-          <div class="fb-bar">
-            <div class="fb-bar-fill"
-                 :class="`fb-bar-fill--${minimaxFiveHour.level}`"
-                 :style="{ width: minimaxFiveHour.percent + '%' }"></div>
-          </div>
-          <span class="fb-bar-pct">{{ minimaxFiveHour.percent }}%</span>
-        </div>
-        <div class="fb-reset" v-if="minimaxFiveHour.resetText">{{ minimaxFiveHour.resetText }}</div>
-        <!-- <div class="fb-bar-row fb-bar-row--secondary" v-if="minimaxWeekly.percent > 0 || minimaxWeekly.resetText">
-          <span class="fb-bar-label">W</span>
-          <div class="fb-bar">
-            <div class="fb-bar-fill fb-bar-fill--muted"
-                 :class="`fb-bar-fill--${minimaxWeekly.level}`"
-                 :style="{ width: minimaxWeekly.percent + '%' }"></div>
-          </div>
-          <span class="fb-bar-pct">{{ minimaxWeekly.percent }}%</span>
-        </div>
-        <div class="fb-reset" v-if="minimaxWeekly.resetText">{{ minimaxWeekly.resetText }}</div> -->
-      </div>
-      <div class="fb-row" v-if="copilotVisible">
-        <div class="fb-bar-row">
-          <span class="fb-bar-label">C</span>
-          <div class="fb-bar">
-            <div class="fb-bar-fill"
-                 :class="`fb-bar-fill--${copilotSlot.level}`"
-                 :style="{ width: copilotSlot.percent + '%' }"></div>
-          </div>
-          <span class="fb-bar-pct">{{ copilotSlot.percent }}%</span>
-        </div>
-        <div class="fb-reset" v-if="copilotSlot.resetText">{{ copilotSlot.resetText }}</div>
-      </div>
-      <div class="fb-row" v-if="codexVisible">
-        <div class="fb-bar-row">
-          <span class="fb-bar-label">Cx</span>
-          <div class="fb-bar">
-            <div class="fb-bar-fill"
-                 :class="`fb-bar-fill--${codexSlot.level}`"
-                 :style="{ width: codexSlot.percent + '%' }"></div>
-          </div>
-          <span class="fb-bar-pct">{{ codexSlot.percent }}%</span>
-        </div>
-        <div class="fb-reset" v-if="codexSlot.resetText">{{ codexSlot.resetText }}</div>
-      </div>
+  <div class="fb" :title="ledTitle">
+    <!-- 拟物化像素 LED 圆灯：可点击弹下拉，按住拖动整个球 -->
+    <div class="led" :class="`led--${ledStateClass}`"
+         @mousedown="onMouseDown">
+      <div class="led-lens"></div>
     </div>
   </div>
 </template>

@@ -21,6 +21,8 @@ const IPC_CHANNELS = {
   FLOATING_BALL_OPEN_MAIN: 'floating-ball:open-main',
   FLOATING_BALL_GET_STATE: 'floating-ball:get-state',
   FLOATING_BALL_NOTIFY_CLEARED: 'floating-ball:notify-cleared',
+  FLOATING_BALL_TOGGLE_DROPDOWN: 'floating-ball:toggle-dropdown',
+  FLOATING_BALL_MOVE: 'floating-ball:move',
   WINDOW_DOCK_STATE: 'window:dock-state',
   WINDOW_DOCK_ANIM: 'window:dock-anim',
   TRAY_HOVER_POINTER: 'tray-hover:pointer',
@@ -73,7 +75,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openMain: () => ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_OPEN_MAIN),
     getState: () => ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_GET_STATE),
     notifyCleared: (cwd: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_NOTIFY_CLEARED, cwd)
+      ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_NOTIFY_CLEARED, cwd),
+    toggleDropdown: () => ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_TOGGLE_DROPDOWN),
+    moveBy: (dx: number, dy: number) => ipcRenderer.send(IPC_CHANNELS.FLOATING_BALL_MOVE, dx, dy)
   },
 
   // 托盘 hover 弹窗：渲染层回报指针是否在窗口内
