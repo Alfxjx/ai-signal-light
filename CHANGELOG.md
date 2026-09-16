@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.6.0](https://github.com/Alfxjx/ai-signal-light/compare/v2.5.0...v2.6.0) (2026-09-16)
+
+
+### ✨ 新功能
+
+* 接入 Kimi Code (web) 实时状态监控 ([8312fdc](https://github.com/Alfxjx/ai-signal-light/commit/8312fdcfefdae0bc5aa1d38ea3b67a17c11ec0fd))
+* 悬浮球改为拟物 LED + 下拉菜单 ([feae498](https://github.com/Alfxjx/ai-signal-light/commit/feae498ffc9f6e78f6d82c6eebb26951e9e3dbdb))
+
 ## [2.5.0](https://github.com/Alfxjx/ai-signal-light/compare/v2.4.0...v2.5.0) (2026-08-25)
 
 
