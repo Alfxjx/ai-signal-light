@@ -31,6 +31,13 @@ export type {
 } from '../../../shared/types/websocket';
 
 export type {
+  KimiStatus,
+  KimiProject,
+  KimiSessionState,
+  KimiAggregateState,
+} from '../../../shared/types/kimi';
+
+export type {
   UsageThresholds,
 } from '../../../shared/types/config';
 

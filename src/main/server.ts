@@ -7,12 +7,14 @@ import { WS_PORT } from '../shared/constants';
 import { normalizeCwd } from '../shared/utils/cwd';
 import type { ConfigStore } from './config';
 import type { UsageMonitor } from './usage-monitor';
+import type { KimiMonitor } from './kimi-monitor';
 import type { WsMessage, ClientWsMessage, PendingHook } from '../shared/types/websocket';
 import { toMobileConfig } from './pairing';
 
 interface ServerOptions {
   configStore?: ConfigStore | null;
   usageMonitor?: UsageMonitor | null;
+  kimiMonitor?: KimiMonitor | null;
 }
 
 /**
@@ -23,6 +25,7 @@ export class StatusServer {
   private detector: AIDetector;
   private configStore: ConfigStore | null;
   private usageMonitor: UsageMonitor | null;
+  private kimiMonitor: KimiMonitor | null;
   private wss: WebSocket.Server | null = null;
   private httpServer: http.Server | null = null;
   private clients = new Set<WebSocket>();
@@ -34,6 +37,7 @@ export class StatusServer {
     this.detector = new AIDetector();
     this.configStore = options.configStore || null;
     this.usageMonitor = options.usageMonitor || null;
+    this.kimiMonitor = options.kimiMonitor || null;
   }
 
   start(): this {
@@ -67,6 +71,7 @@ export class StatusServer {
         type: 'init',
         data: {
           ...this.detector.getAllStatus(),
+          kimi: this.kimiMonitor ? this.kimiMonitor.getStatus() : undefined,
           pending: this.getPendingSnapshot()
         }
       } as WsMessage));
@@ -104,6 +109,7 @@ export class StatusServer {
             console.log('[Server] user requested refresh');
             this.detector.checkAll();
             if (this.usageMonitor) this.usageMonitor.checkAll();
+            if (this.kimiMonitor) this.kimiMonitor.refresh();
           } else if (msg.type === 'getConfig') {
             // QR 配对后手机端反向拉取配置；连接已在 verifyClient 阶段鉴权通过
             const requestId = msg.requestId;
@@ -151,6 +157,13 @@ export class StatusServer {
       });
     }
 
+    // 注册 Kimi Code (web) 状态回调，推送给所有客户端
+    if (this.kimiMonitor) {
+      this.kimiMonitor.onStatusChange((status) => {
+        this.broadcast({ type: 'kimiStatus', data: status } as WsMessage);
+      });
+    }
+
     // 注册配置变更回调：阈值变化时推送给所有客户端
     if (this.configStore) {
       this.configStore.onChange((cfg) => {
@@ -160,6 +173,8 @@ export class StatusServer {
 
     // 启动检测器
     this.detector.start();
+    // 启动 Kimi Code (web) 状态监控
+    this.kimiMonitor?.start();
 
     // 根据 lanMode 决定绑定地址：localhost-only 或 LAN
     const cfg = this.configStore?.get();
@@ -332,6 +347,7 @@ export class StatusServer {
 
   stop(): void {
     this.detector.stop();
+    this.kimiMonitor?.stop();
     if (this.wss) this.wss.close();
     if (this.httpServer) this.httpServer.close();
   }

@@ -378,6 +378,60 @@ body {
   display: none;
 }
 
+/* ===== Kimi Code (web) 卡 ===== */
+/* 与 Claude 卡共享 .claude-header/.project-list/... 样式；同样去掉外壳背景/边框 */
+.status-card[data-assistant="kimi"] {
+  background: transparent;
+  border: none;
+  padding: 8px 0;
+}
+
+.status-card[data-assistant="kimi"]:hover {
+  background: transparent;
+  border: none;
+}
+
+.kimi-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.kimi-state-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.kimi-state-badge[data-state="thinking"] { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
+.kimi-state-badge[data-state="editing"]  { background: rgba(250, 204, 21, 0.15);  color: #facc15; }
+.kimi-state-badge[data-state="approval"] { background: rgba(239, 68, 68, 0.15);   color: #ef4444; }
+.kimi-state-badge[data-state="idle"]     { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+.kimi-state-badge[data-state="offline"]  { background: rgba(100, 116, 139, 0.2);  color: #64748b; }
+
+/* 目录行左侧实时忙态圆点：红=待审核 / 黄=编辑 / 绿=思考 / 灰=空闲 */
+.kimi-state-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+
+.kimi-state-dot.dot-approval { background: #ef4444; }
+.kimi-state-dot.dot-editing  { background: #facc15; }
+.kimi-state-dot.dot-thinking { background: #4ade80; }
+.kimi-state-dot.dot-idle     { background: #94a3b8; }
+
+.compact [data-assistant="kimi"] .project-list .project-row:nth-child(n+5) {
+  display: none;
+}
+
 .usage-title {
   font-size: 13px;
   font-weight: 500;

@@ -2,11 +2,13 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
 import TitleBar from './components/TitleBar.vue';
 import ClaudeCard from './components/ClaudeCard.vue';
+import KimiCard from './components/KimiCard.vue';
 import UsageCard from './components/UsageCard.vue';
 import { useWebSocket } from './composables/useWebSocket';
 import { normalizeCwd } from './utils/cwd';
 import type {
   ClaudeProject,
+  KimiStatus,
   UsageState,
   WsMessage,
   AssistantStatus,
@@ -19,6 +21,7 @@ import { DEFAULT_USAGE_THRESHOLDS } from './types/messages';
 
 // ====== State ======
 const projects = ref<ClaudeProject[]>([]);
+const kimiStatus = ref<KimiStatus | null>(null);
 const usage = reactive<UsageState>({
   kimi: null,
   minimax: null,
@@ -75,9 +78,12 @@ const { isConnected, connect, send } = useWebSocket(handleMessage);
 function handleMessage(msg: WsMessage) {
   if (msg.type === 'init') {
     if (msg.data.claude) handleClaudeData(msg.data.claude);
+    if (msg.data.kimi) kimiStatus.value = msg.data.kimi;
     if (msg.data.usage) handleUsageInit(msg.data.usage);
   } else if (msg.type === 'statusChange' && msg.assistantId === 'claude') {
     handleClaudeData(msg.data as AssistantStatus);
+  } else if (msg.type === 'kimiStatus') {
+    kimiStatus.value = msg.data;
   } else if (msg.type === 'usageInit') {
     handleUsageInit(msg.data);
   } else if (msg.type === 'usageUpdate') {
@@ -256,6 +262,8 @@ const lastUpdateText = computed(() => {
     <div class="cards-container">
       <UsageCard :usage="usage" :now="now" :is-compact="isCompact" :is-refreshing="isUsageRefreshing"
                  @toggle-compact="toggleCompact" @refresh="onUsageRefresh" />
+      <KimiCard v-if="kimiStatus?.available" :status="kimiStatus" :now="now" :is-refreshing="isRefreshing"
+                @refresh="onRefresh" />
       <ClaudeCard :projects="projects" :now="now" :is-refreshing="isRefreshing"
                   :pending-by-cwd="pendingByCwd" @refresh="onRefresh" @clear-pending="clearPending" />
     </div>
