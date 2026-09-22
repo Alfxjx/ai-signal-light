@@ -43,6 +43,18 @@ export interface FloatingBallConfig {
   isVisible: boolean;
 }
 
+/** 桌面宠物（与悬浮球独立开关，可共存） */
+export interface PetConfig {
+  enabled: boolean;
+  /** 当前活动宠物 id，null 表示未安装/未选中 */
+  activePetId: string | null;
+  /** 显示缩放 %（50–150，默认 100），窗口尺寸随之变化 */
+  scale: number;
+  x: number | null;
+  y: number | null;
+  isVisible: boolean;
+}
+
 export interface UsageThresholds {
   /** 超过该已用 % 进入 warn (黄) */
   warn: number;
@@ -69,6 +81,7 @@ export interface AppConfig {
   window: WindowConfig;
   hooks: HooksConfig;
   floatingBall: FloatingBallConfig;
+  pet: PetConfig;
   thresholds: UsageThresholds;
   lanMode: LanModeConfig;
 }
@@ -88,7 +101,7 @@ export interface MobileAppConfig {
   thresholds: UsageThresholds;
 }
 
-export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex' | 'volcengine' | 'window' | 'proxy' | 'floatingBall' | 'thresholds' | 'lanMode'>> & {
+export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex' | 'volcengine' | 'window' | 'proxy' | 'floatingBall' | 'pet' | 'thresholds' | 'lanMode'>> & {
   kimi?: Partial<ProviderConfig>;
   minimax?: Partial<ProviderConfig>;
   copilot?: Partial<ProviderConfig>;
@@ -102,6 +115,7 @@ export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax'
     endpoint?: Partial<HooksEndpointConfig>;
   }>;
   floatingBall?: Partial<FloatingBallConfig>;
+  pet?: Partial<PetConfig>;
   thresholds?: Partial<UsageThresholds>;
   lanMode?: Partial<LanModeConfig>;
 };

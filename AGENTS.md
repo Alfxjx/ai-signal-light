@@ -47,14 +47,19 @@ src/
 │   ├── config.ts              # ConfigStore: userData/config.json with atomic writes; VALID_INTERVALS, HOOK_EVENTS
 │   ├── pairing.ts             # QR payload (v/host/port/apiKey) + LAN IP detection + MobileAppConfig projection
 │   ├── edge-dock.ts           # TopEdgeDock: 主面板顶部吸附/收起/滑出状态机（依赖注入，不 import electron）
+│   ├── pet-store.ts           # 桌面宠物素材库：userData/pets/<id>.json（含 base64 图集）磁盘原子写
 │   ├── edge-dock.test.ts      # Vitest, colocated
 │   ├── usage-monitor.test.ts  # Vitest, colocated
+│   ├── pet-store.test.ts      # Vitest, colocated
 │   └── kimi-monitor.test.ts   # Vitest, colocated（mapPhase/aggregateState/buildProjects/reconcile 纯函数）
 ├── renderer/src/              # Vue 3 + TS (vite build → dist/renderer)
 │   ├── main.ts / App.vue                  # Main panel entry + root
 │   ├── settings.ts / Settings.vue         # Settings window entry + root
 │   ├── floating-ball.ts / FloatingBall.vue  # 悬浮球入口：拟物像素 LED，显示 Kimi 聚合状态；短按弹下拉
 │   ├── dropdown.ts / Dropdown.vue           # 悬浮球下拉窗口：最近活跃项目 + Kimi 5h 用量
+│   ├── pet.ts / pet.html / PetView.vue     # 桌面宠物窗口：Codex 图集播放 + 三态交互（单击开 Kimi Web/长按弹下拉/右键菜单）
+│   ├── pet/pet-install.ts (+ .test.ts)     # 画廊命令解析 + 安全 unzip + 图集尺寸校验（仅下载素材）
+│   ├── pet/pet-sprites.ts                  # 官方 Codex 图集逐帧播放器（9 行动作表，CSS background-position）
 │   ├── components/            # TitleBar, ClaudeCard (project list), KimiCard (web 状态), UsageCard (quota bars)
 │   ├── composables/           # useWebSocket (reconnect), useUsageState
 │   ├── utils/                 # time.ts, cwd.ts, kimiFilter.ts (+ colocated *.test.ts)
@@ -85,6 +90,7 @@ landing/                       # Vue 3 + Tailwind landing page (own package.json
 - **Usage quotas**: `UsageMonitor` polls provider APIs every `intervalMinutes` (5/10/15/30/60), pushes `usageInit` / `usageUpdate` over WS. Progress bar width and label percent both represent **used %** for all providers (bar wider = closer to limit); warn/danger thresholds are configurable in settings. Auth per provider: **Kimi** — manual openplatform API key, queries `GET https://api.kimi.com/coding/v1/usages` (7d + 5h windows, `codingWeekly` / `codingFiveHour`); **MiniMax** — manual openplatform API key; **Copilot** — GitHub Device Flow OAuth (`copilot-auth.ts`, `gho_` token in `copilot.token`; legacy cookie paste still works, distinguished by prefix); **DeepSeek** — manual platform API key (balance only, no rate windows); **Codex** — auto-reads `~/.codex/auth.json`, refreshes via auth.openai.com when expired (`codex-credentials.ts`). `UsageMonitor._safeRun` accepts an optional `resolveToken` for auto credential sources (currently only Codex).
 - **QR pairing (Android)**: desktop shows a QR containing only `{v, host, port, apiKey}` (`src/main/pairing.ts`); the Android app scans it, connects to the WS server with the apiKey, and pulls a trimmed `MobileAppConfig` via the server's `getConfig` handler, then keeps syncing over LAN WebSocket.
 - **顶部吸附收起 (`edge-dock.ts`)**: 主面板拖到屏幕顶部松手（顶边距 workArea 顶边 ≤ 10px）即吸附，延迟后动画收起到 `workArea.y - height + 5`，屏内只剩面板**底边** 5px；主进程每 120ms 轮询 `screen.getCursorScreenPoint()`，光标进顶部触发带则滑出，离开且窗口不"忙"（面板未聚焦、设置/QR 窗口未开）则重新收起；从展开态拖离顶部即退出吸附。状态存 `config.window.dockedTop`，通过 `WINDOW_DOCK_STATE` 通道推给渲染层画底边把手（`.app--docked`）。吸附态下窗口 bounds 由 dock 托管，`saveBounds` 必须保留 config 里旧的 x/y，不能写入收起态的负 y。
+- **桌面宠物 (`pet-*`)**: 与悬浮球**独立开关、可共存**（`config.pet.enabled`）。素材从画廊粘贴命令导入（`pet-install.ts`：awesome-codex-pet slug / codex-pets.net zip / petdex.dev，只下载 `pet.json`+`spritesheet.webp`，`Image` 校验图集 1536 宽 × 208 整数倍高 ≥9 行），主进程 `pet-store.ts` 存 `userData/pets/`。宠物窗口透明置顶 `focusable:false`，尺寸 `192×scale/100 × 208×scale/100`，`pet-sprites.ts` 按官方 9 行动作表逐帧播放，跟随 Kimi 聚合状态（thinking/editing→running、approval→waiting、idle→idle、offline→failed 灰显）。交互：单击 → `KimiMonitor.getWebUrl()` 的 `http://127.0.0.1:<port>` 走 `shell.openExternal`（浏览器对相同 URL 自动聚焦已有标签，不重复开；服务不可达弹系统通知）；左键长按 600ms → 弹共用下拉（锚定宠物窗口）；右键 → 原生菜单（打开 Kimi Web / 打开设置 / 隐藏宠物）；拖拽移动位置存 `config.pet.x/y`。宠物变化经 `pet:changed` 事件通知窗口重建。
 
 ## Conventions
 

@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [desktop-pet](plans/desktop-pet.md) | [history](history/desktop-pet.md)
+- 时间：2026-09-20
+- 范围：桌面宠物（独立开关，可与悬浮球共存）：粘贴画廊命令导入 Codex 素材（awesome-codex-pet slug / codex-pets.net zip / petdex.dev）、主进程磁盘素材库、官方图集播放器跟随 Kimi 状态；单击打开本地 Kimi Web（相同 URL 浏览器自动聚焦不重复开）、长按弹下拉、右键原生菜单、可拖动
+- 关联：`src/main/{pet-store,pet-store.test,main,kimi-monitor,preload,config}.ts`、`src/renderer/src/{PetView.vue,pet.ts,pet.html,pet.css,pet/pet-install.ts,pet/pet-install.test.ts,pet/pet-sprites.ts,Settings.vue,styles/settings.css}`、`src/shared/types/{config,ipc}.ts`、`vite.config.ts`
+
 ## [kimi-web-status](plans/kimi-web-status.md) | [history](history/kimi-web-status.md)
 - 时间：2026-09-16
 - 范围：主面板新增「Kimi Code (web)」实时状态卡：连本机 kimi web 服务（WS 订阅 + REST 校准），会话按 metadata.cwd 归并成目录行，头部四态聚合（待审核>编辑>思考>空闲），离线整卡隐藏

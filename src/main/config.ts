@@ -24,6 +24,7 @@ const DEFAULTS: AppConfig = {
     endpoint: { autoInstalled: false }
   },
   floatingBall: { enabled: false, x: null, y: null, isVisible: false },
+  pet: { enabled: false, activePetId: null, scale: 100, x: null, y: null, isVisible: false },
   thresholds: { ...DEFAULT_USAGE_THRESHOLDS },
   lanMode: { enabled: false, apiKey: '' }
 };
@@ -81,6 +82,16 @@ export class ConfigStore {
           endpoint: { ...DEFAULTS.hooks.endpoint, ...((parsed.hooks && parsed.hooks.endpoint) || {}) }
         },
         floatingBall: { ...DEFAULTS.floatingBall, ...(parsed.floatingBall || {}) },
+        pet: {
+          enabled: typeof parsed.pet?.enabled === 'boolean' ? parsed.pet.enabled : DEFAULTS.pet.enabled,
+          activePetId: typeof parsed.pet?.activePetId === 'string' ? parsed.pet.activePetId : null,
+          scale: typeof parsed.pet?.scale === 'number' && parsed.pet.scale >= 50 && parsed.pet.scale <= 150
+            ? parsed.pet.scale
+            : DEFAULTS.pet.scale,
+          x: parsed.pet?.x === null || Number.isFinite(parsed.pet?.x) ? parsed.pet?.x ?? null : null,
+          y: parsed.pet?.y === null || Number.isFinite(parsed.pet?.y) ? parsed.pet?.y ?? null : null,
+          isVisible: typeof parsed.pet?.isVisible === 'boolean' ? parsed.pet.isVisible : DEFAULTS.pet.isVisible
+        },
         intervalMinutes: VALID_INTERVALS.includes(parsed.intervalMinutes as ValidInterval)
           ? (parsed.intervalMinutes as ValidInterval)
           : DEFAULTS.intervalMinutes,
@@ -157,6 +168,19 @@ export class ConfigStore {
       if (fb.x === null || Number.isFinite(fb.x)) this.data.floatingBall.x = fb.x as number | null;
       if (fb.y === null || Number.isFinite(fb.y)) this.data.floatingBall.y = fb.y as number | null;
       if (typeof fb.isVisible === 'boolean') this.data.floatingBall.isVisible = fb.isVisible;
+    }
+    if (partial.pet && typeof partial.pet === 'object') {
+      const p = partial.pet;
+      if (typeof p.enabled === 'boolean') this.data.pet.enabled = p.enabled;
+      if (typeof p.activePetId === 'string' || p.activePetId === null) {
+        this.data.pet.activePetId = p.activePetId;
+      }
+      if (typeof p.scale === 'number') {
+        this.data.pet.scale = Math.min(150, Math.max(50, Math.round(p.scale)));
+      }
+      if (p.x === null || Number.isFinite(p.x)) this.data.pet.x = p.x as number | null;
+      if (p.y === null || Number.isFinite(p.y)) this.data.pet.y = p.y as number | null;
+      if (typeof p.isVisible === 'boolean') this.data.pet.isVisible = p.isVisible;
     }
     if (partial.thresholds && typeof partial.thresholds === 'object') {
       const t = partial.thresholds as Partial<UsageThresholds>;

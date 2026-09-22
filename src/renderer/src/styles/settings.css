@@ -358,3 +358,32 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ===== 桌面宠物 section ===== */
+.btn-tiny {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.settings-spacer {
+  flex: 1;
+}
+
+.pet-row {
+  justify-content: flex-start;
+}
+
+.pet-name {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pet-badge {
+  font-size: 11px;
+  color: rgba(52, 211, 153, 0.95);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  border-radius: 4px;
+  padding: 1px 6px;
+}

@@ -23,6 +23,18 @@ const IPC_CHANNELS = {
   FLOATING_BALL_NOTIFY_CLEARED: 'floating-ball:notify-cleared',
   FLOATING_BALL_TOGGLE_DROPDOWN: 'floating-ball:toggle-dropdown',
   FLOATING_BALL_MOVE: 'floating-ball:move',
+  PET_GET: 'pet:get',
+  PET_LIST: 'pet:list',
+  PET_INSTALL: 'pet:install',
+  PET_SET_ACTIVE: 'pet:set-active',
+  PET_REMOVE: 'pet:remove',
+  PET_TOGGLE: 'pet:toggle',
+  PET_OPEN_WEB: 'pet:open-web',
+  PET_TOGGLE_DROPDOWN: 'pet:toggle-dropdown',
+  PET_MOVE: 'pet:move',
+  PET_SHOW_MENU: 'pet:show-menu',
+  PET_SET_SCALE: 'pet:set-scale',
+  PET_CHANGED: 'pet:changed',
   WINDOW_DOCK_STATE: 'window:dock-state',
   WINDOW_DOCK_ANIM: 'window:dock-anim',
   TRAY_HOVER_POINTER: 'tray-hover:pointer',
@@ -78,6 +90,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_NOTIFY_CLEARED, cwd),
     toggleDropdown: () => ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_TOGGLE_DROPDOWN),
     moveBy: (dx: number, dy: number) => ipcRenderer.send(IPC_CHANNELS.FLOATING_BALL_MOVE, dx, dy)
+  },
+
+  // 桌面宠物
+  pet: {
+    get: () => ipcRenderer.invoke(IPC_CHANNELS.PET_GET),
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.PET_LIST),
+    install: (input: unknown) => ipcRenderer.invoke(IPC_CHANNELS.PET_INSTALL, input),
+    setActive: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.PET_SET_ACTIVE, id),
+    remove: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.PET_REMOVE, id),
+    toggle: () => ipcRenderer.invoke(IPC_CHANNELS.PET_TOGGLE),
+    openWeb: () => ipcRenderer.invoke(IPC_CHANNELS.PET_OPEN_WEB),
+    toggleDropdown: () => ipcRenderer.invoke(IPC_CHANNELS.PET_TOGGLE_DROPDOWN),
+    moveBy: (dx: number, dy: number) => ipcRenderer.send(IPC_CHANNELS.PET_MOVE, dx, dy),
+    showMenu: () => ipcRenderer.invoke(IPC_CHANNELS.PET_SHOW_MENU),
+    setScale: (scale: number) => ipcRenderer.invoke(IPC_CHANNELS.PET_SET_SCALE, scale),
+    onChanged: (cb: () => void) =>
+      ipcRenderer.on(IPC_CHANNELS.PET_CHANGED, () => cb())
   },
 
   // 托盘 hover 弹窗：渲染层回报指针是否在窗口内

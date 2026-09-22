@@ -10,6 +10,11 @@ export type {
   HooksUninstallResult,
   WindowState,
   FloatingBallState,
+  PetMeta,
+  PetRecord,
+  PetInstallInput,
+  PetGetResult,
+  PetOpenWebResult,
   ElectronAPI,
 } from '../../../shared/types/ipc';
 

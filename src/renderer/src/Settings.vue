@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import type { SettingsSavePayload } from './types/electron';
+import type { SettingsSavePayload, PetMeta } from './types/electron';
 import { DEFAULT_USAGE_THRESHOLDS } from './types/messages';
+import { parseInput, fetchPet } from './pet/pet-install';
 
 interface ProviderState {
   enabled: boolean;
@@ -76,6 +77,71 @@ const intervalMinutes = ref<number>(10);
 const saving = ref<boolean>(false);
 const floatingBallEnabled = ref<boolean>(false);
 const lanModeEnabled = ref<boolean>(false);
+
+// ---- 桌面宠物 ----
+const petEnabled = ref<boolean>(false);
+const petScale = ref<number>(100);
+const petLibrary = ref<PetMeta[]>([]);
+const petActiveId = ref<string>('');
+const petShowInstall = ref<boolean>(false);
+const petInstallInput = ref<string>('');
+const petInstallBusy = ref<boolean>(false);
+const petInstallStatus = ref<string>('');
+
+const PET_SCALE_MIN = 50;
+const PET_SCALE_MAX = 150;
+const PET_SCALE_STEP = 10;
+
+async function refreshPetLibrary(): Promise<void> {
+  if (!window.electronAPI?.pet) return;
+  petLibrary.value = await window.electronAPI.pet.list();
+  const r = await window.electronAPI.pet.get();
+  petActiveId.value = r.pet?.id ?? '';
+  petScale.value = r.scale;
+}
+
+function applyPetScale(value: number): void {
+  const next = Math.min(PET_SCALE_MAX, Math.max(PET_SCALE_MIN, Math.round(value)));
+  if (next === petScale.value) return;
+  petScale.value = next;
+  window.electronAPI?.pet?.setScale(next);
+}
+
+async function onPetInstall(): Promise<void> {
+  if (!window.electronAPI?.pet) return;
+  petInstallBusy.value = true;
+  petInstallStatus.value = '下载中…';
+  try {
+    const plan = parseInput(petInstallInput.value);
+    const { dataUrl, info } = await fetchPet(plan);
+    await window.electronAPI.pet.install({
+      name: info.name,
+      author: info.author,
+      source: info.source,
+      dataUrl,
+    });
+    petInstallInput.value = '';
+    petShowInstall.value = false;
+    petInstallStatus.value = '安装成功，已切换为新宠物';
+    await refreshPetLibrary();
+  } catch (e) {
+    petInstallStatus.value = '安装失败：' + (e instanceof Error ? e.message : String(e));
+  } finally {
+    petInstallBusy.value = false;
+  }
+}
+
+async function onPetSwitch(id: string): Promise<void> {
+  if (!window.electronAPI?.pet) return;
+  await window.electronAPI.pet.setActive(id);
+  await refreshPetLibrary();
+}
+
+async function onPetRemove(id: string): Promise<void> {
+  if (!window.electronAPI?.pet) return;
+  await window.electronAPI.pet.remove(id);
+  await refreshPetLibrary();
+}
 
 // ---- 用量阈值 ----
 const warnThreshold = ref<number>(DEFAULT_USAGE_THRESHOLDS.warn);
@@ -237,12 +303,14 @@ onMounted(async () => {
   }
   hookAutoInstalled.value = !!cfg.hooks?.endpoint?.autoInstalled;
   floatingBallEnabled.value = !!cfg.floatingBall?.enabled;
+  petEnabled.value = !!cfg.pet?.enabled;
   lanModeEnabled.value = !!cfg.lanMode?.enabled;
   if (cfg.thresholds) {
     warnThreshold.value = cfg.thresholds.warn;
     dangerThreshold.value = cfg.thresholds.danger;
   }
   await refreshHelperPath();
+  await refreshPetLibrary();
 
   window.electronAPI.onCopilotDeviceResult((r) => {
     deviceFlowBusy.value = false;
@@ -303,6 +371,7 @@ async function onSave() {
       intervalMinutes: intervalMinutes.value,
       hooks: { enabled: { ...hookEnabled } },
       floatingBall: { enabled: floatingBallEnabled.value },
+      pet: { enabled: petEnabled.value },
       thresholds: {
         warn: warnThreshold.value,
         danger: dangerThreshold.value,
@@ -647,6 +716,69 @@ async function openQrCode() {
         </div>
         <div class="settings-field">
           <div class="settings-hint">桌面右下角常驻 80×80 状态指示器：中心 5h 剩余百分比、底部多模型 mini bar、有通知时顶部亮红点。单击切到主窗口，可拖动改位置。</div>
+        </div>
+      </div>
+
+      <!-- 桌面宠物 -->
+      <div class="settings-section" data-section="pet">
+        <div class="settings-section-header">
+          <span class="settings-section-title">桌面宠物</span>
+          <label class="settings-toggle">
+            <input type="checkbox" v-model="petEnabled">
+            <span class="settings-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <div class="settings-hint">养一只像素宠物，跟随 Kimi 工作状态变换动作。单击打开 Kimi Web，长按看用量，右键菜单，可拖动。</div>
+        </div>
+
+        <div class="settings-field">
+          <div class="settings-label">我的宠物</div>
+          <div v-if="petLibrary.length === 0" class="settings-hint">尚未安装宠物</div>
+          <div v-for="p in petLibrary" :key="p.id" class="settings-row pet-row">
+            <span class="settings-label-inline pet-name" :title="p.author ? `${p.name} by ${p.author}` : p.name">
+              {{ p.name }}<template v-if="p.author"> · {{ p.author }}</template>
+            </span>
+            <span class="settings-spacer"></span>
+            <span v-if="p.id === petActiveId" class="pet-badge">当前</span>
+            <button v-else type="button" class="btn-secondary btn-tiny" @click="onPetSwitch(p.id)">切换</button>
+            <button type="button" class="btn-secondary btn-tiny" @click="onPetRemove(p.id)">移除</button>
+          </div>
+        </div>
+
+        <div class="settings-field">
+          <div v-if="!petShowInstall">
+            <button type="button" class="btn-secondary" @click="petShowInstall = true">＋ 安装新宠物</button>
+          </div>
+          <div v-else>
+            <input
+              id="petInstallInput"
+              class="settings-input"
+              v-model="petInstallInput"
+              placeholder="粘贴画廊安装命令或宠物 slug"
+              spellcheck="false"
+              autocomplete="off"
+              @keyup.enter="onPetInstall"
+            >
+            <div class="settings-row">
+              <button type="button" class="btn-secondary" :disabled="petInstallBusy" @click="onPetInstall">
+                {{ petInstallBusy ? '下载中…' : '安装' }}
+              </button>
+              <button type="button" class="btn-secondary" @click="petShowInstall = false">取消</button>
+            </div>
+          </div>
+          <div class="settings-hint" v-if="petInstallStatus">{{ petInstallStatus }}</div>
+          <div class="settings-hint">从宠物画廊（<code>codexpet.top</code> / <code>petdex.dev</code> 等）复制安装命令粘贴到上方，只下载素材、不执行脚本。</div>
+        </div>
+
+        <div class="settings-field">
+          <div class="settings-row">
+            <span class="settings-label-inline">大小</span>
+            <button type="button" class="btn-secondary btn-tiny" @click="applyPetScale(petScale - PET_SCALE_STEP)">−</button>
+            <button type="button" class="btn-secondary btn-tiny" @click="applyPetScale(100)">重置</button>
+            <button type="button" class="btn-secondary btn-tiny" @click="applyPetScale(petScale + PET_SCALE_STEP)">＋</button>
+            <span class="settings-label-inline">{{ petScale }}%</span>
+          </div>
         </div>
       </div>
 
