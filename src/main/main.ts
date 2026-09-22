@@ -1285,6 +1285,14 @@ ipcMain.on(IPC_CHANNELS.FLOATING_BALL_MOVE, (_event, dx: number, dy: number) => 
   }
 });
 
+// 悬浮球动态宽度：气泡展开/收起（setSize 保持左上角锚点，只向右扩展）
+ipcMain.handle(IPC_CHANNELS.FLOATING_BALL_SET_WIDTH, async (_event, width: number) => {
+  if (floatingBallWindow && !floatingBallWindow.isDestroyed() && Number.isFinite(width)) {
+    const w = Math.max(FB_WIDTH, Math.round(width));
+    floatingBallWindow.setSize(w, FB_HEIGHT);
+  }
+});
+
 // 悬浮球：读取当前状态
 ipcMain.handle(IPC_CHANNELS.FLOATING_BALL_GET_STATE, async () => {
   if (!configStore) return { visible: false, enabled: false };

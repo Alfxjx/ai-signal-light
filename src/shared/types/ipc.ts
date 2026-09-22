@@ -141,6 +141,8 @@ export interface ElectronAPI {
     toggleDropdown: () => Promise<void>;
     /** 浮球自绘拖动：回报位移增量（dx/dy 像素） */
     moveBy: (dx: number, dy: number) => void;
+    /** 气泡展开/收起：动态调整悬浮球窗口宽度（保持左上角锚点，向右扩展） */
+    setWidth: (width: number) => Promise<void>;
   };
   pet: {
     /** 当前活动宠物（含图集 dataUrl）与显示缩放；无活动宠物返回 { pet: null, scale } */
@@ -194,6 +196,7 @@ export const IPC_CHANNELS = {
   FLOATING_BALL_NOTIFY_CLEARED: 'floating-ball:notify-cleared',
   FLOATING_BALL_TOGGLE_DROPDOWN: 'floating-ball:toggle-dropdown',
   FLOATING_BALL_MOVE: 'floating-ball:move',
+  FLOATING_BALL_SET_WIDTH: 'floating-ball:set-width',
   PET_GET: 'pet:get',
   PET_LIST: 'pet:list',
   PET_INSTALL: 'pet:install',

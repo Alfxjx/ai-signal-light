@@ -23,6 +23,7 @@ const IPC_CHANNELS = {
   FLOATING_BALL_NOTIFY_CLEARED: 'floating-ball:notify-cleared',
   FLOATING_BALL_TOGGLE_DROPDOWN: 'floating-ball:toggle-dropdown',
   FLOATING_BALL_MOVE: 'floating-ball:move',
+  FLOATING_BALL_SET_WIDTH: 'floating-ball:set-width',
   PET_GET: 'pet:get',
   PET_LIST: 'pet:list',
   PET_INSTALL: 'pet:install',
@@ -89,7 +90,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     notifyCleared: (cwd: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_NOTIFY_CLEARED, cwd),
     toggleDropdown: () => ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_TOGGLE_DROPDOWN),
-    moveBy: (dx: number, dy: number) => ipcRenderer.send(IPC_CHANNELS.FLOATING_BALL_MOVE, dx, dy)
+    moveBy: (dx: number, dy: number) => ipcRenderer.send(IPC_CHANNELS.FLOATING_BALL_MOVE, dx, dy),
+    setWidth: (width: number) => ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_SET_WIDTH, width)
   },
 
   // 桌面宠物

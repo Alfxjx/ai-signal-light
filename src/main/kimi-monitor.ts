@@ -23,6 +23,7 @@ import path from 'path';
 import { normalizeCwd } from '../shared/utils/cwd';
 import type {
   KimiAggregateState,
+  KimiNotify,
   KimiProject,
   KimiSessionState,
   KimiStatus,
@@ -69,6 +70,31 @@ const STATE_RANK: Record<KimiSessionState, number> = { idle: 0, thinking: 1, edi
 
 function betterState(a: KimiSessionState, b: KimiSessionState): KimiSessionState {
   return STATE_RANK[b] > STATE_RANK[a] ? b : a;
+}
+
+/**
+ * 从 WS 事件里解析 NotifyUser 工具调用（web 模式实验性 API）。
+ * 命中返回 { message, ts }；非 NotifyUser / 无消息 / 未知形状返回 null。
+ */
+export function parseNotifyCall(event: Record<string, unknown>): KimiNotify | null {
+  const type = typeof event.type === 'string' ? event.type : '';
+  if (type !== 'tool.call.started' && type !== 'tool.result') return null;
+
+  const payload = (event.payload ?? {}) as Record<string, unknown>;
+  const toolName = typeof payload.tool_name === 'string'
+    ? payload.tool_name
+    : typeof payload.name === 'string' ? payload.name : '';
+  if (toolName !== 'NotifyUser') return null;
+
+  const msg = (payload.input ?? payload.tool_input ?? payload.arguments ?? {}) as Record<string, unknown>;
+  const message = typeof msg.message === 'string'
+    ? msg.message
+    : typeof payload.message === 'string' ? payload.message : '';
+  if (!message.trim()) {
+    console.warn('[kimi] NotifyUser 调用缺少 message：', JSON.stringify(payload));
+    return null;
+  }
+  return { message, ts: Date.now() };
 }
 
 /** 聚合多个会话忙态为头部状态：任一待审核 > 任一编辑中 > 任一思考中 > 全空闲 */
@@ -258,6 +284,8 @@ export class KimiMonitor {
   private lastRest: RestSession[] | null = null;
   /** 会话 id → 实时忙态 */
   private busy = new Map<string, KimiSessionState>();
+  /** 最近一次 NotifyUser 消息（悬浮球气泡数据源） */
+  private notify: KimiNotify | null = null;
   /** 服务在线标志：成功连上/轮询成功为 true */
   private online = false;
 
@@ -272,6 +300,11 @@ export class KimiMonitor {
 
   getStatus(): KimiStatus {
     return this.buildStatus();
+  }
+
+  /** 本地 Kimi Code Web 页面地址（服务可达且有端口时返回），用于"点击宠物打开" */
+  getWebUrl(): string | null {
+    return this.port ? `http://127.0.0.1:${this.port}` : null;
   }
 
   /** 手动刷新（托盘/面板 refresh 事件） */
@@ -303,13 +336,19 @@ export class KimiMonitor {
       state,
       projects,
       lastUpdate: Date.now(),
+      notify: this.notify,
     };
   }
 
   /** 构建并推送，仅在有实质变化时广播（避免 3s 无谓刷新） */
   private publish(): void {
     const status = this.buildStatus();
-    const key = JSON.stringify({ available: status.available, state: status.state, projects: status.projects });
+    const key = JSON.stringify({
+      available: status.available,
+      state: status.state,
+      projects: status.projects,
+      notify: status.notify ? `${status.notify.ts}:${status.notify.message}` : null,
+    });
     if (key === this.lastKey) return;
     this.lastKey = key;
     this.onChangeCb?.(status);
@@ -428,6 +467,17 @@ export class KimiMonitor {
       const id = (event.payload as Record<string, unknown> | undefined)?.sessionId as string | undefined
         ?? (event.payload as Record<string, unknown> | undefined)?.id as string | undefined;
       if (id) this.send({ type: 'subscribe', id: 'sub-kimi-add', payload: { session_ids: [id] } });
+      return;
+    }
+
+    // NotifyUser 工具调用 → 悬浮球右侧气泡（实验性字段，解析兜底）。
+    // 放在 session_id 门禁之前：tool.call.* 事件未必带 session_id。
+    if (type === 'tool.call.started' || type === 'tool.result') {
+      const notify = parseNotifyCall(event);
+      if (notify) {
+        this.notify = notify;
+        this.publish();
+      }
       return;
     }
 

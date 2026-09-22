@@ -24,6 +24,14 @@ export interface KimiProject {
   pending: boolean;
 }
 
+/** NotifyUser 工具调用（web 模式经 WS tool.call.* 事件捕获，实验性字段） */
+export interface KimiNotify {
+  /** NotifyUser 的 message 参数 */
+  message: string;
+  /** 捕获时间戳，毫秒 */
+  ts: number;
+}
+
 /** 整卡状态（推送给渲染层） */
 export interface KimiStatus {
   /** 服务是否在线；离线时渲染层隐藏整卡 */
@@ -31,6 +39,8 @@ export interface KimiStatus {
   state: KimiAggregateState;
   projects: KimiProject[];
   lastUpdate: number | null;
+  /** 最近一次 NotifyUser 消息；无则为 null（悬浮球右侧气泡的数据源） */
+  notify?: KimiNotify | null;
 }
 
 /** REST /api/v1/sessions 的元素（只取用到的字段） */

@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [kimi-notify-bubble](plans/kimi-notify-bubble.md) | [history](history/kimi-notify-bubble.md)
+- 时间：2026-09-20
+- 范围：悬浮球 LED 右侧显示 Kimi NotifyUser 消息气泡（web 模式经 WS tool.call.* 捕获，15s 自动隐藏，窗口动态加宽）；TUI 无此通道，web 模式走官方 API
+- 关联：`src/shared/types/{kimi,ipc}.ts`、`src/main/{kimi-monitor,kimi-monitor.test,main,preload}.ts`、`src/renderer/src/{FloatingBall.vue,styles/floating-ball.css}`
+
 ## [desktop-pet](plans/desktop-pet.md) | [history](history/desktop-pet.md)
 - 时间：2026-09-20
 - 范围：桌面宠物（独立开关，可与悬浮球共存）：粘贴画廊命令导入 Codex 素材（awesome-codex-pet slug / codex-pets.net zip / petdex.dev）、主进程磁盘素材库、官方图集播放器跟随 Kimi 状态；单击打开本地 Kimi Web（相同 URL 浏览器自动聚焦不重复开）、长按弹下拉、右键原生菜单、可拖动
