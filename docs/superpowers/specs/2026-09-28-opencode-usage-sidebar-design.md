@@ -65,12 +65,11 @@ opencode-plugin/
     ├── tui.tsx                    # Plugin.define：插槽渲染 + 轮询 + 手动刷新命令
     ├── config.ts                  # 定位并解析 AppConfig（只读）
     ├── config.test.ts
-    ├── model.ts                    # 各家结果 → 统一 ProviderView
     ├── format.ts                   # 纯格式化：条形/百分比/倒计时/中日韩宽度对齐/配色
     ├── format.test.ts
     ├── types.ts
     └── providers/
-        ├── index.ts                # provider 注册表（id、显示名、取数函数、窗口语义）
+        ├── index.ts                # PROVIDERS 数组（id、显示名、fetch）
         ├── kimi.ts                 + kimi.test.ts
         ├── minimax.ts              + minimax.test.ts
         ├── deepseek.ts             + deepseek.test.ts
@@ -89,7 +88,7 @@ config.json (只读)
     ▼
 providers/*：fetchUsage(cfg) ── 每家独立 8s 超时
     ▼
-model.ts：归一化为 ProviderView
+各 provider 直接产出 windows / balance；窗口选择与配色在 format.ts
     ▼
 Solid signal ──(每 5 分钟 / 手动)──> sidebar.content 插槽
 ```
@@ -172,21 +171,33 @@ MiMo      ¥33.06
 
 ## 10. 加载与注册
 
-`~/.config/opencode/cli.json` 的 `plugins` 数组追加本目录（`opencode.jsonc` 里那个 legacy
-`plugin` 数组**不动**，其中挂着的 `opencode-tokenwatch` 一并保持原样）：
+本插件通过 opencode 的**全局插件发现目录**加载（实测生效，opencode 2.0.14）：
 
-```jsonc
-{
-  "plugins": [
-    "opencode-tokenwatch",
-    "file:///C:/Users/<user>/Documents/kimi/Workspaces/ai-signal-light/opencode-plugin"
-  ]
-}
+`C:\Users\cari\.config\opencode\plugins\usage-sidebar\tui.ts`：
+
+```ts
+export { default } from '../../../../Documents/kimi/Workspaces/ai-signal-light/opencode-plugin/src/tui.tsx';
 ```
 
-- Windows 下路径书写形式（绝对路径 vs `file:///`）文档未明确，**实现时实测**。
-- 兜底方案：在 `~/.config/opencode/plugins/usage-sidebar/` 放 `index.ts` + `tui.ts` 两行
-  re-export，指向仓库内实现（opencode 会自动发现 `<global-config>/plugins/<name>/`）。
+- opencode 自动发现 `~/.config/opencode/plugins/usage-sidebar/tui.ts`，**不需要**写进
+  `cli.json` 或 `opencode.jsonc`。
+- `cli.json` **保持原样**（`plugins` 里只有 `opencode-tokenwatch`），一个字都不要改。
+- 该 stub 在仓库外、不受版本控制，内容原样记进 `opencode-plugin/README.md`。
+- 运行时依赖来自仓库里的 `opencode-plugin/node_modules`：stub import 的文件在该目录树内，
+  Bun 从它向上解析 `@opencode/plugin/tui` 与 `solid-js`，因此 `npm install` 是**运行时前提**。
+
+### 实测：`cli.json` 路径条目无效
+
+实测（opencode 2.0.14）：`cli.json` 的 `plugins` 里写本地路径**不会被加载，而且零日志静默忽略**。
+失败的三种写法：
+
+- `"file:///C:/Users/cari/Documents/kimi/Workspaces/ai-signal-light/opencode-plugin"`
+- `"C:/Users/cari/Documents/kimi/Workspaces/ai-signal-light/opencode-plugin"`
+- 上面两种 + 给包补 `"."` 主入口（`exports` 同时含 `"."` 与 `"./tui"`）
+
+判定方式：在 `setup()` 里临时 `appendFileSync` 一行看文件是否出现，或查
+`~/.local/share/opencode/log/opencode.log` 的 `plugin operation failed` / reconciliation 行。
+已用落盘追踪实证全局发现目录方式下 `setup()` 被调用。
 
 ## 11. 测试
 
@@ -212,7 +223,7 @@ Vitest，colocated `*.test.ts`，与仓库既有约定一致（`npm test` 在插
 
 | # | 风险 | 处理 |
 |---|---|---|
-| 1 | `cli.json` 中本地目录的路径语法未实测 | 第一步只做「加载成功即弹 toast」的最小插件，通路验证通过再写功能；兜底 re-export 方案 |
+| 1 | `cli.json` 路径条目能否加载 → **已实测不能** | 改用全局发现目录 `~/.config/opencode/plugins/usage-sidebar/tui.ts`（一行 re-export），已用落盘追踪证明 `setup()` 被调用 |
 | 2 | 本地插件在无 `node_modules` 时能否解析 `solid-js` / `@opencode/plugin/tui` | 实测；失败则本地安装（npmmirror 已确认可达 `@opencode/plugin@2.0.18`） |
 | 3 | 侧边栏实际宽度未知，可能不足 35 列 | 按 35 列设计，窄栏时截断名称 |
 | 4 | 5 分钟 × 5 家 ≈ 60 请求/小时，可能触发风控 | 单飞 + 缓存 + 失败退避；不做更激进的短轮询 |
@@ -221,7 +232,7 @@ Vitest，colocated `*.test.ts`，与仓库既有约定一致（`npm test` 在插
 ## 14. 实现顺序（概要）
 
 1. 最小插件 + cli.json 注册，验证加载与 `sidebar.content` 渲染通路（toast + 一行静态文本）
-2. `config.ts` + `format.ts` + `model.ts`（纯函数，先单测）
+2. `config.ts` + `format.ts`（纯函数，先单测）
 3. 五家 provider 取数与映射（逐家：实现 → 单测 → 接入）
 4. `tui.tsx` 组装：轮询、缓存、手动刷新命令、错误态
 5. README 与 `.vibe-harness/` 记录

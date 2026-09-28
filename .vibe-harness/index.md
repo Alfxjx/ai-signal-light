@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [opencode-usage-sidebar](plans/opencode-usage-sidebar.md) | [history](history/opencode-usage-sidebar.md)
+- 时间：2026-09-28
+- 范围：新增 opencode TUI 侧边栏插件（独立 npm 包 opencode-plugin/），显示 Kimi/MiniMax/火山/DeepSeek/MiMo 五家用量；凭据只读 %APPDATA%\AI状态监控\config.json；5 分钟轮询 + 失败退避 + 手动刷新
+- 关联：`opencode-plugin/**`、`.gitignore`、`~/.config/opencode/plugins/usage-sidebar/tui.ts`、`docs/superpowers/specs/2026-09-28-opencode-usage-sidebar-design.md`
+
 ## [android-aksk-and-mimo](plans/android-aksk-and-mimo.md) | [history](history/android-aksk-and-mimo.md)
 - 时间：2026-09-28
 - 范围：安卓端火山接入 AK/SK 官方 OpenAPI（与桌面共用同一套官方测试向量，Cookie 降级回退）；新增 MiMo 余额 provider；修安卓侧 cookie jar 只回写 csrfToken 的老 bug、修重新扫码冲掉手填 AK/SK 的问题

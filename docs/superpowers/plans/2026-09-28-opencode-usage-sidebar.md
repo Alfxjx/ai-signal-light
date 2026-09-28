@@ -2447,7 +2447,7 @@ Set-Location opencode-plugin; npm test
 
 Expected: 前面所有测试仍全绿。
 
-- [ ] **Step 4: 端到端验证**
+- [x] **Step 4: 端到端验证**
 
 ```powershell
 opencode
@@ -2509,7 +2509,7 @@ git commit -m "feat(opencode-plugin): 侧边栏轮询渲染、缓存与手动刷
 - Create: `.vibe-harness/history/opencode-usage-sidebar.md`
 - Modify: `.vibe-harness/index.md`
 
-- [ ] **Step 1: 写 `opencode-plugin/README.md`**
+- [x] **Step 1: 写 `opencode-plugin/README.md`**
 
 内容必须包含以下小节，用实际验证结果填写（不要留占位符）：
 
@@ -2603,7 +2603,7 @@ npm run typecheck
 
 README 里**不允许留尖括号占位符**；「加载方式」一节必须写成实际生效的全局发现目录方案。
 
-- [ ] **Step 2: 同步 spec（三处简化 + 加载方式 + 风险表）**
+- [x] **Step 2: 同步 spec（三处简化 + 加载方式 + 风险表）**
 
 编辑 `docs/superpowers/specs/2026-09-28-opencode-usage-sidebar-design.md`：
 
@@ -2613,7 +2613,7 @@ README 里**不允许留尖括号占位符**；「加载方式」一节必须写
 4. 第 10 节「加载与注册」：整节改写为实测结论 —— **用全局发现目录 `~/.config/opencode/plugins/usage-sidebar/tui.ts`（一行 re-export）**，`cli.json` 保持原样；把原文里「Windows 下路径书写形式未明确，实现时实测」和 cli.json 兜底那段删掉，替换成「实测 `cli.json` 路径条目无效（`file:///C:/…`、裸绝对路径、补 `"."` 主入口三种都试过，零日志静默忽略）」。
 5. 第 13 节风险表第 1 行：改成「`cli.json` 路径条目能否加载 → **已实测不能**，改用全局发现目录，已用落盘追踪证明 `setup()` 被调用」。
 
-- [ ] **Step 3: 写 `.vibe-harness/plans/opencode-usage-sidebar.md`**
+- [x] **Step 3: 写 `.vibe-harness/plans/opencode-usage-sidebar.md`**
 
 ```markdown
 # opencode 供应商用量侧边栏插件
@@ -2625,11 +2625,11 @@ README 里**不允许留尖括号占位符**；「加载方式」一节必须写
 - 边界：不做 Copilot / Codex；不做代理；不写回 config.json
 ```
 
-- [ ] **Step 4: 写 `.vibe-harness/history/opencode-usage-sidebar.md`**
+- [x] **Step 4: 写 `.vibe-harness/history/opencode-usage-sidebar.md`**
 
 按 AGENTS.md 的格式记录：改动摘要（新增 `opencode-plugin/` 独立包、加载方式、五家取数、侧边栏渲染）、影响范围（新增目录，不动桌面应用代码）、验证结果（E2E 实测现象、footgun：`--legacy-peer-deps`、MiniMax 剩余/已用语义、火山 200 带 Error、**`cli.json` 路径条目无效必须走全局发现目录**）。
 
-- [ ] **Step 5: 更新 `.vibe-harness/index.md`**
+- [x] **Step 5: 更新 `.vibe-harness/index.md`**
 
 按现有格式追加：
 
@@ -2640,7 +2640,7 @@ README 里**不允许留尖括号占位符**；「加载方式」一节必须写
 - 关联：`opencode-plugin/**`、`.gitignore`、`~/.config/opencode/cli.json`、`docs/superpowers/specs/2026-09-28-opencode-usage-sidebar-design.md`
 ```
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```powershell
 git add opencode-plugin/README.md docs/superpowers/specs/2026-09-28-opencode-usage-sidebar-design.md .vibe-harness
