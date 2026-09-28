@@ -45,3 +45,12 @@ export const PROVIDERS: ProviderDefinition[] = [
     fetch: async (raw) => ({ windows: [], balance: await fetchMimo(raw) }),
   },
 ];
+
+/**
+ * 只保留 config.json 里显式 `enabled === true` 的 provider。
+ * 注意：`enabled` 但 `token` 为空的那家**仍会返回**，由渲染层画成灰色「未配置」——
+ * 规格要求不静默隐藏「已启用但没填凭据」的行。
+ */
+export function enabledProviders(raw: RawAppConfig): ProviderDefinition[] {
+  return PROVIDERS.filter((p) => raw[p.id]?.enabled === true);
+}

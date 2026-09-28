@@ -4,7 +4,7 @@ import { loadConfig, DEFAULT_THRESHOLDS } from './config';
 import type { RawAppConfig, Thresholds } from './config';
 import { formatHeader, formatProviderLines } from './format';
 import type { Level } from './format';
-import { PROVIDERS } from './providers/index';
+import { enabledProviders } from './providers/index';
 import type { ProviderDefinition } from './providers/index';
 import type { ProviderId, ProviderResult, ProviderState } from './types';
 
@@ -55,11 +55,6 @@ export default Plugin.define({
     const backoffUntil = new Map<ProviderId, number>();
     let inFlight: Promise<void> | null = null;
 
-    /** 只处理 config.json 里 enabled === true 的 provider；已启用但没填凭据的仍会渲染成「未配置」 */
-    function activeProviders(config: RawAppConfig): ProviderDefinition[] {
-      return PROVIDERS.filter((p) => config[p.id]?.enabled === true);
-    }
-
     async function fetchOne(definition: ProviderDefinition, config: RawAppConfig): Promise<ProviderState> {
       try {
         const result: ProviderResult = await definition.fetch(config);
@@ -98,7 +93,7 @@ export default Plugin.define({
       const run = async (): Promise<void> => {
         const { config, thresholds, error } = loadConfig();
         const startedAt = Date.now();
-        const active = activeProviders(config);
+        const active = enabledProviders(config);
         const due = active.filter((p) => manual || startedAt >= (backoffUntil.get(p.id) ?? 0));
 
         const settled = await Promise.all(due.map((p) => fetchOne(p, config)));

@@ -2180,6 +2180,15 @@ export const PROVIDERS: ProviderDefinition[] = [
     fetch: async (raw) => ({ windows: [], balance: await fetchMimo(raw) }),
   },
 ];
+
+/**
+ * 只保留 config.json 里显式 `enabled === true` 的 provider。
+ * 注意：`enabled` 但 `token` 为空的那家**仍会返回**，由渲染层画成灰色「未配置」——
+ * 规格要求不静默隐藏「已启用但没填凭据」的行。
+ */
+export function enabledProviders(raw: RawAppConfig): ProviderDefinition[] {
+  return PROVIDERS.filter((p) => raw[p.id]?.enabled === true);
+}
 ```
 
 - [x] **Step 22: 跑全部测试 + 类型检查**
@@ -2213,7 +2222,7 @@ import { loadConfig, DEFAULT_THRESHOLDS } from './config';
 import type { RawAppConfig, Thresholds } from './config';
 import { formatHeader, formatProviderLines } from './format';
 import type { Level } from './format';
-import { PROVIDERS } from './providers/index';
+import { enabledProviders } from './providers/index';
 import type { ProviderDefinition } from './providers/index';
 import type { ProviderId, ProviderResult, ProviderState } from './types';
 
@@ -2264,11 +2273,6 @@ export default Plugin.define({
     const backoffUntil = new Map<ProviderId, number>();
     let inFlight: Promise<void> | null = null;
 
-    /** 只处理 config.json 里 enabled === true 的 provider；已启用但没填凭据的仍会渲染成「未配置」 */
-    function activeProviders(config: RawAppConfig): ProviderDefinition[] {
-      return PROVIDERS.filter((p) => config[p.id]?.enabled === true);
-    }
-
     async function fetchOne(definition: ProviderDefinition, config: RawAppConfig): Promise<ProviderState> {
       try {
         const result: ProviderResult = await definition.fetch(config);
@@ -2307,7 +2311,7 @@ export default Plugin.define({
       const run = async (): Promise<void> => {
         const { config, thresholds, error } = loadConfig();
         const startedAt = Date.now();
-        const active = activeProviders(config);
+        const active = enabledProviders(config);
         const due = active.filter((p) => manual || startedAt >= (backoffUntil.get(p.id) ?? 0));
 
         const settled = await Promise.all(due.map((p) => fetchOne(p, config)));
@@ -2355,31 +2359,38 @@ export default Plugin.define({
       ),
     });
 
-    // 斜杠命令 /usage 与命令面板都能触发；快捷键可在 cli.json 的 keybinds 覆盖
-    context.keymap.layer(() => ({
-      mode: 'global',
-      commands: [
-        {
-          id: COMMAND_ID,
-          title: '刷新供应商用量',
-          description: '立即重新拉取 Kimi / MiniMax / 火山 / DeepSeek / MiMo 用量',
-          group: '用量',
-          bind: 'ctrl+alt+u',
-          palette: true,
-          slash: { name: 'usage' },
-          run: async () => {
-            await refreshAll(true);
-            const failed = latest.filter((s) => s.error).length;
-            context.ui.toast.show({
-              message: `已刷新 ${latest.length} 家${failed > 0 ? `（${failed} 家失败）` : ''}`,
-              variant: failed > 0 ? 'warning' : 'success',
-              duration: 3000,
-            });
-          },
-        },
-      ],
-      bindings: [COMMAND_ID],
-    }));
+    const unclaimCommands = context.ui.slot({
+      append: 'app',
+      render: () => {
+        // keymap.layer 必须由「组件」调用（setup 里调用会报 Keymap.Provider is missing）——
+        // app 插槽常驻挂载，适合放命令注册。
+        context.keymap.layer(() => ({
+          mode: 'global',
+          commands: [
+            {
+              id: COMMAND_ID,
+              title: '刷新供应商用量',
+              description: '立即重新拉取 Kimi / MiniMax / 火山 / DeepSeek / MiMo 用量',
+              group: '用量',
+              bind: 'ctrl+alt+u',
+              palette: true,
+              slash: { name: 'usage' },
+              run: async () => {
+                await refreshAll(true);
+                const failed = latest.filter((s) => s.error).length;
+                context.ui.toast.show({
+                  message: `已刷新 ${latest.length} 家${failed > 0 ? `（${failed} 家失败）` : ''}`,
+                  variant: failed > 0 ? 'warning' : 'success',
+                  duration: 3000,
+                });
+              },
+            },
+          ],
+          bindings: [COMMAND_ID],
+        }));
+        return null;
+      },
+    });
 
     void refreshAll();
     const timer = setInterval(() => void refreshAll(), REFRESH_MS);
@@ -2388,6 +2399,7 @@ export default Plugin.define({
       clearInterval(timer);
       clearInterval(ticker);
       unclaim();
+      unclaimCommands();
     };
   },
 });
@@ -2416,6 +2428,16 @@ Expected: 无错误。
   → 不要用 `Show`，直接用三元表达式渲染（计划代码块里已经这么写了）：
   `{snapshot.configError ? <text fg={…}>{snapshot.configError}</text> : null}`，同时把 `Show` 从 `solid-js` 的 import 里去掉
   （`noUnusedLocals` 会因为没用到而报错）。
+
+**运行时的坑（类型检查发现不了，E2E 才暴露）：**
+
+- `plugin operation failed … stage=setup … error="Keymap.Provider is missing"`
+  → `context.keymap.layer()` **必须由组件调用**，放在 `setup()` 里会抛这个错；而且 `setup` 一旦抛异常，
+    它之前注册的 `sidebar.content` 插槽也会一起失效，表现为**侧边栏整块空白**。
+  → 修法（计划代码块里已是修好的版本）：把命令注册挪进一个 `append: 'app'` 的插槽 render 里
+    （`app` 插槽常驻挂载），并把返回的注销函数加进 `setup` 的 cleanup。
+  → 这个错误只在 `~/.local/share/opencode/log/opencode.log` 里，且**不带 `error` 关键字之外的其他提示**，
+    排查时直接 `Select-String "operation failed|ai-signal-light"` 最快。
 
 - [ ] **Step 3: 跑全部单测**
 
