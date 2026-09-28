@@ -1343,7 +1343,7 @@ git commit -m "feat(opencode-plugin): 移植火山 V4 签名与官方测试向�
 
 ### 6a Kimi
 
-- [ ] **Step 1: 写失败测试 `providers/kimi.test.ts`**
+- [x] **Step 1: 写失败测试 `providers/kimi.test.ts`**
 
 ```ts
 import { describe, it, expect } from 'vitest';
@@ -1385,7 +1385,7 @@ describe('mapKimiUsages', () => {
 });
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/providers/kimi.test.ts
@@ -1393,7 +1393,7 @@ Set-Location opencode-plugin; npx vitest run src/providers/kimi.test.ts
 
 Expected: FAIL。
 
-- [ ] **Step 3: 实现 `providers/kimi.ts`**
+- [x] **Step 3: 实现 `providers/kimi.ts`**
 
 ```ts
 // Kimi 用量：GET https://api.kimi.com/coding/v1/usages（Bearer sk-kimi-…）
@@ -1459,7 +1459,7 @@ export async function fetchKimi(raw: RawAppConfig): Promise<WindowView[]> {
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/providers/kimi.test.ts
@@ -1469,7 +1469,7 @@ Expected: 全绿。
 
 ### 6b MiniMax
 
-- [ ] **Step 5: 写失败测试 `providers/minimax.test.ts`**
+- [x] **Step 5: 写失败测试 `providers/minimax.test.ts`**
 
 ```ts
 import { describe, it, expect } from 'vitest';
@@ -1513,7 +1513,7 @@ describe('mapMiniMax', () => {
 });
 ```
 
-- [ ] **Step 6: 跑测试确认失败**
+- [x] **Step 6: 跑测试确认失败**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/providers/minimax.test.ts
@@ -1521,7 +1521,7 @@ Set-Location opencode-plugin; npx vitest run src/providers/minimax.test.ts
 
 Expected: FAIL。
 
-- [ ] **Step 7: 实现 `providers/minimax.ts`**
+- [x] **Step 7: 实现 `providers/minimax.ts`**
 
 ```ts
 // MiniMax 用量：GET https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains
@@ -1579,7 +1579,7 @@ export async function fetchMiniMax(raw: RawAppConfig): Promise<WindowView[]> {
 }
 ```
 
-- [ ] **Step 8: 跑测试确认通过**
+- [x] **Step 8: 跑测试确认通过**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/providers/minimax.test.ts
@@ -1589,7 +1589,7 @@ Expected: 全绿。
 
 ### 6c DeepSeek
 
-- [ ] **Step 9: 写失败测试 `providers/deepseek.test.ts`**
+- [x] **Step 9: 写失败测试 `providers/deepseek.test.ts`**
 
 ```ts
 import { describe, it, expect } from 'vitest';
@@ -1610,7 +1610,7 @@ describe('mapDeepseekBalance', () => {
 });
 ```
 
-- [ ] **Step 10: 跑测试确认失败**
+- [x] **Step 10: 跑测试确认失败**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/providers/deepseek.test.ts
@@ -1618,7 +1618,7 @@ Set-Location opencode-plugin; npx vitest run src/providers/deepseek.test.ts
 
 Expected: FAIL。
 
-- [ ] **Step 11: 实现 `providers/deepseek.ts`**
+- [x] **Step 11: 实现 `providers/deepseek.ts`**
 
 ```ts
 // DeepSeek 余额：GET https://api.deepseek.com/user/balance（Bearer sk-…）
@@ -1654,7 +1654,7 @@ export async function fetchDeepseek(raw: RawAppConfig): Promise<BalanceView> {
 }
 ```
 
-- [ ] **Step 12: 跑测试确认通过**
+- [x] **Step 12: 跑测试确认通过**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/providers/deepseek.test.ts
@@ -1664,7 +1664,7 @@ Expected: 全绿。
 
 ### 6d MiMo
 
-- [ ] **Step 13: 写失败测试 `providers/mimo.test.ts`**
+- [x] **Step 13: 写失败测试 `providers/mimo.test.ts`**
 
 ```ts
 import { describe, it, expect } from 'vitest';
@@ -1703,7 +1703,7 @@ describe('mapMimoBalance', () => {
 });
 ```
 
-- [ ] **Step 14: 跑测试确认失败**
+- [x] **Step 14: 跑测试确认失败**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/providers/mimo.test.ts
@@ -1711,7 +1711,7 @@ Set-Location opencode-plugin; npx vitest run src/providers/mimo.test.ts
 
 Expected: FAIL。
 
-- [ ] **Step 15: 实现 `providers/mimo.ts`**
+- [x] **Step 15: 实现 `providers/mimo.ts`**
 
 ```ts
 // MiMo 余额：GET https://platform.xiaomimimo.com/api/v1/balance
@@ -1824,7 +1824,7 @@ export async function fetchMimo(raw: RawAppConfig): Promise<BalanceView> {
 }
 ```
 
-- [ ] **Step 16: 跑测试确认通过**
+- [x] **Step 16: 跑测试确认通过**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/providers/mimo.test.ts
@@ -1834,7 +1834,7 @@ Expected: 全绿。
 
 ### 6e 火山
 
-- [ ] **Step 17: 写失败测试 `providers/volcengine.test.ts`**
+- [x] **Step 17: 写失败测试 `providers/volcengine.test.ts`**
 
 ```ts
 import { describe, it, expect } from 'vitest';
@@ -1893,7 +1893,7 @@ describe('parseCookieJar', () => {
 });
 ```
 
-- [ ] **Step 18: 跑测试确认失败**
+- [x] **Step 18: 跑测试确认失败**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/providers/volcengine.test.ts
@@ -1901,7 +1901,7 @@ Set-Location opencode-plugin; npx vitest run src/providers/volcengine.test.ts
 
 Expected: FAIL。
 
-- [ ] **Step 19: 实现 `providers/volcengine.ts`**
+- [x] **Step 19: 实现 `providers/volcengine.ts`**
 
 ```ts
 // 火山 Ark Coding Plan 额度。
@@ -2050,7 +2050,7 @@ export async function fetchVolcengine(raw: RawAppConfig): Promise<WindowView[]> 
 }
 ```
 
-- [ ] **Step 20: 跑测试确认通过**
+- [x] **Step 20: 跑测试确认通过**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/providers/volcengine.test.ts
@@ -2060,7 +2060,7 @@ Expected: 全绿。
 
 ### 6f 注册表
 
-- [ ] **Step 21: 创建 `providers/index.ts`**
+- [x] **Step 21: 创建 `providers/index.ts`**
 
 ```ts
 import type { RawAppConfig } from '../config';
@@ -2112,7 +2112,7 @@ export const PROVIDERS: ProviderDefinition[] = [
 ];
 ```
 
-- [ ] **Step 22: 跑全部测试 + 类型检查**
+- [x] **Step 22: 跑全部测试 + 类型检查**
 
 ```powershell
 Set-Location opencode-plugin; npm test; npm run typecheck
@@ -2120,7 +2120,7 @@ Set-Location opencode-plugin; npm test; npm run typecheck
 
 Expected: 全绿；typecheck 无错误。
 
-- [ ] **Step 23: 提交**
+- [x] **Step 23: 提交**
 
 ```powershell
 git add opencode-plugin/src/providers
