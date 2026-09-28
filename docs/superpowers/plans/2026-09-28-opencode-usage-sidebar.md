@@ -370,7 +370,7 @@ describe('parseThresholds', () => {
 Set-Location opencode-plugin; npx vitest run src/config.test.ts
 ```
 
-Expected: FAIL —— 无法解析 `./config.js`。
+Expected: FAIL —— 无法解析 `./config`。
 
 - [x] **Step 3: 实现 `config.ts`**
 
@@ -698,7 +698,7 @@ describe('formatProviderLine', () => {
 Set-Location opencode-plugin; npx vitest run src/format.test.ts
 ```
 
-Expected: FAIL —— 无法解析 `./format.js`。
+Expected: FAIL —— 无法解析 `./format`。
 
 - [x] **Step 4: 实现 `format.ts`**
 
@@ -940,7 +940,7 @@ describe('httpRequest', () => {
 Set-Location opencode-plugin; npx vitest run src/providers/http.test.ts
 ```
 
-Expected: FAIL —— 无法解析 `./http.js`。
+Expected: FAIL —— 无法解析 `./http`。
 
 - [x] **Step 3: 实现 `providers/http.ts`**
 
@@ -1028,7 +1028,7 @@ git commit -m "feat(opencode-plugin): provider 请求封装与本地化错误"
 - Create: `opencode-plugin/src/providers/volcengine-sign.ts`
 - Test: `opencode-plugin/src/providers/volcengine-sign.test.ts`
 
-- [ ] **Step 1: 移植实现**
+- [x] **Step 1: 移植实现**
 
 `opencode-plugin/src/providers/volcengine-sign.ts`：
 
@@ -1164,7 +1164,7 @@ export function buildVolcengineUrl(host: string, canonicalQuery: string): string
 }
 ```
 
-- [ ] **Step 2: 移植测试**
+- [x] **Step 2: 移植测试**
 
 `opencode-plugin/src/providers/volcengine-sign.test.ts` —— 从 `src/main/volcengine-sign.test.ts` 原样复制，改两处：`import { describe, it, expect } from 'vitest';` 保留；`createHash` 改成 `from 'node:crypto'`；`from './volcengine-sign'` 改成 `'./volcengine-sign.js'`。
 
@@ -1312,7 +1312,7 @@ describe('signVolcengineRequest（官方文档测试向量）', () => {
 });
 ```
 
-- [ ] **Step 3: 跑测试确认通过**
+- [x] **Step 3: 跑测试确认通过**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/providers/volcengine-sign.test.ts
@@ -1320,7 +1320,7 @@ Set-Location opencode-plugin; npx vitest run src/providers/volcengine-sign.test.
 
 Expected: 全绿（签名与主进程共享同一批官方向量，能过就证明移植无偏差）。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```powershell
 git add opencode-plugin/src/providers/volcengine-sign.ts opencode-plugin/src/providers/volcengine-sign.test.ts
