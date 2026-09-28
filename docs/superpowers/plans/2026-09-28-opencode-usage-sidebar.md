@@ -485,7 +485,7 @@ git commit -m "feat(opencode-plugin): 只读解析应用 config.json"
 - Create: `opencode-plugin/src/format.ts`
 - Test: `opencode-plugin/src/format.test.ts`
 
-- [ ] **Step 1: 先写 `opencode-plugin/src/types.ts`**
+- [x] **Step 1: 先写 `opencode-plugin/src/types.ts`**
 
 ```ts
 export type ProviderId = 'kimi' | 'minimax' | 'volcengine' | 'deepseek' | 'mimo';
@@ -520,7 +520,7 @@ export interface ProviderState {
 }
 ```
 
-- [ ] **Step 2: 写失败测试**
+- [x] **Step 2: 写失败测试**
 
 `opencode-plugin/src/format.test.ts`：
 
@@ -692,7 +692,7 @@ describe('formatProviderLine', () => {
 });
 ```
 
-- [ ] **Step 3: 跑测试确认失败**
+- [x] **Step 3: 跑测试确认失败**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/format.test.ts
@@ -700,7 +700,7 @@ Set-Location opencode-plugin; npx vitest run src/format.test.ts
 
 Expected: FAIL —— 无法解析 `./format.js`。
 
-- [ ] **Step 4: 实现 `format.ts`**
+- [x] **Step 4: 实现 `format.ts`**
 
 ```ts
 import type { ProviderState, WindowView } from './types';
@@ -853,7 +853,7 @@ export function formatProviderLine(
 }
 ```
 
-- [ ] **Step 5: 跑测试确认通过**
+- [x] **Step 5: 跑测试确认通过**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/format.test.ts
@@ -861,7 +861,7 @@ Set-Location opencode-plugin; npx vitest run src/format.test.ts
 
 Expected: 全绿。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```powershell
 git add opencode-plugin/src/types.ts opencode-plugin/src/format.ts opencode-plugin/src/format.test.ts
