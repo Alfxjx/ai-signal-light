@@ -297,7 +297,7 @@ git commit -m "feat(opencode-plugin): 脚手架与最小侧边栏插件，验证
 - Create: `opencode-plugin/src/config.ts`
 - Test: `opencode-plugin/src/config.test.ts`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `opencode-plugin/src/config.test.ts`：
 
@@ -364,7 +364,7 @@ describe('parseThresholds', () => {
 });
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/config.test.ts
@@ -372,7 +372,7 @@ Set-Location opencode-plugin; npx vitest run src/config.test.ts
 
 Expected: FAIL —— 无法解析 `./config.js`。
 
-- [ ] **Step 3: 实现 `config.ts`**
+- [x] **Step 3: 实现 `config.ts`**
 
 ```ts
 // 只读解析桌面应用（AI状态监控）的 config.json。
@@ -461,7 +461,7 @@ export function loadConfig(path: string = configPath()): LoadedConfig {
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/config.test.ts
@@ -469,7 +469,7 @@ Set-Location opencode-plugin; npx vitest run src/config.test.ts
 
 Expected: 7 passed。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```powershell
 git add opencode-plugin/src/config.ts opencode-plugin/src/config.test.ts
