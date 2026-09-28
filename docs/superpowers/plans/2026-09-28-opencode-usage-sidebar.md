@@ -24,6 +24,7 @@
 | opencode | v2.0.14（`D:\apps\node\node_global\node_modules\@opencode\cli\bin\opencode.exe`） |
 | 插件 API 包 | `@opencode/plugin`，V2 类型定义实测取自 2.0.14 |
 | TUI 入口 | `import { Plugin } from '@opencode/plugin/tui'` → `Plugin.define({ id, setup })` |
+| ⚠️ `Context` 类型 | **不是** `@opencode/plugin/tui` 的顶层导出，只有 `Plugin.Context`。`setup(context)` 靠 `Plugin.define` 的上下文推断拿类型，**不要写 `import type { Context } from '@opencode/plugin/tui'`**（已实测：会报 TS2305） |
 | setup 返回值 | `Cleanup = () => void \| Promise<void>` |
 | 插槽 | `context.ui.slot({ append: 'sidebar.content', render: ({ sessionID }) => JSX })`，返回注销函数 |
 | 持久化 | `context.storage.store<T>('k', { initial: v })` → `[Store<T>, (mutation) => Promise<void>]`（solid-js/store，响应式 + 跨重启 + 跨实例同步） |
@@ -33,6 +34,8 @@
 | toast | `context.ui.toast.show({ message, variant, duration })` |
 | registry | npmmirror；`@opencode/plugin@2.0.14` 可装 |
 | 安装注意 | `@opencode/theme` + `@opentui/*` + `solid-js` **必须加 `--legacy-peer-deps`**，否则 ERESOLVE（已实测） |
+| 插件注册点 | **全局发现目录** `~/.config/opencode/plugins/<name>/tui.ts`（已实测生效） |
+| ⚠️ `cli.json` 路径条目 | `plugins` 里写本地路径**不会被加载且无任何日志**。已实测失败的三种写法：`file:///C:/…`、裸绝对路径 `C:/…`、补上 `"."` 主入口后重试。**不要用这条路** |
 
 **移植来源对照（改动时必须两边一起改）：**
 
@@ -82,7 +85,7 @@ opencode-plugin/
 另外修改：
 
 - `.gitignore` —— 追加 `/opencode-plugin/node_modules`
-- `~/.config/opencode/cli.json` —— `plugins` 数组追加本目录
+- `~/.config/opencode/plugins/usage-sidebar/tui.ts` —— 全局发现目录的 re-export stub（**不要**改 `cli.json`）
 
 ---
 
@@ -96,9 +99,9 @@ opencode-plugin/
 - Create: `opencode-plugin/vitest.config.ts`
 - Create: `opencode-plugin/src/tui.tsx`
 - Modify: `.gitignore`
-- Modify: `C:\Users\cari\.config\opencode\cli.json`
+- Create: `C:\Users\cari\.config\opencode\plugins\usage-sidebar\tui.ts`（全局发现目录 stub）
 
-- [ ] **Step 1: 创建 `opencode-plugin/package.json`**
+- [x] **Step 1: 创建 `opencode-plugin/package.json`**
 
 ```json
 {
@@ -128,7 +131,7 @@ opencode-plugin/
 }
 ```
 
-- [ ] **Step 2: 创建 `opencode-plugin/tsconfig.json`**
+- [x] **Step 2: 创建 `opencode-plugin/tsconfig.json`**
 
 ```json
 {
@@ -153,7 +156,7 @@ opencode-plugin/
 }
 ```
 
-- [ ] **Step 3: 创建 `opencode-plugin/vitest.config.ts`**
+- [x] **Step 3: 创建 `opencode-plugin/vitest.config.ts`**
 
 ```ts
 import { defineConfig } from 'vitest/config';
@@ -167,15 +170,14 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 4: 创建最小 `opencode-plugin/src/tui.tsx`**
+- [x] **Step 4: 创建最小 `opencode-plugin/src/tui.tsx`**
 
 ```tsx
 import { Plugin } from '@opencode/plugin/tui';
-import type { Context } from '@opencode/plugin/tui';
 
 export default Plugin.define({
   id: 'ai-signal-light.usage',
-  setup(context: Context) {
+  setup(context) {
     context.ui.toast.show({
       message: `用量侧边栏插件已加载（opencode ${context.app.version}）`,
       variant: 'success',
@@ -192,7 +194,7 @@ export default Plugin.define({
 });
 ```
 
-- [ ] **Step 5: 安装依赖（必须加 `--legacy-peer-deps`）**
+- [x] **Step 5: 安装依赖（必须加 `--legacy-peer-deps`）**
 
 在仓库根执行：
 
@@ -204,7 +206,7 @@ Expected: `added N packages`，退出码 0，`opencode-plugin/node_modules/@open
 
 若报 ERESOLVE：确认用了 `--legacy-peer-deps`。
 
-- [ ] **Step 6: 类型检查 + 空测试跑通**
+- [x] **Step 6: 类型检查 + 空测试跑通**
 
 ```powershell
 Set-Location opencode-plugin; npm run typecheck; npm test
@@ -212,80 +214,67 @@ Set-Location opencode-plugin; npm run typecheck; npm test
 
 Expected: typecheck 无输出（退出码 0）；`npm test` 因为还没有测试文件而提示无测试，退出码 0（`vitest.config.ts` 里已开 `passWithNoTests`）。
 
-- [ ] **Step 7: 把插件目录加进全局 `cli.json`**
+- [x] **Step 7: 用全局发现目录注册插件（不要用 cli.json）**
 
-先备份：
+> ⚠️ **已实测（opencode 2.0.14）：`cli.json` 的 `plugins` 里写本地路径不会被加载，而且一条错误日志都不打。**
+> 试过且失败的三种写法：`"file:///C:/.../opencode-plugin"`、`"C:/Users/cari/.../opencode-plugin"`、
+> 以及给包补上 `"."` 主入口（`exports` 同时含 `"."` 与 `"./tui"`）后再试一次。
+> 唯一有效的方式是**全局插件发现目录** `<global-config>/plugins/<name>/`（已用落盘追踪实证 `setup()` 被调用）。
 
-```powershell
-Copy-Item "$env:USERPROFILE\.config\opencode\cli.json" "$env:USERPROFILE\.config\opencode\cli.json.bak-usage-sidebar"
-```
-
-然后编辑 `C:\Users\cari\.config\opencode\cli.json`，**只改 `plugins` 数组**，其余字段原样保留：
-
-```json
-{
-  "$schema": "https://opencode.ai/v2/cli.json",
-  "theme": {
-    "name": "one-dark",
-    "mode": "system"
-  },
-  "plugins": [
-    "opencode-tokenwatch",
-    "file:///C:/Users/cari/Documents/kimi/Workspaces/ai-signal-light/opencode-plugin"
-  ],
-  "diffs": {
-    "wrap": "word"
-  },
-  "session": {
-    "sidebar": "auto",
-    "scrollbar": false,
-    "thinking": "hide",
-    "markdown": "rendered",
-    "grouping": "auto",
-    "image_preview": false,
-    "tps": true,
-    "new_location": "launch",
-    "permissions": "autoaccept"
-  },
-  "animations": false,
-  "tabs": {
-    "mode": "auto",
-    "layout": "vertical"
-  },
-  "terminal": {
-    "title": true,
-    "copy": "manual"
-  },
-  "attention": {
-    "notifications": false
-  }
-}
-```
-
-- [ ] **Step 8: 验证加载通路**
-
-```powershell
-opencode
-```
-
-Expected: 出现 toast「用量侧边栏插件已加载」；进入任意会话（终端足够宽，`session.sidebar: auto` 会展示侧边栏）后，侧边栏内出现灰字「用量插件占位」。
-
-**如果没出现**，按顺序排查：
-
-1. 看 toast 是否出现 —— 只有 toast 没插槽文本 → 插槽名或渲染有问题。
-2. 看 `~/.local/share/opencode/log/opencode.log`，过滤插件加载错误。
-3. 把 `file:///C:/...` 换成裸路径 `C:/Users/cari/Documents/kimi/Workspaces/ai-signal-light/opencode-plugin` 重试。
-4. 都失败 → 走**兜底方案**：新建 `C:\Users\cari\.config\opencode\plugins\usage-sidebar\tui.ts`，内容：
+创建 `C:\Users\cari\.config\opencode\plugins\usage-sidebar\tui.ts`，内容就一行 re-export：
 
 ```ts
 export { default } from '../../../../Documents/kimi/Workspaces/ai-signal-light/opencode-plugin/src/tui.tsx';
 ```
 
-（`~/.config/opencode/plugins/<name>/` 是 opencode 自动发现的全局插件目录；同时从 `cli.json` 的 `plugins` 里删掉那行，避免重复加载。）
+- 该目录被 opencode 自动发现，**不需要**写进 `cli.json` 或 `opencode.jsonc`。
+- `cli.json` **保持原样**（`plugins` 里只有 `opencode-tokenwatch`），一个字都不要改。
+- 这个 stub 在仓库外、不受版本控制 → 内容必须原样记进 README（Task 8）。
+- 运行时依赖仍来自**仓库里的** `opencode-plugin/node_modules`：stub import 的文件在这个目录树内，
+  Bun 从它向上解析 `@opencode/plugin/tui` 与 `solid-js`。所以 `npm install` 是**运行时前提**，不只是开发前提。
 
-**把最终生效的写法记下来**（哪条路径 / 是否走了兜底），Task 8 要写进 README。
+- [x] **Step 8: 验证加载通路**
 
-- [ ] **Step 9: 追加 `.gitignore` 条目**
+**第一步：非交互验证（推荐先做这个，不用人盯 TUI）**
+
+临时在 `opencode-plugin/src/tui.tsx` 里加落盘追踪 —— 文件顶部加 `import { appendFileSync } from 'node:fs';`，
+`setup(context)` 的第一行加：
+
+```ts
+appendFileSync(
+  'C:\\Users\\cari\\AppData\\Local\\Temp\\opencode\\usage-sidebar-load.log',
+  `${new Date().toISOString()} setup-ran\n`,
+);
+```
+
+opencode 会监听 `~/.config/opencode`，配置或插件目录一变就自动 reconcile，所以不用重启也能触发：
+
+```powershell
+Remove-Item "$env:TEMP\opencode\usage-sidebar-load.log" -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 12
+Get-Content "$env:TEMP\opencode\usage-sidebar-load.log"
+```
+
+Expected: 出现一行或多行 `... setup-ran`（每个 CLI 进程一行）。**出现就证明加载通路打通了。**
+
+验完**删掉这两句诊断代码**（`appendFileSync` 的 import 与调用），再跑 `npm run typecheck` 确认仍为 0。
+
+**第二步：人工验证**
+
+```powershell
+opencode
+```
+
+Expected: 出现 toast「用量侧边栏插件已加载（opencode v2.0.14）」；进入任意会话（终端足够宽，`session.sidebar: auto` 会展示侧边栏）后，侧边栏内出现灰字「用量插件占位」。
+
+**如果没出现**，按顺序排查：
+
+1. 先做第一步的非交互验证 —— 它能区分「插件压根没加载」和「加载了但插槽没渲染」。
+2. trace 文件没出现 → 检查 `~/.config/opencode/plugins/usage-sidebar/tui.ts` 存在、且 re-export 指向真实文件。
+3. 看 `~/.local/share/opencode/log/opencode.log`，过滤 `plugin` 与 `level=WARN|level=ERROR`。
+4. trace 出现但插槽没文本 → 问题在插槽名（`sidebar.content`）或渲染层。
+
+- [x] **Step 9: 追加 `.gitignore` 条目**
 
 在仓库根 `.gitignore` 末尾追加：
 
@@ -293,7 +282,7 @@ export { default } from '../../../../Documents/kimi/Workspaces/ai-signal-light/o
 /opencode-plugin/node_modules
 ```
 
-- [ ] **Step 10: 提交**
+- [x] **Step 10: 提交**
 
 ```powershell
 git add .gitignore opencode-plugin
@@ -2187,7 +2176,7 @@ const EMPTY_STATE = (definition: ProviderDefinition): ProviderState => ({
 
 export default Plugin.define({
   id: PLUGIN_ID,
-  setup(context: Context) {
+  setup(context) {
     const [snapshot, updateSnapshot] = context.storage.store<Snapshot>('snapshot', {
       initial: {
         updatedAt: null,
@@ -2420,19 +2409,33 @@ cookie / CSRF 的续期回写由桌面应用独占，两边同时写会互相覆
 
 ## 加载方式
 
-`~/.config/opencode/cli.json` 的 `plugins` 里登记本目录（与既有插件并列）：
+本插件通过 opencode 的**全局插件发现目录**加载，**不要**写进 `cli.json` 的 `plugins`（实测无效）。
 
-```json
-{
-  "plugins": [
-    "opencode-tokenwatch",
-    "file:///C:/Users/cari/Documents/kimi/Workspaces/ai-signal-light/opencode-plugin"
-  ]
-}
+`C:\Users\cari\.config\opencode\plugins\usage-sidebar\tui.ts`：
+
+```ts
+export { default } from '../../../../Documents/kimi/Workspaces/ai-signal-light/opencode-plugin/src/tui.tsx';
 ```
 
-若 Task 1 实测发现这个写法不生效、最终走了全局插件目录自动发现的兜底方案，就把本节改成
-「无需在 cli.json 登记」并贴出 `~/.config/opencode/plugins/usage-sidebar/tui.ts` 的实际内容。
+- 该文件在仓库外，**不受版本控制** —— 换机器/迁移仓库时要手动重建，路径也要跟着改。
+- opencode 会自动发现 `~/.config/opencode/plugins/<name>/tui.ts`，`cli.json` 与 `opencode.jsonc` 都不用动。
+
+### 为什么不用 cli.json
+
+实测（opencode 2.0.14）：`cli.json` 的 `plugins` 里写本地路径**不会被加载，而且零日志**。失败的写法：
+
+| 写法 | 结果 |
+|---|---|
+| `"file:///C:/Users/cari/Documents/kimi/Workspaces/ai-signal-light/opencode-plugin"` | 不加载 |
+| `"C:/Users/cari/Documents/kimi/Workspaces/ai-signal-light/opencode-plugin"` | 不加载 |
+| 上面两种 + 给包补 `"."` 主入口（`exports` 同时含 `"."` 与 `"./tui"`） | 不加载 |
+
+判定方法：在 `setup()` 里临时 `appendFileSync` 一行，观察文件是否出现（详见实现计划 Task 1 Step 8）。
+
+### 运行时依赖
+
+`npm install` 是**运行时前提**，不只是开发前提：stub import 的 `src/tui.tsx` 位于本目录树内，
+Bun 从这里向上解析 `@opencode/plugin/tui` 与 `solid-js`。删掉 `node_modules` 插件会加载失败。
 
 ## 配置项
 
@@ -2478,15 +2481,17 @@ npm run typecheck
 - 主题色在 setup 时取一次，运行中切换主题需要重开
 ````
 
-按 Task 1 Step 8 的实测结果核对「加载方式」一节：主路径生效就照上面写；走了兜底方案就按本节自己的说明改写。README 里**不允许留尖括号占位符**。
+README 里**不允许留尖括号占位符**；「加载方式」一节必须写成实际生效的全局发现目录方案。
 
-- [ ] **Step 2: 同步 spec 的三处简化**
+- [ ] **Step 2: 同步 spec（三处简化 + 加载方式 + 风险表）**
 
 编辑 `docs/superpowers/specs/2026-09-28-opencode-usage-sidebar-design.md`：
 
 1. 第 4 节目录树：删掉 `model.ts` 那一行；把 `providers/index.ts` 的注释从「provider 注册表（id、显示名、取数函数、窗口语义）」改成「PROVIDERS 数组（id、显示名、fetch）」。
 2. 第 5 节数据流图：删掉 `model.ts：归一化为 ProviderView` 一行，改成「各 provider 直接产出 `windows` / `balance`；窗口选择与配色在 `format.ts`」。
 3. 第 14 节实现顺序第 2 步：`config.ts` + `format.ts` + `model.ts` 改成 `config.ts` + `format.ts`。
+4. 第 10 节「加载与注册」：整节改写为实测结论 —— **用全局发现目录 `~/.config/opencode/plugins/usage-sidebar/tui.ts`（一行 re-export）**，`cli.json` 保持原样；把原文里「Windows 下路径书写形式未明确，实现时实测」和 cli.json 兜底那段删掉，替换成「实测 `cli.json` 路径条目无效（`file:///C:/…`、裸绝对路径、补 `"."` 主入口三种都试过，零日志静默忽略）」。
+5. 第 13 节风险表第 1 行：改成「`cli.json` 路径条目能否加载 → **已实测不能**，改用全局发现目录，已用落盘追踪证明 `setup()` 被调用」。
 
 - [ ] **Step 3: 写 `.vibe-harness/plans/opencode-usage-sidebar.md`**
 
@@ -2502,7 +2507,7 @@ npm run typecheck
 
 - [ ] **Step 4: 写 `.vibe-harness/history/opencode-usage-sidebar.md`**
 
-按 AGENTS.md 的格式记录：改动摘要（新增 `opencode-plugin/` 独立包、加载方式、五家取数、侧边栏渲染）、影响范围（新增目录，不动桌面应用代码）、验证结果（E2E 实测现象、footgun：`--legacy-peer-deps`、MiniMax 剩余/已用语义、火山 200 带 Error）。
+按 AGENTS.md 的格式记录：改动摘要（新增 `opencode-plugin/` 独立包、加载方式、五家取数、侧边栏渲染）、影响范围（新增目录，不动桌面应用代码）、验证结果（E2E 实测现象、footgun：`--legacy-peer-deps`、MiniMax 剩余/已用语义、火山 200 带 Error、**`cli.json` 路径条目无效必须走全局发现目录**）。
 
 - [ ] **Step 5: 更新 `.vibe-harness/index.md`**
 
