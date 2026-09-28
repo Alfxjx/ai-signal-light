@@ -28,18 +28,27 @@ const kimi = reactive<ProviderState>(makeProvider());
 const minimax = reactive<ProviderState>(makeProvider());
 const copilot = reactive<ProviderState>(makeProvider());
 const deepseek = reactive<ProviderState>(makeProvider());
+const mimo = reactive<ProviderState>(makeProvider());
 const codexEnabled = ref<boolean>(false);
 const codexUseProxy = ref<boolean>(false);
 const codexAutoAvailable = ref<boolean>(false);
 
+const volcengineAccessKey = ref<string>('');
+const volcengineSecretKey = ref<string>('');
 const volcengineCookie = ref<string>('');
 const volcengineCsrfToken = ref<string>('');
 const volcengineEnabled = ref<boolean>(false);
 const volcengineUseProxy = ref<boolean>(false);
+const volcengineAccessKeyChanged = ref<boolean>(false);
+const volcengineSecretKeyChanged = ref<boolean>(false);
 const volcengineCookieChanged = ref<boolean>(false);
 const volcengineCsrfTokenChanged = ref<boolean>(false);
+const volcengineHasAccessKey = ref<boolean>(false);
+const volcengineHasSecretKey = ref<boolean>(false);
 const volcengineHasCookie = ref<boolean>(false);
 const volcengineHasCsrf = ref<boolean>(false);
+const volcengineShowAccessKey = ref<boolean>(false);
+const volcengineShowSecretKey = ref<boolean>(false);
 const volcengineShowCookie = ref<boolean>(false);
 const volcengineShowCsrf = ref<boolean>(false);
 
@@ -278,16 +287,27 @@ onMounted(async () => {
   deepseek.token = cfg.hasDeepseekToken ? (cfg.deepseek.token || '') : '';
   deepseek.hasToken = !!cfg.hasDeepseekToken;
 
+  mimo.enabled = !!cfg.mimo?.enabled;
+  mimo.useProxy = !!cfg.mimo?.useProxy;
+  mimo.token = cfg.hasMimoCookie ? (cfg.mimo?.token || '') : '';
+  mimo.hasToken = !!cfg.hasMimoCookie;
+
   codexEnabled.value = !!cfg.codex?.enabled;
   codexUseProxy.value = !!cfg.codex?.useProxy;
   codexAutoAvailable.value = !!cfg.codexAutoAvailable;
 
   volcengineEnabled.value = !!cfg.volcengine?.enabled;
   volcengineUseProxy.value = !!cfg.volcengine?.useProxy;
+  volcengineAccessKey.value = cfg.hasVolcengineAccessKey ? (cfg.volcengine?.accessKey || '') : '';
+  volcengineSecretKey.value = cfg.hasVolcengineSecretKey ? (cfg.volcengine?.secretKey || '') : '';
   volcengineCookie.value = cfg.hasVolcengineCookie ? (cfg.volcengine?.cookie || '') : '';
   volcengineCsrfToken.value = cfg.hasVolcengineCsrfToken ? (cfg.volcengine?.csrfToken || '') : '';
+  volcengineAccessKeyChanged.value = false;
+  volcengineSecretKeyChanged.value = false;
   volcengineCookieChanged.value = false;
   volcengineCsrfTokenChanged.value = false;
+  volcengineHasAccessKey.value = !!cfg.hasVolcengineAccessKey;
+  volcengineHasSecretKey.value = !!cfg.hasVolcengineSecretKey;
   volcengineHasCookie.value = !!cfg.hasVolcengineCookie;
   volcengineHasCsrf.value = !!cfg.hasVolcengineCsrfToken;
 
@@ -356,7 +376,17 @@ async function onSave() {
         useProxy: deepseek.useProxy,
       },
       codex: { enabled: codexEnabled.value, useProxy: codexUseProxy.value },
+      mimo: {
+        token: mimo.token.trim(),
+        tokenChanged: mimo.tokenChanged,
+        enabled: mimo.enabled,
+        useProxy: mimo.useProxy,
+      },
       volcengine: {
+        accessKey: volcengineAccessKey.value.trim(),
+        accessKeyChanged: volcengineAccessKeyChanged.value,
+        secretKey: volcengineSecretKey.value.trim(),
+        secretKeyChanged: volcengineSecretKeyChanged.value,
         cookie: volcengineCookie.value.trim(),
         cookieChanged: volcengineCookieChanged.value,
         csrfToken: volcengineCsrfToken.value.trim(),
@@ -623,7 +653,45 @@ async function openQrCode() {
           </label>
         </div>
         <div class="settings-field">
-          <label class="settings-label" for="volcengineCookie">Cookie</label>
+          <label class="settings-label" for="volcengineAccessKey">Access Key ID</label>
+          <div class="settings-input-wrap">
+            <input
+              :type="volcengineShowAccessKey ? 'text' : 'password'"
+              id="volcengineAccessKey"
+              class="settings-input"
+              v-model="volcengineAccessKey"
+              :placeholder="volcengineHasAccessKey ? '留空保持原值' : 'AKLT...'"
+              autocomplete="off" spellcheck="false"
+              @input="volcengineAccessKeyChanged = true"
+            >
+            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="volcengineShowAccessKey = !volcengineShowAccessKey">
+              {{ volcengineShowAccessKey ? '🔒' : '👁' }}
+            </button>
+          </div>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="volcengineSecretKey">Secret Access Key</label>
+          <div class="settings-input-wrap">
+            <input
+              :type="volcengineShowSecretKey ? 'text' : 'password'"
+              id="volcengineSecretKey"
+              class="settings-input"
+              v-model="volcengineSecretKey"
+              :placeholder="volcengineHasSecretKey ? '留空保持原值' : '粘贴 Secret Access Key'"
+              autocomplete="off" spellcheck="false"
+              @input="volcengineSecretKeyChanged = true"
+            >
+            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="volcengineShowSecretKey = !volcengineShowSecretKey">
+              {{ volcengineShowSecretKey ? '🔒' : '👁' }}
+            </button>
+          </div>
+          <div class="settings-hint">
+            在 <code>console.volcengine.com/iam/keymanage/</code> 创建访问密钥（区域 cn-beijing）。
+            填了 AK/SK 就优先走官方 OpenAPI 查询，无需再维护 Cookie；AK/SK 不可用时自动回退下面的 Cookie。
+          </div>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="volcengineCookie">Cookie（回退通道）</label>
           <div class="settings-input-wrap">
             <input
               :type="volcengineShowCookie ? 'text' : 'password'"
@@ -656,7 +724,48 @@ async function openQrCode() {
             </button>
           </div>
           <div class="settings-hint">
-            在 console.volcengine.com 的 Coding Plan 页面打开 DevTools，复制 <code>GetCodingPlanUsage</code> 请求的整段 Cookie 与 x-csrf-token。Cookie 过期后需重新粘贴。
+            仅在未配置 AK/SK、或 AK/SK 查询失败时使用。在 console.volcengine.com 的 Coding Plan 页面打开 DevTools，复制 <code>GetCodingPlanUsage</code> 请求的整段 Cookie 与 x-csrf-token。Cookie 过期后需重新粘贴。
+          </div>
+        </div>
+      </div>
+
+      <!-- 小米 MiMo -->
+      <div class="settings-section" data-provider="mimo">
+        <div class="settings-section-header">
+          <span class="settings-section-title">小米 MiMo</span>
+          <label class="settings-toggle">
+            <input type="checkbox" v-model="mimo.enabled">
+            <span class="settings-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <label class="settings-toggle-label">
+            <input type="checkbox" v-model="mimo.useProxy">
+            <span>使用代理</span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="mimoCookie">控制台 Cookie</label>
+          <div class="settings-input-wrap">
+            <input
+              :type="mimo.showToken ? 'text' : 'password'"
+              id="mimoCookie"
+              class="settings-input"
+              v-model="mimo.token"
+              :placeholder="mimo.hasToken ? '留空保持原值' : '粘贴整段 Cookie'"
+              autocomplete="off"
+              spellcheck="false"
+              @input="mimo.tokenChanged = true"
+            >
+            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="mimo.showToken = !mimo.showToken">
+              {{ mimo.showToken ? '🔒' : '👁' }}
+            </button>
+          </div>
+          <div class="settings-hint">
+            MiMo 余额只由网页控制台接口暴露，调模型的 <code>sk-</code> API Key 查不到。
+            打开 <code>platform.xiaomimimo.com/#/console/balance</code> → F12 → Network → 刷新 →
+            找到 <code>api/v1/balance</code> 请求 → 复制整段 <code>Cookie</code> 请求头
+            （需含 <code>api-platform_serviceToken</code> 与 <code>userId</code>）。会话过期后需重新粘贴。
           </div>
         </div>
       </div>

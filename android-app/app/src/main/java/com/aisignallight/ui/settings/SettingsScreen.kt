@@ -144,6 +144,13 @@ fun SettingsScreen(
                 onChange = { viewModel.updateDeepseek(it) }
             )
 
+            ProviderSection(
+                title = "小米 MiMo (Cookie)",
+                config = uiState.mimo,
+                onChange = { viewModel.updateMimo(it) },
+                tokenLabel = "Cookie"
+            )
+
             OutlinedTextField(
                 value = uiState.proxyUrl,
                 onValueChange = { viewModel.updateProxy(it) },
@@ -228,7 +235,8 @@ fun SettingsScreen(
 private fun ProviderSection(
     title: String,
     config: ProviderConfig,
-    onChange: (ProviderConfig) -> Unit
+    onChange: (ProviderConfig) -> Unit,
+    tokenLabel: String = "Token / Cookie"
 ) {
     var showToken by remember { mutableStateOf(false) }
 
@@ -249,7 +257,7 @@ private fun ProviderSection(
         OutlinedTextField(
             value = config.token,
             onValueChange = { onChange(config.copy(token = it)) },
-            label = { Text("Token / Cookie") },
+            label = { Text(tokenLabel) },
             modifier = Modifier.fillMaxWidth(),
             visualTransformation = if (showToken) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
@@ -270,6 +278,8 @@ private fun VolcengineSection(
     config: VolcengineProviderConfig,
     onChange: (VolcengineProviderConfig) -> Unit
 ) {
+    var showAk by remember { mutableStateOf(false) }
+    var showSk by remember { mutableStateOf(false) }
     var showCookie by remember { mutableStateOf(false) }
     var showCsrf by remember { mutableStateOf(false) }
 
@@ -285,9 +295,42 @@ private fun VolcengineSection(
         }
 
         OutlinedTextField(
+            value = config.accessKey,
+            onValueChange = { onChange(config.copy(accessKey = it)) },
+            label = { Text("Access Key ID") },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = if (showAk) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = showAk, onCheckedChange = { showAk = it })
+            Text("显示", style = MaterialTheme.typography.bodyMedium)
+        }
+
+        OutlinedTextField(
+            value = config.secretKey,
+            onValueChange = { onChange(config.copy(secretKey = it)) },
+            label = { Text("Secret Access Key") },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = if (showSk) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = showSk, onCheckedChange = { showSk = it })
+            Text("显示", style = MaterialTheme.typography.bodyMedium)
+        }
+
+        Text(
+            text = "在 console.volcengine.com/iam/keymanage/ 创建访问密钥（区域 cn-beijing）。" +
+                "填了 AK/SK 就优先走官方接口，无需再维护 Cookie；桌面端不会把 AK/SK 下发到手机，需在此手动填写。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline
+        )
+
+        OutlinedTextField(
             value = config.cookie,
             onValueChange = { onChange(config.copy(cookie = it)) },
-            label = { Text("Cookie") },
+            label = { Text("Cookie（回退通道）") },
             modifier = Modifier.fillMaxWidth(),
             visualTransformation = if (showCookie) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
@@ -316,7 +359,7 @@ private fun VolcengineSection(
         }
 
         Text(
-            text = "打开桌面控制台 Coding Plan 页面的 DevTools，复制 GetCodingPlanUsage 请求的 Cookie 与 x-csrf-token。登录过期需重新粘贴。",
+            text = "未填 AK/SK 时使用：打开桌面控制台 Coding Plan 页面的 DevTools，复制 GetCodingPlanUsage 请求的 Cookie 与 x-csrf-token。登录过期需重新粘贴。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline
         )

@@ -70,12 +70,23 @@ class ScanViewModel @Inject constructor(
                 }
 
                 // 4. 反向拉取完整配置
-                val config = desktopSyncClient.fetchConfig().getOrElse { e ->
+                val incoming = desktopSyncClient.fetchConfig().getOrElse { e ->
                     error("拉取配置失败：${e.message ?: e.javaClass.simpleName}")
                     return@launch
                 }
 
                 // 5. 落盘 + 启动轮询 worker
+                // 桌面端不下发火山 AK/SK（避免长期有效的控制面密钥落到手机上），
+                // 直接覆盖会把用户在手机上手填的 AK/SK 冲掉，故入站为空时保留本机值。
+                val local = configRepository.getConfig()
+                val config = incoming.copy(
+                    volcengine = incoming.volcengine.let { v ->
+                        v.copy(
+                            accessKey = v.accessKey.ifBlank { local.volcengine.accessKey },
+                            secretKey = v.secretKey.ifBlank { local.volcengine.secretKey }
+                        )
+                    }
+                )
                 configRepository.saveConfig(config)
                 UsagePollingWorker.enqueue(context, config.intervalMinutes)
 

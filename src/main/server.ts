@@ -88,14 +88,16 @@ export class StatusServer {
             deepseek: this.usageMonitor.state.deepseek,
             codex:   this.usageMonitor.state.codex,
             volcengine: this.usageMonitor.state.volcengine,
+            mimo: this.usageMonitor.state.mimo,
             enabled: cfg ? {
               kimi:    cfg.kimi.enabled,
               minimax: cfg.minimax.enabled,
               copilot: cfg.copilot.enabled,
               deepseek: cfg.deepseek.enabled,
               codex:   cfg.codex.enabled,
-              volcengine: cfg.volcengine.enabled
-            } : { kimi: true, minimax: true, copilot: true, deepseek: true, codex: true, volcengine: true },
+              volcengine: cfg.volcengine.enabled,
+              mimo: cfg.mimo.enabled
+            } : { kimi: true, minimax: true, copilot: true, deepseek: true, codex: true, volcengine: true, mimo: true },
             intervalMinutes: cfg ? cfg.intervalMinutes : 10,
             thresholds:      cfg ? cfg.thresholds      : { warn: 50, danger: 80 }
           }

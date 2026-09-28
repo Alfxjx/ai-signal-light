@@ -48,8 +48,8 @@ import com.aisignallight.domain.model.UsageProviderState
 import com.aisignallight.domain.model.UsageSnapshot
 import com.aisignallight.domain.model.VolcengineUsageData
 import com.aisignallight.domain.utils.calcPace
-import com.aisignallight.ui.components.DeepseekBalanceCard
-import com.aisignallight.ui.components.DeepseekBalanceTile
+import com.aisignallight.ui.components.BalanceCard
+import com.aisignallight.ui.components.BalanceTile
 import com.aisignallight.ui.components.GridProviderCard
 import com.aisignallight.ui.components.ProviderCard
 import com.aisignallight.ui.components.UsageBarItem
@@ -185,7 +185,12 @@ private fun UsageGrid(
     ) {
         if (config.deepseek.enabled) {
             item(key = "deepseek") {
-                DeepseekBalanceTile(state = usage.deepseek, modifier = Modifier.fillMaxWidth())
+                BalanceTile(title = "DeepSeek", state = usage.deepseek, modifier = Modifier.fillMaxWidth())
+            }
+        }
+        if (config.mimo.enabled) {
+            item(key = "mimo") {
+                BalanceTile(title = "MiMo", state = usage.mimo, modifier = Modifier.fillMaxWidth())
             }
         }
         items(models, key = { it.shortTitle }) { model ->
@@ -243,7 +248,11 @@ private fun UsageList(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (config.deepseek.enabled) {
-            DeepseekBalanceCard(state = usage.deepseek)
+            BalanceCard(title = "DeepSeek", state = usage.deepseek)
+        }
+
+        if (config.mimo.enabled) {
+            BalanceCard(title = "MiMo", state = usage.mimo)
         }
 
         buildProviderModels(usage, config).forEach { model ->
@@ -438,6 +447,7 @@ private fun allEmpty(usage: UsageSnapshot, config: AppConfig): Boolean {
         && (!config.copilot.enabled || usage.copilot == null)
         && (!config.volcengine.enabled || usage.volcengine == null)
         && (!config.deepseek.enabled || usage.deepseek == null)
+        && (!config.mimo.enabled || usage.mimo == null)
 }
 
 private fun allNoToken(usage: UsageSnapshot, config: AppConfig): Boolean {
@@ -447,6 +457,7 @@ private fun allNoToken(usage: UsageSnapshot, config: AppConfig): Boolean {
         config.copilot.enabled to usage.copilot,
         config.volcengine.enabled to usage.volcengine,
         config.deepseek.enabled to usage.deepseek,
+        config.mimo.enabled to usage.mimo,
     ).filter { it.first } // 只看已启用的
     if (enabledAndMissing.isEmpty()) return false // 全部禁用时不该显示"未配置"
     return enabledAndMissing.all { it.second?.error == "no_token" }

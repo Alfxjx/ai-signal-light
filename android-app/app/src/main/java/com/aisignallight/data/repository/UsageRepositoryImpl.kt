@@ -8,6 +8,7 @@ import com.aisignallight.domain.model.UsageProviderState
 import com.aisignallight.domain.model.UsageSnapshot
 import com.aisignallight.domain.model.VolcengineUsageData
 import com.aisignallight.domain.model.DeepseekUsageData
+import com.aisignallight.domain.model.MimoUsageData
 import com.aisignallight.domain.repository.ConfigRepository
 import com.aisignallight.domain.repository.UsageRepository
 import com.aisignallight.data.remote.CopilotApi
@@ -15,6 +16,7 @@ import com.aisignallight.data.remote.KimiApi
 import com.aisignallight.data.remote.MinimaxApi
 import com.aisignallight.data.remote.VolcengineApi
 import com.aisignallight.data.remote.DeepseekApi
+import com.aisignallight.data.remote.MimoApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +34,8 @@ class UsageRepositoryImpl @Inject constructor(
     private val minimaxApi: MinimaxApi,
     private val copilotApi: CopilotApi,
     private val volcengineApi: VolcengineApi,
-    private val deepseekApi: DeepseekApi
+    private val deepseekApi: DeepseekApi,
+    private val mimoApi: MimoApi
 ) : UsageRepository {
 
     private val _usageFlow = MutableStateFlow(UsageSnapshot())
@@ -54,13 +57,15 @@ class UsageRepositoryImpl @Inject constructor(
         val copilot = async { fetchCopilot(config, proxyUrl, now) }
         val volcengine = async { fetchVolcengine(config, proxyUrl, now) }
         val deepseek = async { fetchDeepseek(config, proxyUrl, now) }
+        val mimo = async { fetchMimo(config, proxyUrl, now) }
 
         UsageSnapshot(
             kimi = kimi.await(),
             minimax = minimax.await(),
             copilot = copilot.await(),
             volcengine = volcengine.await(),
-            deepseek = deepseek.await()
+            deepseek = deepseek.await(),
+            mimo = mimo.await()
         )
     }
 
@@ -105,13 +110,16 @@ class UsageRepositoryImpl @Inject constructor(
     ): UsageProviderState<VolcengineUsageData> {
         val cfg = config.volcengine
         if (!cfg.enabled) return UsageProviderState(error = "disabled", lastUpdated = now)
-        if (cfg.cookie.isBlank() || cfg.csrfToken.isBlank()) {
+        // AK/SK 与 Cookie 至少要配一组，具体走哪条由 VolcengineApi 内部决定
+        val hasAksk = cfg.accessKey.isNotBlank() && cfg.secretKey.isNotBlank()
+        val hasCookie = cfg.cookie.isNotBlank() && cfg.csrfToken.isNotBlank()
+        if (!hasAksk && !hasCookie) {
             return UsageProviderState(error = "no_token", lastUpdated = now)
         }
         return try {
             val proxy = if (cfg.useProxy) proxyUrl else null
             UsageProviderState(
-                data = volcengineApi.fetch(cfg.cookie, cfg.csrfToken, proxy),
+                data = volcengineApi.fetch(cfg, proxy),
                 lastUpdated = now, error = null
             )
         } catch (e: Exception) {
@@ -133,8 +141,21 @@ class UsageRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun formatError(e: Throwable): String {
-        val msg = e.message ?: e.toString()
+    private suspend fun fetchMimo(
+        config: AppConfig, proxyUrl: String?, now: String
+    ): UsageProviderState<MimoUsageData> {
+        val cfg = config.mimo
+        if (!cfg.enabled) return UsageProviderState(error = "disabled", lastUpdated = now)
+        if (cfg.token.isBlank()) return UsageProviderState(error = "no_token", lastUpdated = now)
+        return try {
+            val proxy = if (cfg.useProxy) proxyUrl else null
+            UsageProviderState(data = mimoApi.fetch(cfg.token, proxy), lastUpdated = now, error = null)
+        } catch (e: Exception) {
+            UsageProviderState(error = formatError(e), lastUpdated = now)
+        }
+    }
+
+    private fun formatError(e: Throwable): String {        val msg = e.message ?: e.toString()
         return when {
             msg.contains("timeout", ignoreCase = true) || msg.contains("SocketTimeout") -> "timeout"
             msg.contains("Unable to resolve host") || msg.contains("UnknownHost") -> "DNS 解析失败"

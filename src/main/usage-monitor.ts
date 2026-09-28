@@ -6,9 +6,10 @@
 
 import axios, { AxiosError, AxiosProxyConfig } from 'axios';
 import type { ConfigStore } from './config';
-import type { ProviderConfig } from '../shared/types/config';
+import type { ProviderConfig, VolcengineProviderConfig } from '../shared/types/config';
 import { CopilotSessionCache, fetchCopilotUser, isCopilotOAuthToken } from './copilot-auth';
 import { getCodexAuth } from './codex-credentials';
+import { signVolcengineRequest, buildVolcengineUrl } from './volcengine-sign';
 import type {
   ProviderId,
   UsageMetric,
@@ -19,6 +20,7 @@ import type {
   CodexUsageData,
   CodexWindowData,
   VolcengineUsageData,
+  MimoUsageData,
   UsageUpdatePayload,
   UsageSnapshot,
   ProviderUsageData,
@@ -30,6 +32,14 @@ const COPILOT_API = 'https://github.com/github-copilot/chat/entitlement';
 const DEEPSEEK_API = 'https://api.deepseek.com/user/balance';
 const CODEX_USAGE_API = 'https://chatgpt.com/backend-api/wham/usage';
 const VOLCENGINE_API = 'https://console.volcengine.com/api/top/ark/cn-beijing/2024-01-01/GetCodingPlanUsage';
+// 官方 OpenAPI 通道：AK/SK 签名，不依赖控制台登录态（Cookie 约一周就失效）
+const VOLCENGINE_OPEN_HOST = 'open.volcengineapi.com';
+const VOLCENGINE_OPEN_REGION = 'cn-beijing';
+const VOLCENGINE_OPEN_SERVICE = 'ark';
+const VOLCENGINE_QUOTA_LEVELS = ['session', 'weekly', 'monthly'] as const;
+// MiMo 余额只由 Web 控制台接口暴露，鉴权走小米账号会话 Cookie（api-platform_serviceToken / userId 等），
+// 调模型的 api-key（sk- 前缀）查不到余额。
+const MIMO_BALANCE_API = 'https://platform.xiaomimimo.com/api/v1/balance';
 const REQUEST_TIMEOUT_MS = 8000;
 
 // 浏览器风格的 UA,避免被部分 API 当作 node 客户端拒绝
@@ -62,7 +72,8 @@ export class UsageMonitor {
     copilot: { data: null, lastUpdated: null, error: null },
     deepseek: { data: null, lastUpdated: null, error: null },
     codex:   { data: null, lastUpdated: null, error: null },
-    volcengine: { data: null, lastUpdated: null, error: null }
+    volcengine: { data: null, lastUpdated: null, error: null },
+    mimo:    { data: null, lastUpdated: null, error: null }
   };
 
   constructor(configStore: ConfigStore) {
@@ -118,7 +129,8 @@ export class UsageMonitor {
       this._safeRun('deepseek', this.fetchDeepseek.bind(this)),
       this._safeRun('codex',   this.fetchCodex.bind(this),
         async (proxy) => (await getCodexAuth(proxy)) ? 'local' : null),
-      this._safeRun('volcengine', this.fetchVolcengine.bind(this))
+      this._safeRun('volcengine', this.fetchVolcengine.bind(this)),
+      this._safeRun('mimo', this.fetchMimo.bind(this))
     ]);
   }
 
@@ -381,10 +393,68 @@ export class UsageMonitor {
 
   // ==================== Volcengine ====================
 
+  // 鉴权优先级：AK/SK（官方 OpenAPI，长期有效）→ Cookie（控制台会话，约一周需重配）。
   // token 参数为占位（_safeRun 的签名），实际凭证从配置 store 读取
   private async fetchVolcengine(_token: string, proxyConfig: AxiosProxyConfig | null): Promise<VolcengineUsageData> {
     const cfg = this.configStore.get().volcengine;
+    if (cfg.accessKey.trim() && cfg.secretKey.trim()) {
+      try {
+        return await this.fetchVolcengineByAksk(cfg, proxyConfig);
+      } catch (e) {
+        console.warn('[usage:volcengine] AK/SK 通道失败，回退 Cookie：', e instanceof Error ? e.message : e);
+      }
+    }
     if (!cfg.cookie || !cfg.csrfToken) throw new Error('no_token');
+    return this.fetchVolcengineByCookie(cfg, proxyConfig);
+  }
+
+  /** AK/SK 通道：官方 OpenAPI + V4 签名。返回缺档时抛错，交由调用方回退 Cookie。 */
+  private async fetchVolcengineByAksk(cfg: VolcengineProviderConfig, proxyConfig: AxiosProxyConfig | null): Promise<VolcengineUsageData> {
+    const signed = signVolcengineRequest({
+      method: 'GET',
+      host: VOLCENGINE_OPEN_HOST,
+      region: VOLCENGINE_OPEN_REGION,
+      service: VOLCENGINE_OPEN_SERVICE,
+      action: 'GetCodingPlanUsage',
+      version: '2024-01-01',
+      query: { Region: VOLCENGINE_OPEN_REGION },
+      accessKey: cfg.accessKey.trim(),
+      secretKey: cfg.secretKey.trim(),
+      date: new Date(),
+    });
+    const reqConfig: { headers: Record<string, string>; proxy?: AxiosProxyConfig } = { headers: signed.headers };
+    if (proxyConfig) reqConfig.proxy = proxyConfig;
+    const res = await http.get<unknown>(
+      buildVolcengineUrl(VOLCENGINE_OPEN_HOST, signed.canonicalQuery),
+      reqConfig
+    );
+
+    const json = (typeof res.data === 'object' && res.data) ? (res.data as Record<string, unknown>) : {};
+    const apiErr = (json?.ResponseMetadata as Record<string, unknown> | undefined)?.Error as Record<string, unknown> | undefined;
+    const errCode = apiErr?.Code ? String(apiErr.Code) : null;
+    if (errCode) {
+      console.error(`[usage:volcengine] OpenAPI error ${errCode}\n  body: ${JSON.stringify(apiErr).slice(0, 500)}`);
+      throw new Error(`AK/SK 调用失败: ${errCode}`);
+    }
+    if (res.status >= 400) {
+      throw new Error(`AK/SK 调用失败: HTTP ${res.status}`);
+    }
+
+    const quota = (json?.Result as Record<string, unknown> | undefined)?.QuotaUsage as Record<string, unknown>[] | undefined;
+    const present = new Set((Array.isArray(quota) ? quota : []).map((q) => String(q?.Level)));
+    const missing = VOLCENGINE_QUOTA_LEVELS.filter((l) => !present.has(l));
+    if (missing.length > 0) {
+      // AK/SK 通道的档位可能少于控制台 Cookie 通道，此时回退而不是展示 0
+      throw new Error(`AK/SK 响应缺少 ${missing.join('/')} 档`);
+    }
+
+    const data = mapVolcengineUsage(json);
+    console.log('[usage:volcengine] fetched via AK/SK:', JSON.stringify(data));
+    return data;
+  }
+
+  /** Cookie 通道：控制台内部网关，依赖登录态 */
+  private async fetchVolcengineByCookie(cfg: VolcengineProviderConfig, proxyConfig: AxiosProxyConfig | null): Promise<VolcengineUsageData> {
     const headers: Record<string, string> = {
       'Cookie': cfg.cookie.trim(),
       'x-csrf-token': cfg.csrfToken.trim(),
@@ -425,26 +495,81 @@ export class UsageMonitor {
     }
     const data = mapVolcengineUsage(json);
     console.log('[usage:volcengine] fetched data:', JSON.stringify(data));
-    // 成功后从 Set-Cookie 抓新 csrfToken 并回写，跟随服务端轮换
-    this.syncVolcengineCsrf(res);
+    // 成功后把服务端下发的 cookie 合并回配置，跟随登录态续期
+    this.syncVolcengineCookies(res);
     return data;
   }
 
-  /** 从 Set-Cookie 解析新 csrfToken（服务端每次响应会轮换），与现有不同则回写配置 */
-  private syncVolcengineCsrf(res: { headers: Record<string, unknown> }): void {
+  /**
+   * 合并服务端下发的 Set-Cookie 回配置。
+   * 控制台会在每次响应里轮换登录态（csrfToken 及其它 session cookie），
+   * 只回写 csrfToken 会把续期丢掉，导致配置里的 cookie 约一天就过期。
+   */
+  private syncVolcengineCookies(res: { headers: Record<string, unknown> }): void {
     const setCookie = res.headers['set-cookie'];
     const lines = Array.isArray(setCookie) ? setCookie : (setCookie ? [setCookie] : []);
-    let newCsrf: string | null = null;
+    const jar: Record<string, string> = {};
     for (const line of lines) {
-      const m = /(?:^|;\s*)csrfToken=([^;]+)/i.exec(String(line));
-      if (m) { newCsrf = m[1]; break; }
+      mergeCookiePair(jar, String(line).split(';')[0] ?? '');
     }
-    if (!newCsrf) return;
-    const cur = this.configStore.get().volcengine.csrfToken;
-    if (newCsrf !== cur) {
-      this.configStore.update({ volcengine: { csrfToken: newCsrf } });
-      console.log('[usage:volcengine] csrfToken auto-refreshed');
+    if (Object.keys(jar).length === 0) return;
+
+    const current = this.configStore.get().volcengine;
+    const merged = { ...parseCookieJar(current.cookie), ...jar };
+    const nextCookie = Object.entries(merged).map(([k, v]) => `${k}=${v}`).join('; ');
+    const nextCsrf = jar.csrfToken ?? current.csrfToken;
+    if (nextCookie === current.cookie && nextCsrf === current.csrfToken) return;
+    this.configStore.update({ volcengine: { cookie: nextCookie, csrfToken: nextCsrf } });
+    console.log('[usage:volcengine] cookie jar refreshed');
+  }
+
+  // ==================== MiMo ====================
+
+  // token 字段存的是从 platform.xiaomimimo.com 控制台复制的整段 Cookie
+  private async fetchMimo(cookie: string, proxyConfig: AxiosProxyConfig | null): Promise<MimoUsageData> {
+    const reqConfig: { headers: Record<string, string>; proxy?: AxiosProxyConfig } = {
+      headers: {
+        'Cookie': cookie.trim(),
+        'Origin': 'https://platform.xiaomimimo.com',
+        'Referer': 'https://platform.xiaomimimo.com/#/console/balance',
+        'Accept': 'application/json, text/plain, */*',
+      }
+    };
+    if (proxyConfig) reqConfig.proxy = proxyConfig;
+    const res = await http.get<unknown>(MIMO_BALANCE_API, reqConfig);
+
+    if (res.status === 401 || res.status === 403) {
+      throw new Error('登录态已过期，请重新登录 platform.xiaomimimo.com 并粘贴新的 Cookie');
     }
+    if (res.status >= 400) {
+      const body = typeof res.data === 'string' ? res.data : JSON.stringify(res.data || {});
+      console.error(`[usage:mimo] HTTP ${res.status}\n  body: ${body.slice(0, 500)}`);
+      throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`);
+    }
+
+    const json = res.data as Record<string, unknown>;
+    if (!json || typeof json !== 'object') throw new Error('invalid response');
+
+    let data: MimoUsageData;
+    try {
+      data = mapMimoBalance(json);
+    } catch (e) {
+      console.error(`[usage:mimo] unmappable response: ${JSON.stringify(json).slice(0, 500)}`);
+      // 解析不出余额时再看业务错误：控制台也可能在 HTTP 200/4xx 之外用 code + message 表达失败
+      const code = toFiniteNumber(json.code);
+      const bodyMsg = typeof json.message === 'string' ? json.message
+        : (typeof json.msg === 'string' ? json.msg : null);
+      if (json.loginUrl || json.success === false
+          || /login|auth|token|unauthor|expire|session|未登录|登录/i.test(bodyMsg || '')) {
+        throw new Error('登录态已过期，请重新登录 platform.xiaomimimo.com 并粘贴新的 Cookie');
+      }
+      if (json.success === false || (code !== null && code !== 0 && code !== 200)) {
+        throw new Error(`API 错误${code !== null ? ` ${code}` : ''}: ${(bodyMsg || 'unknown').slice(0, 120)}`);
+      }
+      throw e;
+    }
+    console.log('[usage:mimo] fetched data:', JSON.stringify(data));
+    return data;
   }
 
   // 对外提供快照(用于 init 推送)
@@ -523,8 +648,31 @@ export function mapWhamUsage(json: Record<string, unknown>): CodexUsageData {
   };
 }
 
+// Volcengine Cookie 串解析（纯函数，便于测试）
+/** "a=1; b=2" → { a: '1', b: '2' }，容忍空格与空片段 */
+export function parseCookieJar(cookie: string): Record<string, string> {
+  const jar: Record<string, string> = {};
+  for (const part of (cookie || '').split(';')) {
+    const kv = part.trim();
+    if (!kv) continue;
+    const eq = kv.indexOf('=');
+    if (eq <= 0) continue;
+    jar[kv.slice(0, eq).trim()] = kv.slice(eq + 1).trim();
+  }
+  return jar;
+}
+
+/** 把 Set-Cookie 的首个 name=value 合并进 jar（同名覆盖） */
+export function mergeCookiePair(jar: Record<string, string>, pair: string): void {
+  const kv = pair.trim();
+  const eq = kv.indexOf('=');
+  if (eq <= 0) return;
+  jar[kv.slice(0, eq).trim()] = kv.slice(eq + 1).trim();
+}
+
 // Volcengine GetCodingPlanUsage 响应映射（纯函数，便于测试）
-// QuotaUsage 每档只给 Percent(已用%) 与 Cap(上限) 与 ResetTimestamp(秒级 Unix)。
+// QuotaUsage 每档只给 Percent(已用%) 与 Cap(上限) 与重置时间；重置字段在两条通道上
+// 分别叫 ResetTimestamp / ResetTime，这里兼容两种。
 export function mapVolcengineUsage(json: Record<string, unknown>): VolcengineUsageData {
   const quota = (json?.Result as Record<string, unknown> | undefined)?.QuotaUsage as unknown[] || [];
   const toMetric = (level: string): UsageMetric => {
@@ -533,7 +681,7 @@ export function mapVolcengineUsage(json: Record<string, unknown>): VolcengineUsa
     ) as Record<string, unknown> | undefined;
     const percent = Number(item?.Percent);
     const limit = Number(item?.Cap);
-    const resetSec = Number(item?.ResetTimestamp);
+    const resetSec = Number(item?.ResetTimestamp ?? item?.ResetTime);
     return {
       limit: limit || 0,
       // 接口只给百分比与上限，没有 used 量
@@ -550,6 +698,105 @@ export function mapVolcengineUsage(json: Record<string, unknown>): VolcengineUsa
     session: toMetric('session'),
     weekly:  toMetric('weekly'),
     monthly: toMetric('monthly'),
+  };
+}
+
+// ==================== MiMo 余额映射（纯函数，便于测试） ====================
+// 小米未公开 /api/v1/balance 的响应结构，这里做两层容错：
+// 1) 剥掉 data / result 信封，兼容 balance 本身是嵌套对象；
+// 2) 字段名按「去下划线 + 忽略大小写」匹配，兼容 totalBalance / total_balance / TotalBalance。
+// 金额单位默认按元；若响应里带 scale/unit 之类的倍率字段则按其换算。
+const MIMO_TOTAL_KEYS = [
+  'totalBalance', 'balance', 'total', 'availableBalance',
+  'usableBalance', 'remainBalance', 'remainingBalance', 'amount',
+];
+const MIMO_GRANTED_KEYS = [
+  'grantedBalance', 'grantBalance', 'giftBalance', 'bonusBalance',
+  'freeBalance', 'granted', 'grant', 'gift',
+];
+const MIMO_PAID_KEYS = [
+  'paidBalance', 'toppedUpBalance', 'rechargeBalance', 'cashBalance',
+  'paid', 'toppedUp', 'recharge', 'cash',
+];
+const MIMO_CURRENCY_KEYS = ['currency', 'currencyCode', 'curr'];
+const MIMO_SCALE_KEYS = ['scale', 'unit', 'amountScale', 'precision'];
+
+function toFiniteNumber(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/** 键名归一化：去掉 _ - 空白并转小写，让候选名能匹配多种命名风格 */
+function normalizeKey(k: string): string {
+  return k.replace(/[_\-\s]/g, '').toLowerCase();
+}
+
+/** 按候选键名列表取第一个能解析成数字的值（值是对象/数组时跳过） */
+function pickNumber(src: Record<string, unknown>, keys: string[]): number | null {
+  const wanted = new Set(keys.map(normalizeKey));
+  for (const [k, v] of Object.entries(src)) {
+    if (!wanted.has(normalizeKey(k))) continue;
+    const n = toFiniteNumber(v);
+    if (n !== null) return n;
+  }
+  return null;
+}
+
+function pickString(src: Record<string, unknown>, keys: string[]): string | null {
+  const wanted = new Set(keys.map(normalizeKey));
+  for (const [k, v] of Object.entries(src)) {
+    if (wanted.has(normalizeKey(k)) && typeof v === 'string' && v.trim() !== '') return v.trim();
+  }
+  return null;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+export function mapMimoBalance(json: Record<string, unknown>): MimoUsageData {
+  // 剥信封：最多向下剥 3 层 data / result
+  let payload: Record<string, unknown> = json;
+  for (let i = 0; i < 3; i++) {
+    const next = (payload.data ?? payload.result) as unknown;
+    if (next && typeof next === 'object' && !Array.isArray(next)) {
+      payload = next as Record<string, unknown>;
+    } else {
+      break;
+    }
+  }
+  // balance 可能是嵌套对象 { balance: { total, paid, granted } }，摊平后一起匹配
+  const nested = payload.balance;
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    payload = { ...payload, ...(nested as Record<string, unknown>) };
+  }
+
+  const rawTotal = pickNumber(payload, MIMO_TOTAL_KEYS);
+  if (rawTotal === null) throw new Error('no balance info');
+
+  const scale = pickNumber(payload, MIMO_SCALE_KEYS);
+  const div = scale !== null && scale > 1 ? scale : 1;
+
+  const rawGranted = pickNumber(payload, MIMO_GRANTED_KEYS);
+  const rawPaid = pickNumber(payload, MIMO_PAID_KEYS);
+  // 只给总额+一项时，另一项用减法补齐；两项都缺则全算赠送
+  const granted = rawGranted !== null
+    ? rawGranted
+    : (rawPaid !== null ? rawTotal - rawPaid : rawTotal);
+  const paid = rawPaid !== null
+    ? rawPaid
+    : (rawGranted !== null ? rawTotal - rawGranted : 0);
+
+  return {
+    isAvailable: rawTotal > 0,
+    currency: pickString(payload, MIMO_CURRENCY_KEYS) ?? 'CNY',
+    totalBalance: round2(rawTotal / div),
+    grantedBalance: round2(Math.max(0, granted) / div),
+    paidBalance: round2(Math.max(0, paid) / div),
   };
 }
 

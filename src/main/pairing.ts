@@ -56,12 +56,15 @@ export function encodeQrPayload(payload: QrPayload): string {
 
 /** 投影到移动端订阅的精简配置，去掉 window/hooks/floatingBall/lanMode 等桌面专属字段 */
 export function toMobileConfig(config: AppConfig): MobileAppConfig {
+  // AK/SK 不下发：手机端只用 cookie 通道自取额度，无需长期有效的控制面密钥
+  const { accessKey: _ak, secretKey: _sk, ...volcengine } = config.volcengine;
   return {
     kimi: { ...config.kimi },
     minimax: { ...config.minimax },
     copilot: { ...config.copilot },
-    volcengine: { ...config.volcengine },
+    volcengine,
     deepseek: { ...config.deepseek },
+    mimo: { ...config.mimo },
     proxy: { ...config.proxy },
     intervalMinutes: config.intervalMinutes,
     thresholds: { ...config.thresholds }

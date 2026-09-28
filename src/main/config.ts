@@ -15,7 +15,8 @@ const DEFAULTS: AppConfig = {
   copilot: { token: '', enabled: true, useProxy: false },
   deepseek: { token: '', enabled: true, useProxy: false },
   codex:   { token: '', enabled: true, useProxy: false },
-  volcengine: { cookie: '', csrfToken: '', enabled: true, useProxy: false },
+  volcengine: { accessKey: '', secretKey: '', cookie: '', csrfToken: '', enabled: true, useProxy: false },
+  mimo:    { token: '', enabled: true, useProxy: false },
   proxy: { url: '' },
   intervalMinutes: 10,
   window: { width: 240, height: 550, x: null, y: null, isCompact: true, dockedTop: false },
@@ -75,6 +76,7 @@ export class ConfigStore {
         deepseek: { ...DEFAULTS.deepseek, ...(parsed.deepseek || {}) },
         codex:   { ...DEFAULTS.codex,   ...(parsed.codex   || {}) },
         volcengine: { ...DEFAULTS.volcengine, ...(parsed.volcengine || {}) },
+        mimo:    { ...DEFAULTS.mimo,    ...(parsed.mimo    || {}) },
         proxy:   { ...DEFAULTS.proxy,   ...(parsed.proxy   || {}) },
         window:  { ...DEFAULTS.window,  ...(parsed.window  || {}) },
         hooks: {
@@ -135,6 +137,9 @@ export class ConfigStore {
     }
     if (partial.volcengine && typeof partial.volcengine === 'object') {
       this.data.volcengine = { ...this.data.volcengine, ...partial.volcengine };
+    }
+    if (partial.mimo && typeof partial.mimo === 'object') {
+      this.data.mimo = { ...this.data.mimo, ...partial.mimo };
     }
     if (partial.proxy && typeof partial.proxy === 'object') {
       this.data.proxy = { ...this.data.proxy, ...partial.proxy };

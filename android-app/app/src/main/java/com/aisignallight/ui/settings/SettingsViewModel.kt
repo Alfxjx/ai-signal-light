@@ -37,6 +37,7 @@ class SettingsViewModel @Inject constructor(
                 copilot = config.copilot,
                 volcengine = config.volcengine,
                 deepseek = config.deepseek,
+                mimo = config.mimo,
                 proxyUrl = config.proxy.url,
                 intervalMinutes = config.intervalMinutes,
                 warnThreshold = config.thresholds.warn,
@@ -64,6 +65,10 @@ class SettingsViewModel @Inject constructor(
 
     fun updateDeepseek(config: ProviderConfig) {
         _uiState.value = _uiState.value.copy(deepseek = config)
+    }
+
+    fun updateMimo(config: ProviderConfig) {
+        _uiState.value = _uiState.value.copy(mimo = config)
     }
 
     fun updateProxy(url: String) {
@@ -96,6 +101,7 @@ class SettingsViewModel @Inject constructor(
             copilot = state.copilot,
             volcengine = state.volcengine,
             deepseek = state.deepseek,
+            mimo = state.mimo,
             proxy = ProxyConfig(url = state.proxyUrl),
             intervalMinutes = state.intervalMinutes,
             thresholds = UsageThresholds(warn = state.warnThreshold, danger = state.dangerThreshold),
@@ -117,6 +123,7 @@ data class SettingsUiState(
     val copilot: ProviderConfig = ProviderConfig(),
     val volcengine: VolcengineProviderConfig = VolcengineProviderConfig(),
     val deepseek: ProviderConfig = ProviderConfig(),
+    val mimo: ProviderConfig = ProviderConfig(),
     val proxyUrl: String = "",
     val intervalMinutes: Int = 10,
     val warnThreshold: Int = 50,

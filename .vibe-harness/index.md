@@ -7,6 +7,31 @@
 - 关联：相关模块/文件
 -->
 
+## [android-aksk-and-mimo](plans/android-aksk-and-mimo.md) | [history](history/android-aksk-and-mimo.md)
+- 时间：2026-09-28
+- 范围：安卓端火山接入 AK/SK 官方 OpenAPI（与桌面共用同一套官方测试向量，Cookie 降级回退）；新增 MiMo 余额 provider；修安卓侧 cookie jar 只回写 csrfToken 的老 bug、修重新扫码冲掉手填 AK/SK 的问题
+- 关联：`android-app/.../data/remote/{VolcengineSign,VolcengineApi,MimoApi}.kt`、`android-app/.../domain/model/{AppConfig,UsageData}.kt`、`android-app/.../ui/{home/UsageTab,components/BalanceCard,settings/*,scan/ScanViewModel}.kt`、`android-app/app/src/test/.../VolcengineSignTest.kt`、`AGENTS.md`
+
+## [tray-hover-volcengine](plans/tray-hover-volcengine.md) | [history](history/tray-hover-volcengine.md)
+- 时间：2026-09-28
+- 范围：托盘「用量速览」补上火山 Ark Coding Plan（session/weekly/monthly 三档，此前从未接入）；弹窗高度由写死 260 改为渲染层上报内容高度动态计算
+- 关联：`src/renderer/src/{TrayHover.vue,composables/useUsageState.ts}`、`src/shared/types/ipc.ts`、`src/main/{main,preload}.ts`
+
+## [volcengine-aksk](plans/volcengine-aksk.md) | [history](history/volcengine-aksk.md)
+- 时间：2026-09-28
+- 范围：火山 Coding Plan 额度改用官方 OpenAPI + AK/SK V4 签名（cookie 一天就过期 → 长期有效凭证，cookie 降级回退）；顺带修 cookie jar 只回写 csrfToken 的 bug；AK/SK 不下发手机端
+- 关联：`src/main/{volcengine-sign,volcengine-sign.test,usage-monitor,usage-monitor.test,config,main,pairing}.ts`、`src/shared/types/{config,ipc}.ts`、`src/renderer/src/Settings.vue`、`AGENTS.md`
+
+## [kimi-card-today-only](plans/kimi-card-today-only.md) | [history](history/kimi-card-today-only.md)
+- 时间：2026-09-28
+- 范围：主面板「Kimi Code (web)」目录列表只显示当日活动过的项目（非空闲/pending 强留），悬浮球下拉维持 3 天窗口
+- 关联：`src/renderer/src/utils/kimiFilter.ts`、`src/renderer/src/utils/kimiFilter.test.ts`、`src/renderer/src/components/KimiCard.vue`、`AGENTS.md`
+
+## [mimo-balance-monitor](../AI代码/徐剑祥/mimo-balance-monitor.md) | [history](history/mimo-balance-monitor.md)
+- 时间：2026-09-25
+- 范围：新增小米 MiMo 用量 provider（余额型）：调 `platform.xiaomimimo.com/api/v1/balance`，鉴权用控制台会话 Cookie（`sk-` API Key 查不到余额）；主面板 + 托盘弹窗展示余额与赠送
+- 关联：`src/shared/types/{usage,config,ipc}.ts`、`src/main/{usage-monitor,usage-monitor.test,config,main,server,pairing}.ts`、`src/renderer/src/{Settings.vue,App.vue,TrayHover.vue,components/UsageCard.vue,composables/useUsageState.ts,types/messages.ts}`
+
 ## [kimi-notify-bubble](plans/kimi-notify-bubble.md) | [history](history/kimi-notify-bubble.md)
 - 时间：2026-09-20
 - 范围：悬浮球 LED 右侧显示 Kimi NotifyUser 消息气泡（web 模式经 WS tool.call.* 捕获，15s 自动隐藏，窗口动态加宽）；TUI 无此通道，web 模式走官方 API

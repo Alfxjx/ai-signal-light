@@ -10,6 +10,9 @@ export interface SettingsPayload extends AppConfig {
   codexAutoAvailable: boolean;
   hasVolcengineCookie: boolean;
   hasVolcengineCsrfToken: boolean;
+  hasVolcengineAccessKey: boolean;
+  hasVolcengineSecretKey: boolean;
+  hasMimoCookie: boolean;
 }
 
 export interface SettingsSavePayload {
@@ -17,8 +20,12 @@ export interface SettingsSavePayload {
   minimax: { token: string; tokenChanged: boolean; enabled: boolean; useProxy: boolean };
   copilot: { token: string; tokenChanged: boolean; enabled: boolean; useProxy: boolean };
   deepseek: { token: string; tokenChanged: boolean; enabled: boolean; useProxy: boolean };
+  /** token 字段存 platform.xiaomimimo.com 复制的整段 Cookie */
+  mimo: { token: string; tokenChanged: boolean; enabled: boolean; useProxy: boolean };
   codex?: { enabled: boolean; useProxy: boolean };
   volcengine?: {
+    accessKey: string; accessKeyChanged: boolean;
+    secretKey: string; secretKeyChanged: boolean;
     cookie: string; cookieChanged: boolean;
     csrfToken: string; csrfTokenChanged: boolean;
     enabled: boolean; useProxy: boolean;
@@ -170,6 +177,8 @@ export interface ElectronAPI {
     // 弹窗渲染层回报指针当前位置：用于决定是否取消关闭 timer
     // （leave tray 后，如果光标进了弹窗，就不关）
     pointer: (inside: boolean) => void;
+    /** 渲染层回报内容高度，主进程据此调整弹窗窗口高度 */
+    resize: (height: number) => void;
   };
 }
 
@@ -212,4 +221,5 @@ export const IPC_CHANNELS = {
   WINDOW_DOCK_STATE: 'window:dock-state',
   WINDOW_DOCK_ANIM: 'window:dock-anim',
   TRAY_HOVER_POINTER: 'tray-hover:pointer',
+  TRAY_HOVER_RESIZE: 'tray-hover:resize',
 } as const;

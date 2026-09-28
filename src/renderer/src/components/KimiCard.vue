@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import type { KimiStatus, KimiProject, KimiSessionState, KimiAggregateState } from '../types/messages';
 import { formatAge, ageClass } from '../utils/time';
+import { filterTodayProjects } from '../utils/kimiFilter';
 
 const props = defineProps<{
   status: KimiStatus | null;
@@ -27,7 +28,10 @@ const DOT_CLASS: Record<KimiSessionState, string> = {
   idle: 'dot-idle',
 };
 
-const projects = computed<KimiProject[]>(() => props.status?.projects ?? []);
+const allProjects = computed<KimiProject[]>(() => props.status?.projects ?? []);
+// 只显示当日：今天动过的目录，外加正在跑/等确认的会话（时间戳过期也不隐藏）
+const projects = computed<KimiProject[]>(() => filterTodayProjects(allProjects.value, props.now));
+const emptyText = computed(() => (allProjects.value.length === 0 ? 'No sessions' : '今日无活动'));
 const stateText = computed(() => STATE_TEXT[props.status?.state ?? 'offline']);
 </script>
 
@@ -43,7 +47,7 @@ const stateText = computed(() => STATE_TEXT[props.status?.state ?? 'offline']);
       </div>
     </div>
     <ul class="project-list">
-      <li v-if="projects.length === 0" class="project-empty">No sessions</li>
+      <li v-if="projects.length === 0" class="project-empty">{{ emptyText }}</li>
       <li v-for="p in projects" :key="p.id" class="project-row">
         <span class="kimi-state-dot" :class="DOT_CLASS[p.state]" :title="stateText" />
         <span class="project-name" :title="p.id">{{ p.name }}</span>

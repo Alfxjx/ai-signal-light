@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { useUsageState } from './composables/useUsageState';
-import type { DeepseekUsageData, CodexUsageData, CodexWindowData } from './types/messages';
+import type { DeepseekUsageData, MimoUsageData, CodexUsageData, CodexWindowData } from './types/messages';
 import { formatAge } from './utils/time';
 
 // 复用悬浮球的 useUsageState → 同样接 WS 拿 init/usageUpdate
@@ -12,9 +12,11 @@ const {
   minimaxWeekly,
   copilotSlot,
   codexSlot,
+  volcengineSlots,
   isProviderVisible,
   deepseek,
   codex,
+  mimo,
   lastUpdatedTs,
   isConnected,
   send,
@@ -25,6 +27,8 @@ const minimaxVisible = computed<boolean>(() => isProviderVisible('minimax'));
 const copilotVisible = computed<boolean>(() => isProviderVisible('copilot'));
 const codexVisible   = computed<boolean>(() => isProviderVisible('codex'));
 const deepseekVisible = computed<boolean>(() => isProviderVisible('deepseek'));
+const mimoVisible = computed<boolean>(() => isProviderVisible('mimo'));
+const volcengineVisible = computed<boolean>(() => isProviderVisible('volcengine'));
 
 // DeepSeek 没有 bar，展示余额即可
 const deepseekData = computed<DeepseekUsageData | null>(() => {
@@ -33,6 +37,18 @@ const deepseekData = computed<DeepseekUsageData | null>(() => {
 
 const deepseekBalanceText = computed<string>(() => {
   const d = deepseekData.value;
+  if (!d) return '—';
+  const symbol = d.currency === 'CNY' ? '¥' : d.currency === 'USD' ? '$' : (d.currency ? d.currency + ' ' : '');
+  return `${symbol}${d.totalBalance.toFixed(2)}`;
+});
+
+// MiMo 同样是余额型
+const mimoData = computed<MimoUsageData | null>(() => {
+  return (mimo.value?.data as MimoUsageData | undefined) ?? null;
+});
+
+const mimoBalanceText = computed<string>(() => {
+  const d = mimoData.value;
   if (!d) return '—';
   const symbol = d.currency === 'CNY' ? '¥' : d.currency === 'USD' ? '$' : (d.currency ? d.currency + ' ' : '');
   return `${symbol}${d.totalBalance.toFixed(2)}`;
@@ -57,7 +73,7 @@ const now = computed<number>(() => Date.now());
 
 // 是否有任何可见 provider
 const anyVisible = computed<boolean>(() =>
-  kimiVisible.value || minimaxVisible.value || copilotVisible.value || codexVisible.value || deepseekVisible.value
+  kimiVisible.value || minimaxVisible.value || copilotVisible.value || codexVisible.value || deepseekVisible.value || mimoVisible.value || volcengineVisible.value
 );
 
 // 手动刷新：点击标题旁的刷新按钮，向服务端请求一次用量刷新
@@ -69,31 +85,56 @@ function onRefresh(): void {
   }
 }
 
+// 保存监听器引用，确保 unmount 时能正确解绑
+const onEnter = () => reportPointer(true);
+const onLeave = () => reportPointer(false);
+
 // 把"指针是否在窗口内"汇报给主进程
 // 主进程会用它配合 tray 的 mouse-enter/leave 决定要不要取消/排队隐藏弹窗
 function reportPointer(inside: boolean): void {
   window.electronAPI?.trayHover?.pointer(inside);
 }
 
-// 保存监听器引用，确保 unmount 时能正确解绑
-const onEnter = () => reportPointer(true);
-const onLeave = () => reportPointer(false);
+// 弹窗高度随 section 数量变化，渲染层量出内容高度交给主进程调整窗口
+// （provider 会增减，写死高度必然对不上）
+const root = ref<HTMLElement | null>(null);
+let resizeObserver: ResizeObserver | null = null;
+let lastReportedHeight = 0;
+
+function reportContentHeight(): void {
+  const el = root.value;
+  if (!el) return;
+  // 用 scrollHeight 取完整内容高度：窗口当前可能比内容矮
+  const h = Math.ceil(el.scrollHeight);
+  if (h === lastReportedHeight) return;
+  lastReportedHeight = h;
+  window.electronAPI?.trayHover?.resize(h);
+}
 
 onMounted(() => {
   document.addEventListener('mouseenter', onEnter);
   document.addEventListener('mouseleave', onLeave);
+  reportContentHeight();
+  if (root.value) {
+    resizeObserver = new ResizeObserver(reportContentHeight);
+    resizeObserver.observe(root.value);
+  }
+  window.addEventListener('resize', reportContentHeight);
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('mouseenter', onEnter);
   document.removeEventListener('mouseleave', onLeave);
+  window.removeEventListener('resize', reportContentHeight);
+  resizeObserver?.disconnect();
+  resizeObserver = null;
   // 卸载时主动告诉主进程：指针已经不在我这里了，免得它以为还在卡住隐藏 timer
   reportPointer(false);
 });
 </script>
 
 <template>
-  <div class="th">
+  <div class="th" ref="root">
     <div class="th-header">
       <div class="th-header-left">
         <span class="th-title">用量速览</span>
@@ -159,6 +200,35 @@ onBeforeUnmount(() => {
         <div class="th-row">
           <span class="th-tag">余额</span>
           <span class="th-balance">{{ deepseekBalanceText }}</span>
+        </div>
+      </div>
+
+      <!-- MiMo: 余额 -->
+      <div class="th-section" v-if="mimoVisible">
+        <div class="th-section-name">MiMo</div>
+        <div class="th-row">
+          <span class="th-tag">余额</span>
+          <span class="th-balance">{{ mimoBalanceText }}</span>
+        </div>
+      </div>
+
+      <!-- 火山 Ark Coding Plan: session(5h) + weekly + monthly -->
+      <div class="th-section" v-if="volcengineVisible">
+        <div class="th-section-name">Ark Coding Plan</div>
+        <div class="th-row">
+          <span class="th-tag">session</span>
+          <span class="th-pct" :class="`th-pct--${volcengineSlots.session.level}`">{{ volcengineSlots.session.percent }}%</span>
+          <span class="th-reset" v-if="volcengineSlots.session.resetText">({{ volcengineSlots.session.resetText }})</span>
+        </div>
+        <div class="th-row">
+          <span class="th-tag">weekly</span>
+          <span class="th-pct" :class="`th-pct--${volcengineSlots.weekly.level}`">{{ volcengineSlots.weekly.percent }}%</span>
+          <span class="th-reset" v-if="volcengineSlots.weekly.resetText">({{ volcengineSlots.weekly.resetText }})</span>
+        </div>
+        <div class="th-row">
+          <span class="th-tag">monthly</span>
+          <span class="th-pct" :class="`th-pct--${volcengineSlots.monthly.level}`">{{ volcengineSlots.monthly.percent }}%</span>
+          <span class="th-reset" v-if="volcengineSlots.monthly.resetText">({{ volcengineSlots.monthly.resetText }})</span>
         </div>
       </div>
 

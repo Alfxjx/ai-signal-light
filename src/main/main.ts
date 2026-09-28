@@ -250,7 +250,9 @@ function isRectVisible(x: number, y: number, w: number, h: number): boolean {
 // ==================== 托盘 hover 弹窗 ====================
 
 const TH_WIDTH = 200;   // 与 tray-hover.css 的 html/body width 保持一致
-const TH_HEIGHT = 260;  // 单列分段：header + 5 个 provider section + padding
+const TH_HEIGHT = 260;  // 初始高度；渲染层回报内容高度后会覆盖（provider 数量会变）
+// 弹窗当前高度，由渲染层通过 TRAY_HOVER_RESIZE 上报驱动
+let trayHoverHeight = TH_HEIGHT;
 
 // 创建托盘 hover 弹窗（首次 hover 时创建，之后复用）
 function createTrayHoverWindow(): BrowserWindow {
@@ -324,12 +326,13 @@ function positionTrayHover(): void {
 
   let x: number;
   let y: number;
+  const h = trayHoverHeight;
   if (taskbarLeft || taskbarRight) {
     // 任务栏在左/右：贴内侧边，竖直居中于图标
     x = taskbarLeft ? wa.x : wa.x + wa.width - TH_WIDTH;
-    y = Math.round(centerY - TH_HEIGHT / 2);
+    y = Math.round(centerY - h / 2);
     if (y < wa.y) y = wa.y;
-    if (y + TH_HEIGHT > wa.y + wa.height) y = wa.y + wa.height - TH_HEIGHT;
+    if (y + h > wa.y + wa.height) y = wa.y + wa.height - h;
   } else if (taskbarTop) {
     // 任务栏在顶部：图标下方，水平居中，顶部贴任务栏
     x = Math.round(centerX - TH_WIDTH / 2);
@@ -337,13 +340,13 @@ function positionTrayHover(): void {
   } else {
     // 默认任务栏在底部：图标上方，水平居中，底部贴任务栏
     x = Math.round(centerX - TH_WIDTH / 2);
-    y = wa.y + wa.height - TH_HEIGHT;
+    y = wa.y + wa.height - h;
   }
   if (x < wa.x) x = wa.x;
   if (x + TH_WIDTH > wa.x + wa.width) x = wa.x + wa.width - TH_WIDTH;
 
-  console.log('[tray-hover] position:', { icon, centerX, centerY, x, y, wa });
-  trayHoverWindow.setBounds({ x, y, width: TH_WIDTH, height: TH_HEIGHT });
+  console.log('[tray-hover] position:', { icon, centerX, centerY, x, y, h, wa });
+  trayHoverWindow.setBounds({ x, y, width: TH_WIDTH, height: h });
 }
 
 function clearTrayHoverTimers(): void {
@@ -384,6 +387,19 @@ ipcMain.on(IPC_CHANNELS.TRAY_HOVER_POINTER, (_event, inside: boolean) => {
   } else {
     // 光标离开弹窗 → 如果也不在托盘上，就排队隐藏
     if (!pointerInsideTray) scheduleHideTrayHover();
+  }
+});
+
+// 托盘弹窗渲染层回报：内容高度（provider 数量会变，窗口高度跟着内容走）
+ipcMain.on(IPC_CHANNELS.TRAY_HOVER_RESIZE, (_event, height: number) => {
+  const h = Math.round(Number(height));
+  // 上下各留 4px 余量，并夹在合理区间内防住异常上报
+  if (!Number.isFinite(h) || h <= 0) return;
+  const next = Math.min(Math.max(h + 8, 120), 900);
+  if (next === trayHoverHeight) return;
+  trayHoverHeight = next;
+  if (trayHoverWindow && !trayHoverWindow.isDestroyed() && trayHoverWindow.isVisible()) {
+    positionTrayHover();
   }
 });
 
@@ -1091,6 +1107,8 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, async () => {
     deepseek: { token: cfg.deepseek.token ? maskToken(cfg.deepseek.token) : '', enabled: cfg.deepseek.enabled, useProxy: cfg.deepseek.useProxy },
     codex:   { enabled: cfg.codex.enabled, useProxy: cfg.codex.useProxy },
     volcengine: {
+      accessKey: cfg.volcengine.accessKey ? maskToken(cfg.volcengine.accessKey) : '',
+      secretKey: cfg.volcengine.secretKey ? maskToken(cfg.volcengine.secretKey) : '',
       cookie: cfg.volcengine.cookie ? maskToken(cfg.volcengine.cookie) : '',
       csrfToken: cfg.volcengine.csrfToken ? maskToken(cfg.volcengine.csrfToken) : '',
       enabled: cfg.volcengine.enabled,
@@ -1106,6 +1124,10 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, async () => {
     hasDeepseekToken: !!cfg.deepseek.token,
     hasVolcengineCookie: !!cfg.volcengine.cookie,
     hasVolcengineCsrfToken: !!cfg.volcengine.csrfToken,
+    hasVolcengineAccessKey: !!cfg.volcengine.accessKey,
+    hasVolcengineSecretKey: !!cfg.volcengine.secretKey,
+    mimo: { token: cfg.mimo.token ? maskToken(cfg.mimo.token) : '', enabled: cfg.mimo.enabled, useProxy: cfg.mimo.useProxy },
+    hasMimoCookie: !!cfg.mimo.token,
     codexAutoAvailable: codexAuthAvailable(),
     hooks: {
       enabled: { ...cfg.hooks.enabled },
@@ -1161,6 +1183,17 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_SAVE, async (_event, partial: Record<string
     }
     delete (next.deepseek as Record<string, unknown>).tokenChanged;
   }
+  // mimo：token 字段存控制台 Cookie，沿用同一套变更协议
+  if (next.mimo && typeof next.mimo === 'object') {
+    const mimo = next.mimo as Record<string, unknown>;
+    if (mimo.tokenChanged) {
+      next.mimo = { ...mimo, token: (mimo.token as string) || '' };
+    } else {
+      next.mimo = { ...mimo, token: current.mimo.token };
+    }
+    delete (next.mimo as Record<string, unknown>).tokenChanged;
+  }
+
   // proxy 使用同样的变更协议
   if (next.proxy && typeof next.proxy === 'object') {
     const proxy = next.proxy as Record<string, unknown>;
@@ -1172,15 +1205,19 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_SAVE, async (_event, partial: Record<string
     delete (next.proxy as Record<string, unknown>).urlChanged;
   }
 
-  // volcengine：cookie 与 csrfToken 各自的变更协议
+  // volcengine：accessKey / secretKey / cookie / csrfToken 各自的变更协议
   if (next.volcengine && typeof next.volcengine === 'object') {
     const v = next.volcengine as Record<string, unknown>;
-    if (v.cookieChanged) { v.cookie = (v.cookie as string) || ''; }
-    else { v.cookie = current.volcengine.cookie; }
-    if (v.csrfTokenChanged) { v.csrfToken = (v.csrfToken as string) || ''; }
-    else { v.csrfToken = current.volcengine.csrfToken; }
-    delete (next.volcengine as Record<string, unknown>).cookieChanged;
-    delete (next.volcengine as Record<string, unknown>).csrfTokenChanged;
+    const keepOrTake = (field: 'accessKey' | 'secretKey' | 'cookie' | 'csrfToken'): void => {
+      const changedKey = `${field}Changed`;
+      if (v[changedKey]) { v[field] = (v[field] as string) || ''; }
+      else { v[field] = current.volcengine[field]; }
+      delete v[changedKey];
+    };
+    keepOrTake('accessKey');
+    keepOrTake('secretKey');
+    keepOrTake('cookie');
+    keepOrTake('csrfToken');
   }
 
   // LAN 模式：首次开启时自动生成 apiKey

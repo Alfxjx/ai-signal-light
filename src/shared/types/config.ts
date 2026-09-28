@@ -5,6 +5,10 @@ export interface ProviderConfig {
 }
 
 export interface VolcengineProviderConfig {
+  /** AK/SK 通道（官方 OpenAPI，配一次长期有效）。二者齐备时优先于 cookie */
+  accessKey: string;
+  secretKey: string;
+  /** Cookie 通道（控制台会话，约一周需重配），仅在 AK/SK 不可用时回退 */
   cookie: string;
   csrfToken: string;
   enabled: boolean;
@@ -76,6 +80,8 @@ export interface AppConfig {
   deepseek: ProviderConfig;
   codex: ProviderConfig;
   volcengine: VolcengineProviderConfig;
+  /** token 字段存 platform.xiaomimimo.com 复制的整段 Cookie（api-platform_serviceToken / userId 等） */
+  mimo: ProviderConfig;
   proxy: { url: string };
   intervalMinutes: number;
   window: WindowConfig;
@@ -94,20 +100,23 @@ export interface MobileAppConfig {
   kimi: ProviderConfig;
   minimax: ProviderConfig;
   copilot: ProviderConfig;
-  volcengine: VolcengineProviderConfig;
+  /** 移动端只用 cookie 通道自取额度，不需要 AK/SK（长期有效的控制面密钥不应下发到手机） */
+  volcengine: Omit<VolcengineProviderConfig, 'accessKey' | 'secretKey'>;
   deepseek: ProviderConfig;
+  mimo: ProviderConfig;
   proxy: { url: string };
   intervalMinutes: number;
   thresholds: UsageThresholds;
 }
 
-export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex' | 'volcengine' | 'window' | 'proxy' | 'floatingBall' | 'pet' | 'thresholds' | 'lanMode'>> & {
+export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex' | 'volcengine' | 'mimo' | 'window' | 'proxy' | 'floatingBall' | 'pet' | 'thresholds' | 'lanMode'>> & {
   kimi?: Partial<ProviderConfig>;
   minimax?: Partial<ProviderConfig>;
   copilot?: Partial<ProviderConfig>;
   deepseek?: Partial<ProviderConfig>;
   codex?: Partial<ProviderConfig>;
   volcengine?: Partial<VolcengineProviderConfig>;
+  mimo?: Partial<ProviderConfig>;
   proxy?: Partial<{ url: string }>;
   window?: Partial<WindowConfig>;
   hooks?: Partial<{
