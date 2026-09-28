@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.7.0](https://github.com/Alfxjx/ai-signal-light/compare/v2.6.0...v2.7.0) (2026-09-28)
+
+
+### ✨ 新功能
+
+* 火山 Coding Plan 支持 AK/SK，新增 MiMo provider，Kimi 列表只显示当日 ([f826630](https://github.com/Alfxjx/ai-signal-light/commit/f826630a03855c9295ca797e315e9186458509f7))
+* 悬浮球 LED 右侧显示 Kimi NotifyUser 消息气泡 ([71d4a57](https://github.com/Alfxjx/ai-signal-light/commit/71d4a579ae4608b41e7f4c491b102a7af8870b17))
+* 桌面宠物窗口（Codex 图集播放，独立开关可与悬浮球共存） ([7fae767](https://github.com/Alfxjx/ai-signal-light/commit/7fae767c7b5edba21cde7a14ec7d09acbafa6211))
+
 ## [2.6.0](https://github.com/Alfxjx/ai-signal-light/compare/v2.5.0...v2.6.0) (2026-09-16)
 
 
