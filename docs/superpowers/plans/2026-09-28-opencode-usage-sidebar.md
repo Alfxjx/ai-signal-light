@@ -2651,9 +2651,9 @@ git commit -m "docs(opencode-plugin): README、spec 同步与记忆归档"
 
 ## 完成标准
 
-- [ ] `opencode-plugin` 下 `npm test` 全绿、`npm run typecheck` 无错误
-- [ ] `opencode` 启动后侧边栏稳定显示 `用量` 表头 + 5 家一行
-- [ ] `/usage` 与快捷键都能触发刷新并弹汇总 toast
-- [ ] 重启 opencode 先显示缓存再刷新
-- [ ] config.json 缺失/损坏时只显示一行红字，不崩溃
-- [ ] 桌面应用代码零改动；`git status` 里没有 `src/` 的改动
+- [x] `opencode-plugin` 下 `npm test` 全绿（77 个）、`npm run typecheck` 无错误
+- [x] `opencode` 启动后侧边栏稳定显示 `用量` 表头 + 五家多行展开
+- [x] `/usage` 与快捷键都能触发刷新并弹汇总 toast
+- [ ] 重启 opencode 先显示缓存再刷新 —— **用户主动跳过，未验证**（见 Task 7 Step 4 的验证记录）
+- [x] config.json 读不到时插件不崩（日志无 `plugin operation failed`；用「临时指向不存在的路径」的安全做法验的，未动真实配置）
+- [x] 桌面应用代码零改动；`git status` 里没有 `src/` 的改动

@@ -22,7 +22,7 @@
 |---|---|
 | opencode | v2.0.14 |
 | 插件 API | `@opencode/plugin`（V2；`@opencode/plugin/tui` 提供 TUI 能力），npm 上最新 2.0.18 |
-| 插件注册点 | `~/.config/opencode/cli.json` 的 `plugins`（CLI-only 插件，远端 server 下也生效） |
+| 插件注册点 | **全局插件发现目录** `~/.config/opencode/plugins/<name>/tui.ts`（已实测生效）。⚠️ `cli.json` 的 `plugins` 写本地路径**不会加载**，见第 10 节 |
 | 侧边栏插槽 | `sidebar.content`（另有 `sidebar.footer`、`home.footer.status` 等） |
 | 配置来源 | `%APPDATA%\AI状态监控\config.json`（正式版 userData） |
 | npm registry | npmmirror（`https://registry.npmmirror.com`） |
@@ -57,7 +57,7 @@
 
 ```
 opencode-plugin/
-├── package.json          # name: opencode-usage-sidebar；exports: "." 与 "./tui"
+├── package.json          # name: opencode-usage-sidebar；exports 只有 "./tui"（实测不需要 "." 主入口）
 ├── tsconfig.json
 ├── vitest.config.ts
 ├── README.md             # 本地加载方式、调试笔记、与主进程实现的对应关系
@@ -231,7 +231,7 @@ Vitest，colocated `*.test.ts`，与仓库既有约定一致（`npm test` 在插
 
 ## 14. 实现顺序（概要）
 
-1. 最小插件 + cli.json 注册，验证加载与 `sidebar.content` 渲染通路（toast + 一行静态文本）
+1. 最小插件 + 全局发现目录注册，验证加载与 `sidebar.content` 渲染通路（toast + 一行静态文本）
 2. `config.ts` + `format.ts`（纯函数，先单测）
 3. 五家 provider 取数与映射（逐家：实现 → 单测 → 接入）
 4. `tui.tsx` 组装：轮询、缓存、手动刷新命令、错误态
