@@ -2213,7 +2213,7 @@ git commit -m "feat(opencode-plugin): 五家 provider 取数与响应映射"
 **Files:**
 - Modify: `opencode-plugin/src/tui.tsx`（整体替换 Task 1 的占位实现）
 
-- [ ] **Step 1: 整体替换 `opencode-plugin/src/tui.tsx`**
+- [x] **Step 1: 整体替换 `opencode-plugin/src/tui.tsx`**
 
 ```tsx
 import { Plugin } from '@opencode/plugin/tui';
@@ -2405,7 +2405,7 @@ export default Plugin.define({
 });
 ```
 
-- [ ] **Step 2: 类型检查**
+- [x] **Step 2: 类型检查**
 
 ```powershell
 Set-Location opencode-plugin; npm run typecheck
@@ -2439,7 +2439,7 @@ Expected: 无错误。
   → 这个错误只在 `~/.local/share/opencode/log/opencode.log` 里，且**不带 `error` 关键字之外的其他提示**，
     排查时直接 `Select-String "operation failed|ai-signal-light"` 最快。
 
-- [ ] **Step 3: 跑全部单测**
+- [x] **Step 3: 跑全部单测**
 
 ```powershell
 Set-Location opencode-plugin; npm test
@@ -2456,22 +2456,42 @@ opencode
 逐项确认：
 
 1. 侧边栏出现 1 行表头（`用量  刷新 …`）+ 五家的多行展开（配额型每家 1 行标题 + 每周期 1 行；余额型 1 行）。
-2. 用正式版 config 的当前状态对照预期：
+2. 用正式版 config 的当前状态对照预期：五家都应有真实数据 ——
    - `Kimi` / `MiniMax` / `火山` 每家一个标题行 + 每周期一行（百分比 + 倒计时），颜色按各窗口自己的阈值（<50 绿）。
-   - `MiMo` 显示灰色 `－ 未配置`（正式版 config 里 `mimo.token` 为空）。
-   - `火山` 大概率显示红色 `－ 登录态已过期` 或 `－ x-csrf-token 已过期`（正式版里只有约一个月前的 cookie）。
+   - `DeepSeek` / `MiMo` 单行「名称  金额」。
 3. 输入 `/usage` 回车 → toast 报 `已刷新 5 家（N 家失败）`。
 4. 按 `Ctrl+Alt+U` → 同样触发（若无反应，说明该键位不合法，把 `bind` 改成 `false` 并在 README 记下「快捷键需自行在 cli.json 绑定」）。
 5. 退出并重开 `opencode` → 首屏立刻显示上一轮缓存（表头时间不是「拉取中…」），随后自动刷新。
-6. 把 config.json 里 `mimo` 临时改成 `enabled: false`，`/usage` 刷新后该行应**消失**；改回 `true` 再刷新后回来。（验证「只渲染 enabled 的 provider」）
+6. 把 config.json 里 `mimo` 临时改成 `enabled: false`，`/usage` 刷新后该行应**消失**；改回 `true` 再刷新后回来。
 
-- [ ] **Step 5: 验证失败提示不吞异常**
+**实际验证记录（2026-09-28）：**
 
-把 `%APPDATA%\AI状态监控\config.json` 临时改名，重开 opencode。
+| 项 | 结果 |
+|---|---|
+| 1、2 渲染 | ✅ 用户目视确认，五家真实数据（Kimi 5h/周、MiniMax 5h/周、火山 5h/周/月、DeepSeek ¥29.06、MiMo ¥33.06） |
+| 3 `/usage` | ✅ 弹出 toast |
+| 4 `Ctrl+Alt+U` | ✅ 弹出 toast（键位合法，`bind` 保留） |
+| 5 重启缓存 | ⏭️ **用户跳过，未验证**。若日后确认未持久化，`context.storage.store` 的落盘位置需再查（`~/.local/state/opencode/kv.json` 是 TUI 自己的设置，不是插件存储；疑似在 `opencode.db`） |
+| 6 enabled 过滤 | ✅ 由 `src/providers/index.test.ts` 的 `enabledProviders` 单测覆盖（5 个用例），**未做 E2E** |
 
-Expected: 侧边栏出现红色 `config.json 读取失败`，没有崩溃。**验完把文件名改回来。**
+- [x] **Step 5: 验证失败提示不吞异常**
 
-- [ ] **Step 6: 提交**
+⚠️ **不要按原方案改名 `%APPDATA%\AI状态监控\config.json`** —— 桌面应用（AI状态监控）可能正在运行，
+改名/改坏它可能被应用回写覆盖，甚至丢失用户填的 API Key。
+
+安全的等价做法：临时把 `tui.tsx` 里那句改成指向一个不存在的路径，热重载后观察，验完改回来：
+
+```ts
+const { config, thresholds, error } = loadConfig('C:\\__ai_signal_light_missing__\\config.json');
+```
+
+Expected: 侧边栏只剩一行红色 `config.json 读取失败`，其余 provider 行消失；插件不崩
+（`~/.local/share/opencode/log/opencode.log` 里没有 `plugin operation failed`）。**验完务必把参数删掉。**
+
+**实际验证记录（2026-09-28）：** ✅ 用上述安全做法验过 —— 日志确认没有 `plugin operation failed`（插件未崩）。
+红字的目视确认用户未单独回报（渲染通路与 provider 行同为 `<text>`，已由 1、2 项间接覆盖）。
+
+- [x] **Step 6: 提交**
 
 ```powershell
 git add opencode-plugin/src/tui.tsx
