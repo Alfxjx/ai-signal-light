@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DEFAULT_THRESHOLDS, loadConfig, parseThresholds } from './config';
+import { DEFAULT_THRESHOLDS, configPath, loadConfig, parseThresholds } from './config';
 
 function writeConfig(content: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'usage-cfg-'));
@@ -49,6 +49,20 @@ describe('loadConfig', () => {
   it('缺 thresholds 时回落到默认值', () => {
     const loaded = loadConfig(writeConfig('{}'));
     expect(loaded.thresholds).toEqual(DEFAULT_THRESHOLDS);
+  });
+});
+
+describe('configPath', () => {
+  it('指向正式版 userData 的 config.json，而不是 -dev', () => {
+    const path = configPath();
+    expect(path.endsWith(join('AI状态监控', 'config.json'))).toBe(true);
+    expect(path).not.toContain('-dev');
+  });
+
+  it('以 APPDATA 为根（Windows），不是用户家目录下的相对路径', () => {
+    const appData = process.env.APPDATA;
+    if (!appData) return; // 非 Windows 环境跳过
+    expect(configPath().startsWith(appData.trim())).toBe(true);
   });
 });
 
