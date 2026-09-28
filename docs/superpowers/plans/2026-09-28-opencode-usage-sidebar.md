@@ -876,7 +876,7 @@ git commit -m "feat(opencode-plugin): 侧边栏纯格式化（宽度对齐/条�
 - Create: `opencode-plugin/src/providers/http.ts`
 - Test: `opencode-plugin/src/providers/http.test.ts`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `opencode-plugin/src/providers/http.test.ts`：
 
@@ -934,7 +934,7 @@ describe('httpRequest', () => {
 });
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/providers/http.test.ts
@@ -942,7 +942,7 @@ Set-Location opencode-plugin; npx vitest run src/providers/http.test.ts
 
 Expected: FAIL —— 无法解析 `./http.js`。
 
-- [ ] **Step 3: 实现 `providers/http.ts`**
+- [x] **Step 3: 实现 `providers/http.ts`**
 
 ```ts
 // 五家 provider 共用的请求封装。
@@ -1003,7 +1003,7 @@ export function numberOr(value: unknown, fallback: number): number {
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```powershell
 Set-Location opencode-plugin; npx vitest run src/providers/http.test.ts
@@ -1011,7 +1011,7 @@ Set-Location opencode-plugin; npx vitest run src/providers/http.test.ts
 
 Expected: 全绿。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```powershell
 git add opencode-plugin/src/providers/http.ts opencode-plugin/src/providers/http.test.ts
