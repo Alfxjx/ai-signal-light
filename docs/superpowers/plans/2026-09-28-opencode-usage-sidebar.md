@@ -70,7 +70,7 @@ opencode-plugin/
     ├── tui.tsx                       # 唯一入口：setup / 轮询 / 插槽渲染 / 命令
     ├── types.ts                      # ProviderId / WindowView / BalanceView / ProviderState
     ├── config.ts     + config.test.ts      # 只读解析 AppConfig
-    ├── format.ts     + format.test.ts      # 纯格式化（宽度/条形/倒计时/金额/配色/整行）
+    ├── format.ts     + format.test.ts      # 纯格式化（宽度/倒计时/金额/配色/多行展开）
     └── providers/
         ├── http.ts   + http.test.ts        # fetch 封装 + 本地化错误
         ├── kimi.ts   + kimi.test.ts
@@ -529,12 +529,11 @@ import { describe, it, expect } from 'vitest';
 import {
   displayWidth,
   errorLabel,
-  formatBar,
   formatCountdown,
   formatHeader,
   formatMoney,
   formatPercent,
-  formatProviderLine,
+  formatProviderLines,
   levelFor,
   padToWidth,
   pickPrimary,
@@ -569,13 +568,7 @@ describe('displayWidth / padToWidth / truncateToWidth', () => {
   });
 });
 
-describe('formatBar / formatPercent / levelFor', () => {
-  it('5 格条形按比例填充', () => {
-    expect(formatBar(0)).toBe('░░░░░');
-    expect(formatBar(50)).toBe('███░░');
-    expect(formatBar(100)).toBe('█████');
-  });
-
+describe('formatPercent / levelFor', () => {
   it('百分比四舍五入并夹到 0-100', () => {
     expect(formatPercent(62.4)).toBe('62%');
     expect(formatPercent(-5)).toBe('0%');
@@ -653,7 +646,7 @@ describe('formatHeader', () => {
   });
 });
 
-describe('formatProviderLine', () => {
+describe('formatProviderLines', () => {
   const now = Date.parse('2026-09-28T12:00:00Z');
   const base: ProviderState = {
     id: 'kimi',
@@ -664,30 +657,81 @@ describe('formatProviderLine', () => {
     lastUpdated: null,
   };
 
-  it('Kimi 双窗口取大的那个并标窗口名', () => {
+  it('Kimi 双窗口：标题行 + 每个周期一行，都带百分比与倒计时', () => {
     const state: ProviderState = {
       ...base,
       windows: [
-        { label: '5h', percent: 34, resetTime: '2026-09-28T15:00:00Z' },
-        { label: '周', percent: 62, resetTime: '2026-09-30T12:00:00Z' },
+        { label: '5h', percent: 18, resetTime: '2026-09-28T12:27:00Z' },
+        { label: '周', percent: 31, resetTime: '2026-09-30T12:00:00Z' },
       ],
     };
-    const line = formatProviderLine(state, 8, THRESHOLDS, now);
-    expect(line.text).toBe('Kimi     ███░░ 62% 周 2d');
-    expect(line.level).toBe('warn');
+    expect(formatProviderLines(state, THRESHOLDS, now)).toEqual([
+      { text: 'Kimi', level: 'fresh' },
+      { text: '  5h   18%  27m', level: 'fresh' },
+      { text: '  周   31%  2d', level: 'fresh' },
+    ]);
   });
 
-  it('余额型显示货币金额', () => {
-    const state: ProviderState = { ...base, id: 'deepseek', name: 'DeepSeek', balance: { currency: 'CNY', total: 12.4 } };
-    const line = formatProviderLine(state, 8, THRESHOLDS, now);
-    expect(line.text).toBe('DeepSeek ¥12.40');
-    expect(line.level).toBe('fresh');
+  it('标题行按最紧（已用 % 最高）的窗口着色', () => {
+    const state: ProviderState = {
+      ...base,
+      windows: [
+        { label: '5h', percent: 18, resetTime: null },
+        { label: '周', percent: 62, resetTime: null },
+      ],
+    };
+    const lines = formatProviderLines(state, THRESHOLDS, now);
+    expect(lines[0]).toEqual({ text: 'Kimi', level: 'warn' });
+    expect(lines[1].level).toBe('fresh');
+    expect(lines[2].level).toBe('warn');
+  });
+
+  it('三窗口（火山）会渲染成 4 行，标签对齐、百分比右对齐', () => {
+    const state: ProviderState = {
+      ...base,
+      id: 'volcengine',
+      name: '火山',
+      windows: [
+        { label: '5h', percent: 13, resetTime: null },
+        { label: '周', percent: 4, resetTime: null },
+        { label: '月', percent: 100, resetTime: null },
+      ],
+    };
+    const lines = formatProviderLines(state, THRESHOLDS, now);
+    expect(lines.map((l) => l.text)).toEqual(['火山', '  5h   13%', '  周    4%', '  月  100%']);
+    expect(lines[3].level).toBe('danger');
+  });
+
+  it('没有重置时间时不输出倒计时', () => {
+    const state: ProviderState = {
+      ...base,
+      windows: [{ label: '5h', percent: 18, resetTime: null }],
+    };
+    expect(formatProviderLines(state, THRESHOLDS, now)[1].text).toBe('  5h   18%');
+  });
+
+  it('余额型只有一行：名称 + 金额', () => {
+    const state: ProviderState = {
+      ...base,
+      id: 'deepseek',
+      name: 'DeepSeek',
+      balance: { currency: 'CNY', total: 29.06 },
+    };
+    expect(formatProviderLines(state, THRESHOLDS, now)).toEqual([
+      { text: 'DeepSeek  ¥29.06', level: 'fresh' },
+    ]);
   });
 
   it('未配置是灰的，鉴权失败是红的', () => {
-    expect(formatProviderLine({ ...base, id: 'mimo', name: 'MiMo', error: 'no_token' }, 8, THRESHOLDS, now))
-      .toEqual({ text: 'MiMo     － 未配置', level: 'muted' });
-    expect(formatProviderLine({ ...base, error: '鉴权失败' }, 8, THRESHOLDS, now).level).toBe('danger');
+    expect(formatProviderLines({ ...base, id: 'mimo', name: 'MiMo', error: 'no_token' }, THRESHOLDS, now))
+      .toEqual([{ text: 'MiMo  － 未配置', level: 'muted' }]);
+    expect(
+      formatProviderLines({ ...base, error: '鉴权失败' }, THRESHOLDS, now)[0].level,
+    ).toBe('danger');
+  });
+
+  it('没有窗口也不是错误时显示占位短横', () => {
+    expect(formatProviderLines(base, THRESHOLDS, now)).toEqual([{ text: 'Kimi  －', level: 'muted' }]);
   });
 });
 ```
@@ -758,13 +802,6 @@ export function clamp(percent: number): number {
   return Math.max(0, Math.min(100, n));
 }
 
-/** 5 格条形：█ 已用 / ░ 剩余，越宽 = 越接近上限 */
-export function formatBar(percent: number, width = 5): string {
-  const filled = Math.round((clamp(percent) / 100) * width);
-  const head = Math.max(0, Math.min(width, filled));
-  return '█'.repeat(head) + '░'.repeat(width - head);
-}
-
 export function formatPercent(percent: number): string {
   return `${Math.round(clamp(percent))}%`;
 }
@@ -810,7 +847,7 @@ export function errorLabel(error: string): string {
   return error === 'no_token' ? '未配置' : error;
 }
 
-/** 取已用 % 最大的窗口作为主数字（并列时保留靠前的） */
+/** 取已用 % 最大的窗口（并列时保留靠前的）。用于给「每家的标题行」着色 */
 export function pickPrimary(windows: WindowView[]): WindowView | null {
   let best: WindowView | null = null;
   for (const w of windows) {
@@ -826,30 +863,63 @@ export function formatHeader(updatedAt: number | null, now: number): string {
   return `用量  刷新 ${age}`;
 }
 
-export function formatProviderLine(
+/** 一行渲染结果：文本 + 该行的告警档位 */
+export interface RenderedLine {
+  text: string;
+  level: Level;
+}
+
+/** 窗口标签固定 2 列显示宽度（5h / 周 / 月），百分比右对齐 4 列 */
+const LABEL_WIDTH = 2;
+const PERCENT_WIDTH = 4;
+
+function formatWindowLine(window: WindowView, now: number): string {
+  const parts = [
+    `  ${padToWidth(window.label, LABEL_WIDTH)}`,
+    formatPercent(window.percent).padStart(PERCENT_WIDTH),
+  ];
+  const reset = formatCountdown(window.resetTime, now);
+  if (reset) parts.push(reset);
+  return parts.join('  ');
+}
+
+/**
+ * 把一个 provider 渲染成若干行（每家多行展开）：
+ * - 出错：一行「名称  － 原因」
+ * - 余额型：一行「名称  金额」（只有一项数据，不套标题行）
+ * - 百分比型：标题行「名称」（按最紧的窗口着色）+ 每个窗口一行「  标签  百分比  倒计时」
+ */
+export function formatProviderLines(
   state: ProviderState,
-  nameWidth: number,
   thresholds: { warn: number; danger: number },
   now: number,
-): { text: string; level: Level } {
-  const name = padToWidth(state.name, nameWidth);
-
+): RenderedLine[] {
   if (state.error) {
     const label = errorLabel(state.error);
-    return { text: `${name} － ${label}`, level: state.error === 'no_token' ? 'muted' : 'danger' };
+    return [{ text: `${state.name}  － ${label}`, level: state.error === 'no_token' ? 'muted' : 'danger' }];
   }
 
   if (state.balance) {
-    return { text: `${name} ${formatMoney(state.balance.currency, state.balance.total)}`, level: 'fresh' };
+    return [
+      {
+        text: `${state.name}  ${formatMoney(state.balance.currency, state.balance.total)}`,
+        level: 'fresh',
+      },
+    ];
   }
 
-  const main = pickPrimary(state.windows);
-  if (!main) return { text: `${name} －`, level: 'muted' };
+  if (state.windows.length === 0) {
+    return [{ text: `${state.name}  －`, level: 'muted' }];
+  }
 
-  const parts = [formatBar(main.percent), formatPercent(main.percent), main.label];
-  const reset = formatCountdown(main.resetTime, now);
-  if (reset) parts.push(reset);
-  return { text: `${name} ${parts.join(' ')}`, level: levelFor(main.percent, thresholds) };
+  const tightest = pickPrimary(state.windows);
+  const lines: RenderedLine[] = [
+    { text: state.name, level: tightest ? levelFor(tightest.percent, thresholds) : 'muted' },
+  ];
+  for (const window of state.windows) {
+    lines.push({ text: formatWindowLine(window, now), level: levelFor(window.percent, thresholds) });
+  }
+  return lines;
 }
 ```
 
@@ -2138,11 +2208,10 @@ git commit -m "feat(opencode-plugin): 五家 provider 取数与响应映射"
 
 ```tsx
 import { Plugin } from '@opencode/plugin/tui';
-import type { Context } from '@opencode/plugin/tui';
-import { For, Show, createSignal } from 'solid-js';
+import { For, createSignal } from 'solid-js';
 import { loadConfig, DEFAULT_THRESHOLDS } from './config';
 import type { RawAppConfig, Thresholds } from './config';
-import { formatHeader, formatProviderLine } from './format';
+import { formatHeader, formatProviderLines } from './format';
 import type { Level } from './format';
 import { PROVIDERS } from './providers/index';
 import type { ProviderDefinition } from './providers/index';
@@ -2154,8 +2223,6 @@ const REFRESH_MS = 5 * 60 * 1000;
 const MAX_BACKOFF_MS = 30 * 60 * 1000;
 /** 重绘「刷新 Xm前」的节拍 */
 const TICK_MS = 30 * 1000;
-/** 名称列宽（按终端显示宽度计，CJK 算 2 列） */
-const NAME_WIDTH = 8;
 const COMMAND_ID = 'usage.refresh';
 
 interface Snapshot {
@@ -2274,14 +2341,15 @@ export default Plugin.define({
       render: () => (
         <box flexDirection="column">
           <text fg={context.theme.text.base}>{formatHeader(snapshot.updatedAt, now())}</text>
-          <Show when={snapshot.configError}>
-            {(message) => <text fg={context.theme.text.feedback.error.base}>{message()}</text>}
-          </Show>
+          {snapshot.configError ? (
+            <text fg={context.theme.text.feedback.error.base}>{snapshot.configError}</text>
+          ) : null}
           <For each={snapshot.providers}>
-            {(state) => {
-              const line = () => formatProviderLine(state, NAME_WIDTH, snapshot.thresholds, now());
-              return <text fg={colorFor(line().level)}>{line().text}</text>;
-            }}
+            {(state) => (
+              <For each={formatProviderLines(state, snapshot.thresholds, now())}>
+                {(line) => <text fg={colorFor(line.level)}>{line.text}</text>}
+              </For>
+            )}
           </For>
         </box>
       ),
@@ -2339,6 +2407,16 @@ Expected: 无错误。
 - 报 JSX 元素类型不认识的 `box` / `text` → `tsconfig.json` 的 `jsxImportSource` 必须是 `@opentui/solid`，且 `@opentui/solid` 已安装。
 - 报 `fetch` 不存在 → `@types/node` 未装或 `types` 没包含 `node`。
 
+**已经踩过的两个坑（本仓库实测，代码块里已是修好的版本，别再改回去）：**
+
+- `TS2305: Module '"@opencode/plugin/tui"' has no exported member 'Context'` + `TS6133: 'Context' is declared but its value is never read`
+  → 就是事实表里警告的那条：`Context` 不是顶层导出。**照计划代码块删掉那行 `import type { Context } from '@opencode/plugin/tui';`，不要写它**，
+  `setup(context)` 靠 `Plugin.define` 的上下文推断拿类型。
+- `TS7006: Parameter 'message' implicitly has an 'any' type`（出现在 `<Show when={snapshot.configError}>{(message) => …}</Show>`）
+  → 不要用 `Show`，直接用三元表达式渲染（计划代码块里已经这么写了）：
+  `{snapshot.configError ? <text fg={…}>{snapshot.configError}</text> : null}`，同时把 `Show` 从 `solid-js` 的 import 里去掉
+  （`noUnusedLocals` 会因为没用到而报错）。
+
 - [ ] **Step 3: 跑全部单测**
 
 ```powershell
@@ -2355,9 +2433,9 @@ opencode
 
 逐项确认：
 
-1. 侧边栏出现 6 行：`用量  刷新 …` + 5 家。
+1. 侧边栏出现 1 行表头（`用量  刷新 …`）+ 五家的多行展开（配额型每家 1 行标题 + 每周期 1 行；余额型 1 行）。
 2. 用正式版 config 的当前状态对照预期：
-   - `Kimi` / `MiniMax` / `DeepSeek` 应有条形或金额，颜色按阈值（<50 绿）。
+   - `Kimi` / `MiniMax` / `火山` 每家一个标题行 + 每周期一行（百分比 + 倒计时），颜色按各窗口自己的阈值（<50 绿）。
    - `MiMo` 显示灰色 `－ 未配置`（正式版 config 里 `mimo.token` 为空）。
    - `火山` 大概率显示红色 `－ 登录态已过期` 或 `－ x-csrf-token 已过期`（正式版里只有约一个月前的 cookie）。
 3. 输入 `/usage` 回车 → toast 报 `已刷新 5 家（N 家失败）`。
@@ -2443,7 +2521,7 @@ Bun 从这里向上解析 `@opencode/plugin/tui` 与 `solid-js`。删掉 `node_m
 |---|---|---|
 | 刷新间隔 | `src/tui.tsx` 的 `REFRESH_MS` | 5 分钟 |
 | 失败退避上限 | `src/tui.tsx` 的 `MAX_BACKOFF_MS` | 30 分钟 |
-| 名称列宽 | `src/tui.tsx` 的 `NAME_WIDTH` | 8 |
+| 行格式 | `src/format.ts` 的 `LABEL_WIDTH` / `PERCENT_WIDTH` | 标签 2 列、百分比右对齐 4 列 |
 | 告警阈值 | 读 config.json 的 `thresholds` | warn 50 / danger 80 |
 | 快捷键 | 命令 ID `usage.refresh`，可在 cli.json 的 `keybinds` 覆盖 | `ctrl+alt+u`（若无效应在 cli.json 自行绑定） |
 

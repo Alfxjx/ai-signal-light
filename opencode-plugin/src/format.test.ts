@@ -2,12 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   displayWidth,
   errorLabel,
-  formatBar,
   formatCountdown,
   formatHeader,
   formatMoney,
   formatPercent,
-  formatProviderLine,
+  formatProviderLines,
   levelFor,
   padToWidth,
   pickPrimary,
@@ -42,13 +41,7 @@ describe('displayWidth / padToWidth / truncateToWidth', () => {
   });
 });
 
-describe('formatBar / formatPercent / levelFor', () => {
-  it('5 格条形按比例填充', () => {
-    expect(formatBar(0)).toBe('░░░░░');
-    expect(formatBar(50)).toBe('███░░');
-    expect(formatBar(100)).toBe('█████');
-  });
-
+describe('formatPercent / levelFor', () => {
   it('百分比四舍五入并夹到 0-100', () => {
     expect(formatPercent(62.4)).toBe('62%');
     expect(formatPercent(-5)).toBe('0%');
@@ -126,7 +119,7 @@ describe('formatHeader', () => {
   });
 });
 
-describe('formatProviderLine', () => {
+describe('formatProviderLines', () => {
   const now = Date.parse('2026-09-28T12:00:00Z');
   const base: ProviderState = {
     id: 'kimi',
@@ -137,29 +130,80 @@ describe('formatProviderLine', () => {
     lastUpdated: null,
   };
 
-  it('Kimi 双窗口取大的那个并标窗口名', () => {
+  it('Kimi 双窗口：标题行 + 每个周期一行，都带百分比与倒计时', () => {
     const state: ProviderState = {
       ...base,
       windows: [
-        { label: '5h', percent: 34, resetTime: '2026-09-28T15:00:00Z' },
-        { label: '周', percent: 62, resetTime: '2026-09-30T12:00:00Z' },
+        { label: '5h', percent: 18, resetTime: '2026-09-28T12:27:00Z' },
+        { label: '周', percent: 31, resetTime: '2026-09-30T12:00:00Z' },
       ],
     };
-    const line = formatProviderLine(state, 8, THRESHOLDS, now);
-    expect(line.text).toBe('Kimi     ███░░ 62% 周 2d');
-    expect(line.level).toBe('warn');
+    expect(formatProviderLines(state, THRESHOLDS, now)).toEqual([
+      { text: 'Kimi', level: 'fresh' },
+      { text: '  5h   18%  27m', level: 'fresh' },
+      { text: '  周   31%  2d', level: 'fresh' },
+    ]);
   });
 
-  it('余额型显示货币金额', () => {
-    const state: ProviderState = { ...base, id: 'deepseek', name: 'DeepSeek', balance: { currency: 'CNY', total: 12.4 } };
-    const line = formatProviderLine(state, 8, THRESHOLDS, now);
-    expect(line.text).toBe('DeepSeek ¥12.40');
-    expect(line.level).toBe('fresh');
+  it('标题行按最紧（已用 % 最高）的窗口着色', () => {
+    const state: ProviderState = {
+      ...base,
+      windows: [
+        { label: '5h', percent: 18, resetTime: null },
+        { label: '周', percent: 62, resetTime: null },
+      ],
+    };
+    const lines = formatProviderLines(state, THRESHOLDS, now);
+    expect(lines[0]).toEqual({ text: 'Kimi', level: 'warn' });
+    expect(lines[1].level).toBe('fresh');
+    expect(lines[2].level).toBe('warn');
+  });
+
+  it('三窗口（火山）会渲染成 4 行，标签对齐、百分比右对齐', () => {
+    const state: ProviderState = {
+      ...base,
+      id: 'volcengine',
+      name: '火山',
+      windows: [
+        { label: '5h', percent: 13, resetTime: null },
+        { label: '周', percent: 4, resetTime: null },
+        { label: '月', percent: 100, resetTime: null },
+      ],
+    };
+    const lines = formatProviderLines(state, THRESHOLDS, now);
+    expect(lines.map((l) => l.text)).toEqual(['火山', '  5h   13%', '  周    4%', '  月  100%']);
+    expect(lines[3].level).toBe('danger');
+  });
+
+  it('没有重置时间时不输出倒计时', () => {
+    const state: ProviderState = {
+      ...base,
+      windows: [{ label: '5h', percent: 18, resetTime: null }],
+    };
+    expect(formatProviderLines(state, THRESHOLDS, now)[1].text).toBe('  5h   18%');
+  });
+
+  it('余额型只有一行：名称 + 金额', () => {
+    const state: ProviderState = {
+      ...base,
+      id: 'deepseek',
+      name: 'DeepSeek',
+      balance: { currency: 'CNY', total: 29.06 },
+    };
+    expect(formatProviderLines(state, THRESHOLDS, now)).toEqual([
+      { text: 'DeepSeek  ¥29.06', level: 'fresh' },
+    ]);
   });
 
   it('未配置是灰的，鉴权失败是红的', () => {
-    expect(formatProviderLine({ ...base, id: 'mimo', name: 'MiMo', error: 'no_token' }, 8, THRESHOLDS, now))
-      .toEqual({ text: 'MiMo     － 未配置', level: 'muted' });
-    expect(formatProviderLine({ ...base, error: '鉴权失败' }, 8, THRESHOLDS, now).level).toBe('danger');
+    expect(formatProviderLines({ ...base, id: 'mimo', name: 'MiMo', error: 'no_token' }, THRESHOLDS, now))
+      .toEqual([{ text: 'MiMo  － 未配置', level: 'muted' }]);
+    expect(
+      formatProviderLines({ ...base, error: '鉴权失败' }, THRESHOLDS, now)[0].level,
+    ).toBe('danger');
+  });
+
+  it('没有窗口也不是错误时显示占位短横', () => {
+    expect(formatProviderLines(base, THRESHOLDS, now)).toEqual([{ text: 'Kimi  －', level: 'muted' }]);
   });
 });

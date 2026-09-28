@@ -53,13 +53,6 @@ export function clamp(percent: number): number {
   return Math.max(0, Math.min(100, n));
 }
 
-/** 5 格条形：█ 已用 / ░ 剩余，越宽 = 越接近上限 */
-export function formatBar(percent: number, width = 5): string {
-  const filled = Math.round((clamp(percent) / 100) * width);
-  const head = Math.max(0, Math.min(width, filled));
-  return '█'.repeat(head) + '░'.repeat(width - head);
-}
-
 export function formatPercent(percent: number): string {
   return `${Math.round(clamp(percent))}%`;
 }
@@ -105,7 +98,7 @@ export function errorLabel(error: string): string {
   return error === 'no_token' ? '未配置' : error;
 }
 
-/** 取已用 % 最大的窗口作为主数字（并列时保留靠前的） */
+/** 取已用 % 最大的窗口（并列时保留靠前的）。用于给「每家的标题行」着色 */
 export function pickPrimary(windows: WindowView[]): WindowView | null {
   let best: WindowView | null = null;
   for (const w of windows) {
@@ -121,28 +114,61 @@ export function formatHeader(updatedAt: number | null, now: number): string {
   return `用量  刷新 ${age}`;
 }
 
-export function formatProviderLine(
+/** 一行渲染结果：文本 + 该行的告警档位 */
+export interface RenderedLine {
+  text: string;
+  level: Level;
+}
+
+/** 窗口标签固定 2 列显示宽度（5h / 周 / 月），百分比右对齐 4 列 */
+const LABEL_WIDTH = 2;
+const PERCENT_WIDTH = 4;
+
+function formatWindowLine(window: WindowView, now: number): string {
+  const parts = [
+    `  ${padToWidth(window.label, LABEL_WIDTH)}`,
+    formatPercent(window.percent).padStart(PERCENT_WIDTH),
+  ];
+  const reset = formatCountdown(window.resetTime, now);
+  if (reset) parts.push(reset);
+  return parts.join('  ');
+}
+
+/**
+ * 把一个 provider 渲染成若干行（每家多行展开）：
+ * - 出错：一行「名称  － 原因」
+ * - 余额型：一行「名称  金额」（只有一项数据，不套标题行）
+ * - 百分比型：标题行「名称」（按最紧的窗口着色）+ 每个窗口一行「  标签  百分比  倒计时」
+ */
+export function formatProviderLines(
   state: ProviderState,
-  nameWidth: number,
   thresholds: { warn: number; danger: number },
   now: number,
-): { text: string; level: Level } {
-  const name = padToWidth(state.name, nameWidth);
-
+): RenderedLine[] {
   if (state.error) {
     const label = errorLabel(state.error);
-    return { text: `${name} － ${label}`, level: state.error === 'no_token' ? 'muted' : 'danger' };
+    return [{ text: `${state.name}  － ${label}`, level: state.error === 'no_token' ? 'muted' : 'danger' }];
   }
 
   if (state.balance) {
-    return { text: `${name} ${formatMoney(state.balance.currency, state.balance.total)}`, level: 'fresh' };
+    return [
+      {
+        text: `${state.name}  ${formatMoney(state.balance.currency, state.balance.total)}`,
+        level: 'fresh',
+      },
+    ];
   }
 
-  const main = pickPrimary(state.windows);
-  if (!main) return { text: `${name} －`, level: 'muted' };
+  if (state.windows.length === 0) {
+    return [{ text: `${state.name}  －`, level: 'muted' }];
+  }
 
-  const parts = [formatBar(main.percent), formatPercent(main.percent), main.label];
-  const reset = formatCountdown(main.resetTime, now);
-  if (reset) parts.push(reset);
-  return { text: `${name} ${parts.join(' ')}`, level: levelFor(main.percent, thresholds) };
+  const tightest = pickPrimary(state.windows);
+  const lines: RenderedLine[] = [
+    { text: state.name, level: tightest ? levelFor(tightest.percent, thresholds) : 'muted' },
+  ];
+  for (const window of state.windows) {
+    lines.push({ text: formatWindowLine(window, now), level: levelFor(window.percent, thresholds) });
+  }
+  return lines;
 }
