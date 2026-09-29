@@ -3,16 +3,16 @@ import {
   displayWidth,
   errorLabel,
   formatCountdown,
-  formatHeader,
+  formatFreshness,
   formatMoney,
   formatPercent,
-  formatProviderLines,
   levelFor,
+  padLeft,
   padToWidth,
   pickPrimary,
   truncateToWidth,
 } from './format';
-import type { ProviderState } from './types';
+import type { WindowView } from './types';
 
 const THRESHOLDS = { warn: 50, danger: 80 };
 
@@ -27,6 +27,16 @@ describe('displayWidth / padToWidth / truncateToWidth', () => {
     expect(padToWidth('火山', 8)).toBe('火山    ');
     expect(padToWidth('MiniMax', 8)).toBe('MiniMax ');
     expect(padToWidth('Kimi', 8)).toBe('Kimi    ');
+  });
+
+  it('padToWidth 补右边，padLeft 补左边（右对齐数字列用后者）', () => {
+    expect(padToWidth('5%', 4)).toBe('5%  ');
+    expect(padLeft('5%', 4)).toBe('  5%');
+    expect(padLeft('100%', 4)).toBe('100%');
+  });
+
+  it('padLeft 超宽时截断而不是补负数空格', () => {
+    expect(padLeft('DeepSeek', 4)).toBe('Dee…');
   });
 
   it('超宽时截断并加省略号，总宽度不超过目标', () => {
@@ -46,6 +56,11 @@ describe('formatPercent / levelFor', () => {
     expect(formatPercent(62.4)).toBe('62%');
     expect(formatPercent(-5)).toBe('0%');
     expect(formatPercent(140)).toBe('100%');
+  });
+
+  it('百分比恒被 clamp 到 0-100，最多 3 位数字（无千分位）', () => {
+    expect(formatPercent(100)).toBe('100%');
+    expect(formatPercent(1000)).toBe('100%');
   });
 
   it('阈值用严格大于判定', () => {
@@ -103,107 +118,31 @@ describe('pickPrimary', () => {
   it('空数组返回 null', () => {
     expect(pickPrimary([])).toBeNull();
   });
+
+  it('并列时保留靠前的窗口', () => {
+    const windows: WindowView[] = [
+      { label: '5h', percent: 62, resetTime: null },
+      { label: '周', percent: 62, resetTime: null },
+    ];
+    expect(pickPrimary(windows)?.label).toBe('5h');
+  });
 });
 
-describe('formatHeader', () => {
+describe('formatFreshness', () => {
   const now = Date.parse('2026-09-28T12:00:00Z');
 
   it('没有更新时间时显示拉取中', () => {
-    expect(formatHeader(null, now)).toBe('用量  拉取中…');
+    expect(formatFreshness(null, now)).toBe('拉取中…');
   });
 
-  it('按分钟/小时显示新鲜度', () => {
-    expect(formatHeader(now - 30_000, now)).toBe('用量  刷新 刚刚');
-    expect(formatHeader(now - 2 * 60_000, now)).toBe('用量  刷新 2m前');
-    expect(formatHeader(now - 3 * 3_600_000, now)).toBe('用量  刷新 3h前');
-  });
-});
-
-describe('formatProviderLines', () => {
-  const now = Date.parse('2026-09-28T12:00:00Z');
-  const base: ProviderState = {
-    id: 'kimi',
-    name: 'Kimi',
-    windows: [],
-    balance: null,
-    error: null,
-    lastUpdated: null,
-  };
-
-  it('Kimi 双窗口：标题行 + 每个周期一行，都带百分比与倒计时', () => {
-    const state: ProviderState = {
-      ...base,
-      windows: [
-        { label: '5h', percent: 18, resetTime: '2026-09-28T12:27:00Z' },
-        { label: '周', percent: 31, resetTime: '2026-09-30T12:00:00Z' },
-      ],
-    };
-    expect(formatProviderLines(state, THRESHOLDS, now)).toEqual([
-      { text: 'Kimi', level: 'fresh' },
-      { text: '  5h   18%  27m', level: 'fresh' },
-      { text: '  周   31%  2d', level: 'fresh' },
-    ]);
+  it('按分钟/小时显示新鲜度（不含「用量」前缀，交给 flex 撑开）', () => {
+    expect(formatFreshness(now - 30_000, now)).toBe('刚刚');
+    expect(formatFreshness(now - 2 * 60_000, now)).toBe('2m 前');
+    expect(formatFreshness(now - 3 * 3_600_000, now)).toBe('3h 前');
   });
 
-  it('标题行按最紧（已用 % 最高）的窗口着色', () => {
-    const state: ProviderState = {
-      ...base,
-      windows: [
-        { label: '5h', percent: 18, resetTime: null },
-        { label: '周', percent: 62, resetTime: null },
-      ],
-    };
-    const lines = formatProviderLines(state, THRESHOLDS, now);
-    expect(lines[0]).toEqual({ text: 'Kimi', level: 'warn' });
-    expect(lines[1].level).toBe('fresh');
-    expect(lines[2].level).toBe('warn');
-  });
-
-  it('三窗口（火山）会渲染成 4 行，标签对齐、百分比右对齐', () => {
-    const state: ProviderState = {
-      ...base,
-      id: 'volcengine',
-      name: '火山',
-      windows: [
-        { label: '5h', percent: 13, resetTime: null },
-        { label: '周', percent: 4, resetTime: null },
-        { label: '月', percent: 100, resetTime: null },
-      ],
-    };
-    const lines = formatProviderLines(state, THRESHOLDS, now);
-    expect(lines.map((l) => l.text)).toEqual(['火山', '  5h   13%', '  周    4%', '  月  100%']);
-    expect(lines[3].level).toBe('danger');
-  });
-
-  it('没有重置时间时不输出倒计时', () => {
-    const state: ProviderState = {
-      ...base,
-      windows: [{ label: '5h', percent: 18, resetTime: null }],
-    };
-    expect(formatProviderLines(state, THRESHOLDS, now)[1].text).toBe('  5h   18%');
-  });
-
-  it('余额型只有一行：名称 + 金额', () => {
-    const state: ProviderState = {
-      ...base,
-      id: 'deepseek',
-      name: 'DeepSeek',
-      balance: { currency: 'CNY', total: 29.06 },
-    };
-    expect(formatProviderLines(state, THRESHOLDS, now)).toEqual([
-      { text: 'DeepSeek  ¥29.06', level: 'fresh' },
-    ]);
-  });
-
-  it('未配置是灰的，鉴权失败是红的', () => {
-    expect(formatProviderLines({ ...base, id: 'mimo', name: 'MiMo', error: 'no_token' }, THRESHOLDS, now))
-      .toEqual([{ text: 'MiMo  － 未配置', level: 'muted' }]);
-    expect(
-      formatProviderLines({ ...base, error: '鉴权失败' }, THRESHOLDS, now)[0].level,
-    ).toBe('danger');
-  });
-
-  it('没有窗口也不是错误时显示占位短横', () => {
-    expect(formatProviderLines(base, THRESHOLDS, now)).toEqual([{ text: 'Kimi  －', level: 'muted' }]);
+  it('未来时间不会显示负数', () => {
+    expect(formatFreshness(now + 60_000, now)).toBe('刚刚');
   });
 });
+

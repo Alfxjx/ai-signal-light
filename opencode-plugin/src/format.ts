@@ -1,4 +1,4 @@
-import type { ProviderState, WindowView } from './types';
+import type { WindowView } from './types';
 
 export type Level = 'fresh' | 'warn' | 'danger' | 'muted';
 
@@ -47,12 +47,20 @@ export function padToWidth(text: string, width: number): string {
   return gap > 0 ? trimmed + ' '.repeat(gap) : trimmed;
 }
 
+/** 左补齐（右对齐用）。数字列必须右对齐，否则位数一变整列就跳 */
+export function padLeft(text: string, width: number): string {
+  const trimmed = truncateToWidth(text, width);
+  const gap = width - displayWidth(trimmed);
+  return gap > 0 ? ' '.repeat(gap) + trimmed : trimmed;
+}
+
 export function clamp(percent: number): number {
   const n = Number(percent);
   if (!Number.isFinite(n)) return 0;
   return Math.max(0, Math.min(100, n));
 }
 
+// 百分比恒被 clamp 到 0-100，所以最多 3 位数字，不需要千分位分隔。
 export function formatPercent(percent: number): string {
   return `${Math.round(clamp(percent))}%`;
 }
@@ -107,68 +115,12 @@ export function pickPrimary(windows: WindowView[]): WindowView | null {
   return best;
 }
 
-export function formatHeader(updatedAt: number | null, now: number): string {
-  if (updatedAt === null) return '用量  拉取中…';
+/** 表头右侧的新鲜度（不含「用量」前缀）—— 前缀与它之间由 flex 弹性空间撑开 */
+export function formatFreshness(updatedAt: number | null, now: number): string {
+  if (updatedAt === null) return '拉取中…';
   const mins = Math.max(0, Math.floor((now - updatedAt) / 60_000));
-  const age = mins < 1 ? '刚刚' : mins < 60 ? `${mins}m前` : `${Math.floor(mins / 60)}h前`;
-  return `用量  刷新 ${age}`;
+  if (mins < 1) return '刚刚';
+  if (mins < 60) return `${mins}m 前`;
+  return `${Math.floor(mins / 60)}h 前`;
 }
 
-/** 一行渲染结果：文本 + 该行的告警档位 */
-export interface RenderedLine {
-  text: string;
-  level: Level;
-}
-
-/** 窗口标签固定 2 列显示宽度（5h / 周 / 月），百分比右对齐 4 列 */
-const LABEL_WIDTH = 2;
-const PERCENT_WIDTH = 4;
-
-function formatWindowLine(window: WindowView, now: number): string {
-  const parts = [
-    `  ${padToWidth(window.label, LABEL_WIDTH)}`,
-    formatPercent(window.percent).padStart(PERCENT_WIDTH),
-  ];
-  const reset = formatCountdown(window.resetTime, now);
-  if (reset) parts.push(reset);
-  return parts.join('  ');
-}
-
-/**
- * 把一个 provider 渲染成若干行（每家多行展开）：
- * - 出错：一行「名称  － 原因」
- * - 余额型：一行「名称  金额」（只有一项数据，不套标题行）
- * - 百分比型：标题行「名称」（按最紧的窗口着色）+ 每个窗口一行「  标签  百分比  倒计时」
- */
-export function formatProviderLines(
-  state: ProviderState,
-  thresholds: { warn: number; danger: number },
-  now: number,
-): RenderedLine[] {
-  if (state.error) {
-    const label = errorLabel(state.error);
-    return [{ text: `${state.name}  － ${label}`, level: state.error === 'no_token' ? 'muted' : 'danger' }];
-  }
-
-  if (state.balance) {
-    return [
-      {
-        text: `${state.name}  ${formatMoney(state.balance.currency, state.balance.total)}`,
-        level: 'fresh',
-      },
-    ];
-  }
-
-  if (state.windows.length === 0) {
-    return [{ text: `${state.name}  －`, level: 'muted' }];
-  }
-
-  const tightest = pickPrimary(state.windows);
-  const lines: RenderedLine[] = [
-    { text: state.name, level: tightest ? levelFor(tightest.percent, thresholds) : 'muted' },
-  ];
-  for (const window of state.windows) {
-    lines.push({ text: formatWindowLine(window, now), level: levelFor(window.percent, thresholds) });
-  }
-  return lines;
-}

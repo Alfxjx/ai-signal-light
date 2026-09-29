@@ -1,9 +1,11 @@
 import { Plugin } from '@opencode/plugin/tui';
-import { For, createSignal } from 'solid-js';
+import type { RGBA } from '@opentui/core';
+import { For, Switch, Match, createSignal } from 'solid-js';
 import { loadConfig, DEFAULT_THRESHOLDS } from './config';
 import type { RawAppConfig, Thresholds } from './config';
-import { formatHeader, formatProviderLines } from './format';
-import type { Level } from './format';
+import { layoutPlan, providerMark, BAR_DOTS, DOT_EMPTY, DOT_FILLED, LABEL_WIDTH } from './layout';
+import type { RenderedBlock, LayoutInput, Level } from './layout';
+import { clamp } from './format';
 import { enabledProviders } from './providers/index';
 import type { ProviderDefinition } from './providers/index';
 import type { ProviderId, ProviderResult, ProviderState } from './types';
@@ -14,17 +16,37 @@ const REFRESH_MS = 5 * 60 * 1000;
 const MAX_BACKOFF_MS = 30 * 60 * 1000;
 /** 重绘「刷新 Xm前」的节拍 */
 const TICK_MS = 30 * 1000;
-const COMMAND_ID = 'usage.refresh';
+const REFRESH_COMMAND_ID = 'usage.refresh';
+const TOGGLE_COMMAND_ID = 'usage.toggle';
+
+/**
+ * 纵向留白：窗口行不加（`5h / 周 / 月` 属于同一家，紧贴成块）；
+ * 每家标题行上方留 1 行空行，于是「家与家之间」自然分隔开。
+ * 想更松：PROVIDER_GAP 改 2；想全去掉：两个都改 0。
+ */
+const WINDOW_GAP = 0;
+const PROVIDER_GAP = 1;
+
+/**
+ * 供应商名前的竖色条 + 粗体。
+ * 色条承担「状态色」（按最紧窗口的档位），粗体承担「这是一组的标题」——
+ * 两者叠加才够起眼；去掉色条会失去状态信号，去掉粗体会退回成一堆等重文本行。
+ */
+const PROVIDER_MARK = '▌';
+
+/** 外框样式，与 `opencode-tokenwatch` 保持一致 */
+const BORDER_STYLE = 'rounded';
 
 interface Snapshot {
   updatedAt: number | null;
   configError: string | null;
   thresholds: Thresholds;
   providers: ProviderState[];
+  /** 折叠态：只显示表头 + 一行「最紧的一家」摘要 */
+  collapsed: boolean;
 }
 
-const EMPTY_STATE = (definition: ProviderDefinition): ProviderState => ({
-  id: definition.id,
+const EMPTY_STATE = (definition: ProviderDefinition): ProviderState => ({  id: definition.id,
   name: definition.name,
   windows: [],
   balance: null,
@@ -32,6 +54,153 @@ const EMPTY_STATE = (definition: ProviderDefinition): ProviderState => ({
   lastUpdated: null,
 });
 
+type HeaderBlock = Extract<RenderedBlock, { kind: 'header' }>;
+type ProviderHeadBlock = Extract<RenderedBlock, { kind: 'providerHead' }>;
+type BalanceBlock = Extract<RenderedBlock, { kind: 'balance' }>;
+type NoteBlock = Extract<RenderedBlock, { kind: 'note' }>;
+type WindowBlock = Extract<RenderedBlock, { kind: 'window' }>;
+
+/** 类型收窄用：把联合类型按 kind 缩到具体成员，<Match> 里 TS 才能识别字段 */
+function asKind<K extends RenderedBlock['kind']>(
+  block: RenderedBlock,
+  kind: K,
+): Extract<RenderedBlock, { kind: K }> | undefined {
+  return block.kind === kind ? (block as Extract<RenderedBlock, { kind: K }>) : undefined;
+}
+
+interface BlockViewProps {
+  block: RenderedBlock;
+  colorFor: (level: Level) => RGBA;
+  trackColor: RGBA;
+  /** 表头点击 = 折叠 / 展开 */
+  onToggle: () => void;
+}
+
+/**
+ * 点阵进度条。
+ *
+ * 不用实心背景色，而是画一串圆点，让父盒**裁剪**出可见部分：
+ * - 外层 `flexBasis={0} + flexGrow={1}` —— 从 0 开始长到满，**忽略 256 个点的固有宽度**
+ * - 内层 `overflow="hidden"` —— 超出部分被裁掉，于是「撑多宽」完全由布局引擎说了算，
+ *   不需要知道侧边栏有多宽
+ * - 填充层绝对定位 + `width={percent}%`，盖在空槽层上，得到已用部分
+ */
+function Meter(props: { percent: number; fill: RGBA; empty: RGBA }) {
+  return (
+    <box flexBasis={0} flexGrow={1} flexShrink={1} height={1} overflow="hidden">
+      <box width="100%" height={1} overflow="hidden">
+        <text fg={props.empty}>{DOT_EMPTY.repeat(BAR_DOTS)}</text>
+      </box>
+      <box position="absolute" left={0} top={0} height={1} width={`${clamp(props.percent)}%`} overflow="hidden">
+        <text fg={props.fill}>{DOT_FILLED.repeat(BAR_DOTS)}</text>
+      </box>
+    </box>
+  );
+}
+
+/**
+ * 把 layout 决策翻译成 yoga 布局。
+ *
+ * 列宽分工：
+ * - 标签 / 百分比 / 倒计时：layout 已按本轮最大位数算好并补齐空格，
+ *   这里直接用字符串长度当 box 宽度 → 固定列宽，右边缘连成直线
+ * - 进度条：`Meter` 独占剩余空间
+ * 空间不够时靠 flexShrink 依次让步（先压进度条，再压倒计时），
+ * 标签和百分比永远不被压掉。
+ */
+function BlockView(props: BlockViewProps) {
+  return (
+    <Switch>
+      {/* 表头：三角 + 「用量」在左，新鲜度被弹性空间推到最右。
+          onMouseDown 挂在这个 box 上（而不是里面的 text），
+          点击热区才能横跨整行宽度 —— 参照 opencode-tokenwatch 的做法。 */}
+      <Match when={asKind(props.block, 'header')}>
+        {(b: () => HeaderBlock) => (
+          <box flexDirection="row" width="100%" onMouseDown={props.onToggle}>
+            <box flexShrink={0}>
+              <text fg={props.colorFor(b().collapsed ? 'muted' : 'fresh')}>
+                <b>{b().left}</b>
+              </text>
+            </box>
+            <box flexGrow={1} />
+            <box flexShrink={0}>
+              <text fg={props.colorFor('muted')}>{b().right}</text>
+            </box>
+          </box>
+        )}
+      </Match>
+
+      {/* provider 标题行：色条 + 粗体名。色条占满 LABEL_WIDTH 宽，
+          于是供应商名的左边缘和下面 `5h / 周 / 月` 的左边缘严格对齐。 */}
+      <Match when={asKind(props.block, 'providerHead')}>
+        {(b: () => ProviderHeadBlock) => (
+          <box flexDirection="row" width="100%" marginTop={PROVIDER_GAP}>
+            <box flexShrink={0} width={LABEL_WIDTH}>
+              <text fg={props.colorFor(b().level)}>
+                <b>{providerMark(PROVIDER_MARK)}</b>
+              </text>
+            </box>
+            <text fg={props.colorFor(b().level)}>
+              <b>{b().name}</b>
+            </text>
+          </box>
+        )}
+      </Match>
+
+      {/* 余额型：名称在左、金额被弹性空间推到最右，与百分比型结构不同 */}
+      <Match when={asKind(props.block, 'balance')}>
+        {(b: () => BalanceBlock) => (
+          <box flexDirection="row" width="100%" marginTop={PROVIDER_GAP}>
+            <box flexShrink={0} width={LABEL_WIDTH}>
+              <text fg={props.colorFor(b().level)}>
+                <b>{providerMark(PROVIDER_MARK)}</b>
+              </text>
+            </box>
+            <box flexShrink={0}>
+              <text fg={props.colorFor(b().level)}>
+                <b>{b().name}</b>
+              </text>
+            </box>
+            <box flexGrow={1} />
+            <box flexShrink={0}>
+              <text fg={props.colorFor(b().level)}>{b().amount}</text>
+            </box>
+          </box>
+        )}
+      </Match>
+
+      {/* 错误 / configError：整行一条，不需要分列 */}
+      <Match when={asKind(props.block, 'note')}>
+        {(b: () => NoteBlock) => (
+          <box flexDirection="column" width="100%" marginTop={PROVIDER_GAP}>
+            <text fg={props.colorFor(b().level)}>{b().text}</text>
+          </box>
+        )}
+      </Match>
+
+      {/* 窗口行：标签 | 点阵进度条 | 百分比 | 倒计时。marginBottom 较小，组内紧凑 */}
+      <Match when={asKind(props.block, 'window')}>
+        {(b: () => WindowBlock) => (
+          <box flexDirection="row" width="100%" gap={1} marginBottom={WINDOW_GAP}>
+            <box flexShrink={0} width={LABEL_WIDTH}>
+              <text fg={props.colorFor(b().level)}>{b().label}</text>
+            </box>
+            <Meter percent={b().percent} fill={props.colorFor(b().level)} empty={props.trackColor} />
+            {/* 宽度 = 补齐后的字符串长度，这就是那一列的固定宽度 */}
+            <box flexShrink={0} width={b().percentText.length}>
+              <text fg={props.colorFor(b().level)}>{b().percentText}</text>
+            </box>
+            {b().resetText ? (
+              <box flexShrink={0} width={b().resetText.length}>
+                <text fg={props.colorFor('muted')}>{b().resetText}</text>
+              </box>
+            ) : null}
+          </box>
+        )}
+      </Match>
+    </Switch>
+  );
+}
 export default Plugin.define({
   id: PLUGIN_ID,
   setup(context) {
@@ -42,6 +211,8 @@ export default Plugin.define({
         thresholds: { ...DEFAULT_THRESHOLDS },
         // 首屏还不知道哪些 provider 被启用，先空着；第一轮刷新后填充
         providers: [],
+        // 默认展开：用量是常驻信息，折叠交给用户主动切
+        collapsed: false,
       },
     });
 
@@ -122,19 +293,54 @@ export default Plugin.define({
       return context.theme.text.feedback.success.base;
     };
 
+    /** 进度条 track 恒为 muted，fill 用 level 色 —— 对比由「灰 vs 亮色」承担 */
+    const trackColor = context.theme.text.muted;
+
+    const planInput = (): LayoutInput => ({
+      updatedAt: snapshot.updatedAt,
+      configError: snapshot.configError,
+      thresholds: snapshot.thresholds,
+      providers: snapshot.providers,
+      now: now(),
+      collapsed: snapshot.collapsed,
+    });
+
+    /** 点击表头与快捷键 / 斜杠命令共用这一个入口，避免两处逻辑漂移 */
+    const toggleCollapsed = async (notify: boolean): Promise<void> => {
+      let next = false;
+      await updateSnapshot((draft) => {
+        draft.collapsed = !draft.collapsed;
+        next = draft.collapsed;
+      });
+      if (notify) {
+        context.ui.toast.show({
+          message: next ? '已折叠用量侧边栏' : '已展开用量侧边栏',
+          duration: 1500,
+        });
+      }
+    };
+
     const unclaim = context.ui.slot({
       append: 'sidebar.content',
       render: () => (
-        <box flexDirection="column">
-          <text fg={context.theme.text.base}>{formatHeader(snapshot.updatedAt, now())}</text>
-          {snapshot.configError ? (
-            <text fg={context.theme.text.feedback.error.base}>{snapshot.configError}</text>
-          ) : null}
-          <For each={snapshot.providers}>
-            {(state) => (
-              <For each={formatProviderLines(state, snapshot.thresholds, now())}>
-                {(line) => <text fg={colorFor(line.level)}>{line.text}</text>}
-              </For>
+        // 外框：圆角 + 主题边框色，把整块用量和侧边栏其它内容视觉隔离。
+        // paddingX 是必需的 —— 边框吃掉左右各 1 列，不留白的话文字会贴在线上。
+        <box
+          flexDirection="column"
+          width="100%"
+          border={true}
+          borderStyle={BORDER_STYLE}
+          borderColor={context.theme.border.base}
+          paddingX={1}
+        >
+          <For each={layoutPlan(planInput())}>
+            {(block) => (
+              <BlockView
+                block={block}
+                colorFor={colorFor}
+                trackColor={trackColor}
+                onToggle={() => void toggleCollapsed(false)}
+              />
             )}
           </For>
         </box>
@@ -150,7 +356,7 @@ export default Plugin.define({
           mode: 'global',
           commands: [
             {
-              id: COMMAND_ID,
+              id: REFRESH_COMMAND_ID,
               title: '刷新供应商用量',
               description: '立即重新拉取 Kimi / MiniMax / 火山 / DeepSeek / MiMo 用量',
               group: '用量',
@@ -167,8 +373,18 @@ export default Plugin.define({
                 });
               },
             },
+            {
+              id: TOGGLE_COMMAND_ID,
+              title: '折叠 / 展开用量侧边栏',
+              description: '折叠后只保留一行「最紧的一家」摘要',
+              group: '用量',
+              bind: 'ctrl+alt+y',
+              palette: true,
+              slash: { name: 'usage-toggle' },
+              run: () => toggleCollapsed(true),
+            },
           ],
-          bindings: [COMMAND_ID],
+          bindings: [REFRESH_COMMAND_ID, TOGGLE_COMMAND_ID],
         }));
         return null;
       },
@@ -185,3 +401,5 @@ export default Plugin.define({
     };
   },
 });
+
+

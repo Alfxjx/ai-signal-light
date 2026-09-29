@@ -7,6 +7,17 @@
 - 关联：相关模块/文件
 -->
 
+
+## [opencode-usage-sidebar-redesign](plans/opencode-usage-sidebar-redesign.md) | [history](history/opencode-usage-sidebar-redesign.md)
+- 时间：2026-09-29
+- 范围：把 opencode TUI 用量侧边栏从「裸文本 + 手工列宽」改成 yoga flexbox 布局 + 加回进度条 + 新增可折叠栏；**侧边栏宽度不能自己测（会量到脏值导致进度条消失），一律交给布局引擎**
+- 涉及：`opencode-plugin/src/{format,layout,tui}.ts(x)` + 各自 `.test.ts`、`opencode-plugin/README.md`
+
+## [zhipu-glm-coding-plan-provider](plans/zhipu-glm-coding-plan-provider.md) ⏸️ 待开发
+- 时间：2026-09-29
+- 范围：**调研存档（未开工）**：智谱 GLM Coding Plan 额度查询接口形态（端点/鉴权/响应字段/解析坑）、未订阅时的行为盲区、开发前待验证清单与实施计划草案
+- 关联：`.vibe-harness/plans/zhipu-glm-coding-plan-provider.md`、`src/main/usage-monitor.ts`、`src/shared/types/usage.ts`
+
 ## [opencode-usage-sidebar](plans/opencode-usage-sidebar.md) | [history](history/opencode-usage-sidebar.md)
 - 时间：2026-09-28
 - 范围：新增 opencode TUI 侧边栏插件（独立 npm 包 opencode-plugin/），显示 Kimi/MiniMax/火山/DeepSeek/MiMo 五家用量；凭据只读 %APPDATA%\AI状态监控\config.json；5 分钟轮询 + 失败退避 + 手动刷新
@@ -150,3 +161,4 @@
 - 时间：2026-06-18
 - 范围：electron-builder files 漏声明 `dist/shared/**/*`，打包后主进程 require `../shared/constants` 失败；追加该 glob 修复
 - 关联：`package.json`
+
