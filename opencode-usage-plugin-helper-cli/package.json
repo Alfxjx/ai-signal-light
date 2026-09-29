@@ -1,0 +1,21 @@
+{
+  "name": "opencode-usage-plugin-helper-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "opencode 用量侧边栏插件的配置助手：init / set / doctor / install",
+  "bin": {
+    "usage-helper": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^3.0.0"
+  }
+}
