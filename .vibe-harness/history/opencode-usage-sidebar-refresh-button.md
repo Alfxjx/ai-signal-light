@@ -97,6 +97,21 @@
   `Kimi ⟳ － 鉴权失败`；`configError` 仍无 `name` / `id`，整行直接铺满。
 - `layout.test.ts` 相应更新两条 note 断言（补 `name`、`text` 去掉名字）。
 
+## 第四轮：单家刷新也弹 toast（带供应商名）
+
+用户要求：单家刷新也要 toast，并且要显示刷了哪一家；同时问了 opencode 多 toast 的行为。
+
+- `refreshOne` 完成后弹 toast：成功 `已刷新 <名字>`（success），失败 `<名字> <原因>`（warning，
+  原因用 `format.errorLabel`，`no_token` → `未配置`）。
+- 之前文档/注释写的「不弹 toast」已全部改正（README + 本文件第二轮段落 + 代码注释）。
+- README 补充了宿主 toast 行为说明（一次一条、FIFO、`+N more`、hover 暂停、空队列时新条替换旧条）。
+
+### 扒出来的 opencode toast 逻辑（v2.0.14，来自 bin/opencode.exe 里的 `FK()`）
+- 同一时刻只显示 **1 条**，其余进 `queue`，视图渲染 `+N more`。
+- `show()` 条件：`if(currentToast && (paused || queue.length>0)) → 入队；否则直接替换当前条`。
+- `duration` 默认 **5000ms**；hover 调 `pause()`（扣掉已过时间），移开 `resume()`。
+- 这是宿主行为，插件只能 `show()`，无法自定义排队策略。
+
 ## 未做
 - 没做旋转动画（终端逐帧代价高），忙碌态只用「变灰」表达。
 - 没给按钮加 hover 高亮（opentui 有 `onMouseOver`，但当前风格未使用）。

@@ -5,7 +5,7 @@ import { loadConfig, DEFAULT_THRESHOLDS } from './config';
 import type { RawAppConfig, Thresholds } from './config';
 import { layoutPlan, providerMark, BAR_DOTS, DOT_EMPTY, DOT_FILLED, LABEL_WIDTH } from './layout';
 import type { RenderedBlock, LayoutInput, Level } from './layout';
-import { clamp } from './format';
+import { clamp, errorLabel } from './format';
 import { enabledProviders } from './providers/index';
 import type { ProviderDefinition } from './providers/index';
 import type { ProviderId, ProviderResult, ProviderState } from './types';
@@ -395,7 +395,7 @@ export default Plugin.define({
     const singleFlight = new Map<ProviderId, Promise<void>>();
 
     /**
-     * 单家手动刷新：绕过退避，只重拉这一家并就地更新快照，不弹 toast（避免刷屏）。
+     * 单家手动刷新：绕过退避，只重拉这一家并就地更新快照，完成后弹一条带供应商名的 toast。
      * 刻意**不动 `updatedAt`** —— 表头的新鲜度代表「整份快照最后一次全量刷新」的时间，
      * 只刷一家的部分更新不该把它冒充成全量新鲜。
      */
@@ -411,6 +411,11 @@ export default Plugin.define({
         latest = latest.map((s) => (s.id === id ? state : s));
         await updateSnapshot((draft) => {
           draft.providers = latest;
+        });
+        context.ui.toast.show({
+          message: state.error ? `${state.name} ${errorLabel(state.error)}` : `已刷新 ${state.name}`,
+          variant: state.error ? 'warning' : 'success',
+          duration: 3000,
         });
       })();
       singleFlight.set(id, run);
