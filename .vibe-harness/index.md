@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [landing-update](plans/landing-update.md) | [history](history/landing-update.md)
+- 时间：2026-09-30
+- 范围：landing 整页重做为暗色仪表盘 / LED 风（9 段结构 + 6 个纯 CSS mock，删占位 PNG），README 按真实能力刷新（7 家 provider 鉴权表、脚本表、项目结构、Kimi web 检测原理）；分支 `landing-update`
+- 关联：`landing/**`、`README.md`
+
 ## [opencode-usage-sidebar-refresh-button](history/opencode-usage-sidebar-refresh-button.md)
 - 时间：2026-09-30
 - 范围：用量侧边栏刷新按钮：表头「用量」后一个（= `/usage`，刷新全部）+ 每个 provider 行右端一个（只刷该家）；拉取中变灰，点刷新不折叠（`stopPropagation`）
