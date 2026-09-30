@@ -9,7 +9,7 @@
 
 ## [opencode-usage-sidebar-refresh-button](history/opencode-usage-sidebar-refresh-button.md)
 - 时间：2026-09-30
-- 范围：用量侧边栏表头「用量」后加可点 `⟳` 刷新按钮（= `/usage`），拉取中变灰；点它只刷新不折叠（`stopPropagation`）
+- 范围：用量侧边栏刷新按钮：表头「用量」后一个（= `/usage`，刷新全部）+ 每个 provider 行右端一个（只刷该家）；拉取中变灰，点刷新不折叠（`stopPropagation`）
 - 关联：`opencode-plugin/src/{layout,layout.test,tui}.ts(x)`、`opencode-plugin/README.md`
 
 ## [opencode-usage-plugin-helper-cli](plans/opencode-usage-plugin-helper-cli.md) | [history](history/opencode-usage-plugin-helper-cli.md)

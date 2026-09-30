@@ -5,7 +5,6 @@ import {
   resetColumnWidth,
   COLLAPSED_GLYPH,
   EXPANDED_GLYPH,
-  REFRESH_GLYPH,
   DOT_EMPTY,
   DOT_FILLED,
   BAR_DOTS,
@@ -59,15 +58,9 @@ describe('表头', () => {
     expect(plan([kimiTwoWindows])[0]).toEqual({
       kind: 'header',
       left: `${EXPANDED_GLYPH} 用量`,
-      refresh: REFRESH_GLYPH,
       right: '2m 前',
       collapsed: false,
     });
-  });
-
-  it('表头带刷新按钮字形，折叠态也保留（随时能手动刷新）', () => {
-    expect(plan([kimiTwoWindows])[0]).toMatchObject({ refresh: REFRESH_GLYPH });
-    expect(plan([], { collapsed: true })[0]).toMatchObject({ refresh: REFRESH_GLYPH });
   });
 
   it('折叠态三角换成 ▸', () => {
@@ -126,6 +119,7 @@ describe('展开态：结构', () => {
     const deepseek = base({ id: 'deepseek', name: 'DeepSeek', balance: { currency: 'CNY', total: 29.06 } });
     expect(plan([deepseek])[1]).toEqual({
       kind: 'balance',
+      id: 'deepseek',
       name: 'DeepSeek',
       amount: '¥29.06',
       level: 'fresh',
@@ -160,7 +154,7 @@ describe('展开态：档位', () => {
       ],
     });
     const [, head, w5h, week] = plan(state ? [state] : []);
-    expect(head).toEqual({ kind: 'providerHead', name: 'Kimi', level: 'warn' });
+    expect(head).toEqual({ kind: 'providerHead', id: 'kimi', name: 'Kimi', level: 'warn' });
     expect((w5h as { level: string }).level).toBe('fresh');
     expect((week as { level: string }).level).toBe('warn');
   });
@@ -173,7 +167,7 @@ describe('展开态：档位', () => {
   });
 
   it('没有窗口也没有错误时标题行带占位短横', () => {
-    expect(plan([base()])[1]).toEqual({ kind: 'providerHead', name: 'Kimi  －', level: 'muted' });
+    expect(plan([base()])[1]).toEqual({ kind: 'providerHead', id: 'kimi', name: 'Kimi  －', level: 'muted' });
   });
 });
 
@@ -181,14 +175,33 @@ describe('展开态：错误', () => {
   it('鉴权失败是红字，no_token 是灰字，都带原因', () => {
     const failed = base({ error: '鉴权失败' });
     const unconfigured = base({ id: 'mimo', name: 'MiMo', error: 'no_token' });
-    expect(plan([failed])[1]).toEqual({ kind: 'note', text: 'Kimi  － 鉴权失败', level: 'danger' });
-    expect(plan([unconfigured])[1]).toEqual({ kind: 'note', text: 'MiMo  － 未配置', level: 'muted' });
+    expect(plan([failed])[1]).toEqual({ kind: 'note', id: 'kimi', text: 'Kimi  － 鉴权失败', level: 'danger' });
+    expect(plan([unconfigured])[1]).toEqual({ kind: 'note', id: 'mimo', text: 'MiMo  － 未配置', level: 'muted' });
   });
 
   it('configError 插在表头之后、provider 之前', () => {
     const blocks = plan([kimiTwoWindows], { configError: 'config.json 读取失败' });
     expect(blocks[1]).toEqual({ kind: 'note', text: 'config.json 读取失败', level: 'danger' });
     expect(blocks[2].kind).toBe('providerHead');
+  });
+});
+
+describe('单家刷新按钮的挂载点（provider id）', () => {
+  it('百分比型：标题行带 provider id，窗口行不带', () => {
+    const blocks = plan([kimiTwoWindows]);
+    expect(blocks[1]).toMatchObject({ kind: 'providerHead', id: 'kimi' });
+    expect(blocks[2]).not.toHaveProperty('id');
+  });
+
+  it('余额型：行带 provider id', () => {
+    const b = base({ id: 'deepseek', name: 'DeepSeek', balance: { currency: 'CNY', total: 1 } });
+    expect(plan([b])[1]).toMatchObject({ kind: 'balance', id: 'deepseek' });
+  });
+
+  it('provider 的错误行带 id（可单独重试），configError 不带（没有对应 provider）', () => {
+    expect(plan([base({ error: '鉴权失败' })])[1]).toMatchObject({ kind: 'note', id: 'kimi' });
+    const cfg = plan([], { configError: 'config.json 读取失败' });
+    expect(cfg[1]).not.toHaveProperty('id');
   });
 });
 

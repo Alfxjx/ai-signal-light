@@ -5,7 +5,7 @@
 // `18%` 和 `100%` 天然对齐，且完全不依赖侧边栏有多宽。
 
 import type { Thresholds } from './config';
-import type { ProviderState } from './types';
+import type { ProviderId, ProviderState } from './types';
 import {
   errorLabel,
   formatCountdown,
@@ -29,13 +29,6 @@ export const COLLAPSED_GLYPH = '▶';
 export const EXPANDED_GLYPH = '▾';
 
 /**
- * 表头里的「刷新」按钮字形，紧跟在「用量」文字后面，点击立即重新拉取（见 tui.tsx）。
- * 它不参与任何列对齐，只是贴在标题右侧的一个可点热区，所以不必像色条那样按
- * 显示宽度补齐（`⟳` 属于 East-Asian Ambiguous，换字体会差 1 列，但不影响对齐）。
- */
-export const REFRESH_GLYPH = '⟳';
-
-/**
  * 点阵进度条的字符。填充用实心圆点、空槽用中点 —— 比实心色块轻，
  * 深色主题下不会糊成一片，且都是单宽字符（不会错位）。
  */
@@ -52,8 +45,8 @@ export const BAR_DOTS = 256;
 export const LABEL_WIDTH = 2;
 
 export type RenderedBlock =
-  | { kind: 'header'; left: string; refresh: string; right: string; collapsed: boolean }
-  | { kind: 'providerHead'; name: string; level: Level }
+  | { kind: 'header'; left: string; right: string; collapsed: boolean }
+  | { kind: 'providerHead'; id: ProviderId; name: string; level: Level }
   | {
       kind: 'window';
       label: string;
@@ -63,8 +56,8 @@ export type RenderedBlock =
       resetText: string;
       level: Level;
     }
-  | { kind: 'balance'; name: string; amount: string; level: Level }
-  | { kind: 'note'; text: string; level: Level };
+  | { kind: 'balance'; id: ProviderId; name: string; amount: string; level: Level }
+  | { kind: 'note'; id?: ProviderId; text: string; level: Level };
 
 export interface LayoutInput {
   updatedAt: number | null;
@@ -72,7 +65,7 @@ export interface LayoutInput {
   thresholds: Thresholds;
   providers: ProviderState[];
   now: number;
-  /** 折叠时只出表头 + 一行摘要 */
+  /** 折叠时只出表头 */
   collapsed: boolean;
 }
 
@@ -119,23 +112,23 @@ function providerBlocks(
 ): RenderedBlock[] {
   if (state.error) {
     return [
-      { kind: 'note', text: `${state.name}  － ${errorLabel(state.error)}`, level: state.error === 'no_token' ? 'muted' : 'danger' },
+      { kind: 'note', id: state.id, text: `${state.name}  － ${errorLabel(state.error)}`, level: state.error === 'no_token' ? 'muted' : 'danger' },
     ];
   }
 
   if (state.balance) {
     return [
-      { kind: 'balance', name: state.name, amount: formatMoney(state.balance.currency, state.balance.total), level: 'fresh' },
+      { kind: 'balance', id: state.id, name: state.name, amount: formatMoney(state.balance.currency, state.balance.total), level: 'fresh' },
     ];
   }
 
   const tightest = pickPrimary(state.windows);
   const headLevel: Level = tightest ? levelFor(tightest.percent, thresholds) : 'muted';
   if (state.windows.length === 0) {
-    return [{ kind: 'providerHead', name: `${state.name}  －`, level: headLevel }];
+    return [{ kind: 'providerHead', id: state.id, name: `${state.name}  －`, level: headLevel }];
   }
 
-  const blocks: RenderedBlock[] = [{ kind: 'providerHead', name: state.name, level: headLevel }];
+  const blocks: RenderedBlock[] = [{ kind: 'providerHead', id: state.id, name: state.name, level: headLevel }];
   for (const w of state.windows) {
     // 两列都右对齐到固定列宽，右边缘连成一条直线
     const reset = formatCountdown(w.resetTime, now);
@@ -157,7 +150,6 @@ export function layoutPlan(input: LayoutInput): RenderedBlock[] {
   const header: RenderedBlock = {
     kind: 'header',
     left: `${collapsed ? COLLAPSED_GLYPH : EXPANDED_GLYPH} 用量`,
-    refresh: REFRESH_GLYPH,
     right: formatFreshness(updatedAt, now),
     collapsed,
   };

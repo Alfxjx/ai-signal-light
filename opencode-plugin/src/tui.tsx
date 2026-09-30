@@ -34,6 +34,13 @@ const PROVIDER_GAP = 1;
  */
 const PROVIDER_MARK = '▌';
 
+/**
+ * 刷新按钮字形。表头「用量」后面一个，每个 provider 行的右端一个。
+ * 它不参与任何列对齐，只是右端的一个可点小格，所以不必像色条那样按显示宽度补齐
+ * （`⟳` 属于 East-Asian Ambiguous，换字体会差 1 列，但不影响任何对齐）。
+ */
+const REFRESH_GLYPH = '⟳';
+
 /** 外框样式，与 `opencode-tokenwatch` 保持一致 */
 const BORDER_STYLE = 'rounded';
 
@@ -42,7 +49,7 @@ interface Snapshot {
   configError: string | null;
   thresholds: Thresholds;
   providers: ProviderState[];
-  /** 折叠态：只显示表头 + 一行「最紧的一家」摘要 */
+  /** 折叠态：整个侧边栏只剩表头一行 */
   collapsed: boolean;
 }
 
@@ -74,8 +81,12 @@ interface BlockViewProps {
   trackColor: RGBA;
   /** 表头点击 = 折叠 / 展开 */
   onToggle: () => void;
-  /** 表头「刷新」按钮点击 = 立即重新拉取 */
+  /** 表头「刷新」按钮点击 = 重新拉取全部 provider */
   onRefresh: () => void;
+  /** 单个 provider 行的刷新按钮点击 = 只重拉这一家 */
+  onRefreshProvider: (id: ProviderId) => void;
+  /** 某个 provider 是否正在刷新（把它的刷新按钮压暗当忙碌指示） */
+  isRefreshing: (id: ProviderId) => boolean;
   /** 刷新进行中（把刷新按钮压暗当忙碌指示） */
   refreshing: boolean;
   /** 刷新按钮常态色：中性文字色，不和红/黄/绿状态色抢眼 */
@@ -105,6 +116,26 @@ function Meter(props: { percent: number; fill: RGBA; empty: RGBA }) {
 }
 
 /**
+ * 刷新按钮：一个「空格 + ⟳」的可点小格，表头与每个 provider 行共用。
+ * 一律 `stopPropagation()` —— 表头整行是可点的折叠热区，不拦住冒泡的话点刷新会顺手折叠；
+ * provider 行没有整行点击，拦一下也无害。
+ * 空闲用中性色，忙碌（该 provider 或全局刷新中）时压成 muted 作为指示。
+ */
+function RefreshCell(props: { active: boolean; mutedColor: RGBA; actionColor: RGBA; onRefresh: () => void }) {
+  return (
+    <box
+      flexShrink={0}
+      onMouseDown={(event) => {
+        event.stopPropagation();
+        props.onRefresh();
+      }}
+    >
+      <text fg={props.active ? props.mutedColor : props.actionColor}>{` ${REFRESH_GLYPH}`}</text>
+    </box>
+  );
+}
+
+/**
  * 把 layout 决策翻译成 yoga 布局。
  *
  * 列宽分工：
@@ -129,18 +160,13 @@ function BlockView(props: BlockViewProps) {
                 <b>{b().left}</b>
               </text>
             </box>
-            {/* 刷新按钮：热区 = 「空格 + 字形」两个格子，点它只刷新、不折叠 */}
-            <box
-              flexShrink={0}
-              onMouseDown={(event) => {
-                event.stopPropagation();
-                props.onRefresh();
-              }}
-            >
-              <text fg={props.refreshing ? props.colorFor('muted') : props.actionColor}>
-                {` ${b().refresh}`}
-              </text>
-            </box>
+            {/* 表头刷新按钮：点它只刷新、不折叠（RefreshCell 内部已 stopPropagation） */}
+            <RefreshCell
+              active={props.refreshing}
+              mutedColor={props.colorFor('muted')}
+              actionColor={props.actionColor}
+              onRefresh={props.onRefresh}
+            />
             <box flexGrow={1} />
             <box flexShrink={0}>
               <text fg={props.colorFor('muted')}>{b().right}</text>
@@ -150,7 +176,8 @@ function BlockView(props: BlockViewProps) {
       </Match>
 
       {/* provider 标题行：色条 + 粗体名。色条占满 LABEL_WIDTH 宽，
-          于是供应商名的左边缘和下面 `5h / 周 / 月` 的左边缘严格对齐。 */}
+          于是供应商名的左边缘和下面 `5h / 周 / 月` 的左边缘严格对齐。
+          右端一个单家刷新按钮（⟳）。 */}
       <Match when={asKind(props.block, 'providerHead')}>
         {(b: () => ProviderHeadBlock) => (
           <box flexDirection="row" width="100%" marginTop={PROVIDER_GAP}>
@@ -162,6 +189,13 @@ function BlockView(props: BlockViewProps) {
             <text fg={props.colorFor(b().level)}>
               <b>{b().name}</b>
             </text>
+            <box flexGrow={1} />
+            <RefreshCell
+              active={props.isRefreshing(b().id)}
+              mutedColor={props.trackColor}
+              actionColor={props.actionColor}
+              onRefresh={() => props.onRefreshProvider(b().id)}
+            />
           </box>
         )}
       </Match>
@@ -184,17 +218,37 @@ function BlockView(props: BlockViewProps) {
             <box flexShrink={0}>
               <text fg={props.colorFor(b().level)}>{b().amount}</text>
             </box>
+            <RefreshCell
+              active={props.isRefreshing(b().id)}
+              mutedColor={props.trackColor}
+              actionColor={props.actionColor}
+              onRefresh={() => props.onRefreshProvider(b().id)}
+            />
           </box>
         )}
       </Match>
 
-      {/* 错误 / configError：整行一条，不需要分列 */}
+      {/* 错误 / configError：整行一条；provider 错误行右端带单家刷新按钮（可单独重试），
+          configError 没有对应 provider，因而不带按钮。 */}
       <Match when={asKind(props.block, 'note')}>
-        {(b: () => NoteBlock) => (
-          <box flexDirection="column" width="100%" marginTop={PROVIDER_GAP}>
-            <text fg={props.colorFor(b().level)}>{b().text}</text>
-          </box>
-        )}
+        {(b: () => NoteBlock) => {
+          const id = b().id;
+          return (
+            <box flexDirection="row" width="100%" marginTop={PROVIDER_GAP}>
+              <box flexGrow={1} flexShrink={1}>
+                <text fg={props.colorFor(b().level)}>{b().text}</text>
+              </box>
+              {id ? (
+                <RefreshCell
+                  active={props.isRefreshing(id)}
+                  mutedColor={props.trackColor}
+                  actionColor={props.actionColor}
+                  onRefresh={() => props.onRefreshProvider(id)}
+                />
+              ) : null}
+            </box>
+          );
+        }}
       </Match>
 
       {/* 窗口行：标签 | 点阵进度条 | 百分比 | 倒计时。marginBottom 较小，组内紧凑 */}
@@ -317,6 +371,49 @@ export default Plugin.define({
       return context.theme.text.feedback.success.base;
     };
 
+    /** 单家刷新按钮的忙碌态：按 provider id 记录，与全局 `refreshing` 相互独立 */
+    const [refreshingIds, setRefreshingIds] = createSignal<ReadonlySet<ProviderId>>(new Set());
+    const markRefreshing = (id: ProviderId, on: boolean): void => {
+      setRefreshingIds((prev) => {
+        const next = new Set(prev);
+        if (on) next.add(id);
+        else next.delete(id);
+        return next;
+      });
+    };
+    const isRefreshing = (id: ProviderId): boolean => refreshingIds().has(id);
+
+    /** 单家重拉的单飞表：同 id 的重复点击共享同一个 promise */
+    const singleFlight = new Map<ProviderId, Promise<void>>();
+
+    /**
+     * 单家手动刷新：绕过退避，只重拉这一家并就地更新快照，不弹 toast（避免刷屏）。
+     * 刻意**不动 `updatedAt`** —— 表头的新鲜度代表「整份快照最后一次全量刷新」的时间，
+     * 只刷一家的部分更新不该把它冒充成全量新鲜。
+     */
+    async function refreshOne(id: ProviderId): Promise<void> {
+      const pending = singleFlight.get(id);
+      if (pending) return pending;
+      const definition = enabledProviders(loadConfig().config).find((p) => p.id === id);
+      if (!definition) return;
+      markRefreshing(id, true);
+      const run = (async (): Promise<void> => {
+        const { config } = loadConfig();
+        const state = await fetchOne(definition, config);
+        latest = latest.map((s) => (s.id === id ? state : s));
+        await updateSnapshot((draft) => {
+          draft.providers = latest;
+        });
+      })();
+      singleFlight.set(id, run);
+      try {
+        await run;
+      } finally {
+        singleFlight.delete(id);
+        markRefreshing(id, false);
+      }
+    }
+
     /** 进度条 track 恒为 muted，fill 用 level 色 —— 对比由「灰 vs 亮色」承担 */
     const trackColor = context.theme.text.muted;
 
@@ -379,6 +476,8 @@ export default Plugin.define({
                 trackColor={trackColor}
                 onToggle={() => void toggleCollapsed(false)}
                 onRefresh={() => void manualRefresh()}
+                onRefreshProvider={(id) => void refreshOne(id)}
+                isRefreshing={isRefreshing}
                 refreshing={refreshing()}
                 actionColor={actionColor}
               />
