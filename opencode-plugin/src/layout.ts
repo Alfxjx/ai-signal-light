@@ -57,7 +57,7 @@ export type RenderedBlock =
       level: Level;
     }
   | { kind: 'balance'; id: ProviderId; name: string; amount: string; level: Level }
-  | { kind: 'note'; id?: ProviderId; text: string; level: Level };
+  | { kind: 'note'; id?: ProviderId; name?: string; text: string; level: Level };
 
 export interface LayoutInput {
   updatedAt: number | null;
@@ -112,7 +112,7 @@ function providerBlocks(
 ): RenderedBlock[] {
   if (state.error) {
     return [
-      { kind: 'note', id: state.id, text: `${state.name}  － ${errorLabel(state.error)}`, level: state.error === 'no_token' ? 'muted' : 'danger' },
+      { kind: 'note', id: state.id, name: state.name, text: `－ ${errorLabel(state.error)}`, level: state.error === 'no_token' ? 'muted' : 'danger' },
     ];
   }
 

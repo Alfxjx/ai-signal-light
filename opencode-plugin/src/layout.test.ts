@@ -175,8 +175,8 @@ describe('展开态：错误', () => {
   it('鉴权失败是红字，no_token 是灰字，都带原因', () => {
     const failed = base({ error: '鉴权失败' });
     const unconfigured = base({ id: 'mimo', name: 'MiMo', error: 'no_token' });
-    expect(plan([failed])[1]).toEqual({ kind: 'note', id: 'kimi', text: 'Kimi  － 鉴权失败', level: 'danger' });
-    expect(plan([unconfigured])[1]).toEqual({ kind: 'note', id: 'mimo', text: 'MiMo  － 未配置', level: 'muted' });
+    expect(plan([failed])[1]).toEqual({ kind: 'note', id: 'kimi', name: 'Kimi', text: '－ 鉴权失败', level: 'danger' });
+    expect(plan([unconfigured])[1]).toEqual({ kind: 'note', id: 'mimo', name: 'MiMo', text: '－ 未配置', level: 'muted' });
   });
 
   it('configError 插在表头之后、provider 之前', () => {

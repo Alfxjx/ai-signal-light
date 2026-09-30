@@ -189,13 +189,14 @@ function BlockView(props: BlockViewProps) {
             <text fg={props.colorFor(b().level)}>
               <b>{b().name}</b>
             </text>
-            <box flexGrow={1} />
+            {/* 刷新按钮紧贴供应商名，不推到行尾 */}
             <RefreshCell
               active={props.isRefreshing(b().id)}
               mutedColor={props.trackColor}
               actionColor={props.actionColor}
               onRefresh={() => props.onRefreshProvider(b().id)}
             />
+            <box flexGrow={1} />
           </box>
         )}
       </Match>
@@ -214,30 +215,34 @@ function BlockView(props: BlockViewProps) {
                 <b>{b().name}</b>
               </text>
             </box>
-            <box flexGrow={1} />
-            <box flexShrink={0}>
-              <text fg={props.colorFor(b().level)}>{b().amount}</text>
-            </box>
+            {/* 刷新按钮紧贴供应商名；金额仍被弹性空间推到最右 */}
             <RefreshCell
               active={props.isRefreshing(b().id)}
               mutedColor={props.trackColor}
               actionColor={props.actionColor}
               onRefresh={() => props.onRefreshProvider(b().id)}
             />
+            <box flexGrow={1} />
+            <box flexShrink={0}>
+              <text fg={props.colorFor(b().level)}>{b().amount}</text>
+            </box>
           </box>
         )}
       </Match>
 
-      {/* 错误 / configError：整行一条；provider 错误行右端带单家刷新按钮（可单独重试），
-          configError 没有对应 provider，因而不带按钮。 */}
+      {/* 错误 / configError：provider 错误行 = 名字 + 紧贴的刷新按钮 + 原因（可单独重试）；
+          configError 没有对应 provider，因而不带名字也不带按钮，整行直接铺满。 */}
       <Match when={asKind(props.block, 'note')}>
         {(b: () => NoteBlock) => {
           const id = b().id;
+          const name = b().name;
           return (
             <box flexDirection="row" width="100%" marginTop={PROVIDER_GAP}>
-              <box flexGrow={1} flexShrink={1}>
-                <text fg={props.colorFor(b().level)}>{b().text}</text>
-              </box>
+              {name ? (
+                <box flexShrink={0}>
+                  <text fg={props.colorFor(b().level)}>{name}</text>
+                </box>
+              ) : null}
               {id ? (
                 <RefreshCell
                   active={props.isRefreshing(id)}
@@ -246,6 +251,9 @@ function BlockView(props: BlockViewProps) {
                   onRefresh={() => props.onRefreshProvider(id)}
                 />
               ) : null}
+              <box flexShrink={1}>
+                <text fg={props.colorFor(b().level)}>{name ? ` ${b().text}` : b().text}</text>
+              </box>
             </box>
           );
         }}
