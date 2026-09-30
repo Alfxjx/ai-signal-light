@@ -74,6 +74,12 @@ interface BlockViewProps {
   trackColor: RGBA;
   /** 表头点击 = 折叠 / 展开 */
   onToggle: () => void;
+  /** 表头「刷新」按钮点击 = 立即重新拉取 */
+  onRefresh: () => void;
+  /** 刷新进行中（把刷新按钮压暗当忙碌指示） */
+  refreshing: boolean;
+  /** 刷新按钮常态色：中性文字色，不和红/黄/绿状态色抢眼 */
+  actionColor: RGBA;
 }
 
 /**
@@ -111,15 +117,28 @@ function Meter(props: { percent: number; fill: RGBA; empty: RGBA }) {
 function BlockView(props: BlockViewProps) {
   return (
     <Switch>
-      {/* 表头：三角 + 「用量」在左，新鲜度被弹性空间推到最右。
-          onMouseDown 挂在这个 box 上（而不是里面的 text），
-          点击热区才能横跨整行宽度 —— 参照 opencode-tokenwatch 的做法。 */}
+      {/* 表头：三角 + 「用量」在左，紧随一个「刷新」按钮（⟳），新鲜度被弹性空间推到最右。
+          onMouseDown 挂在整行 box 上（而不是里面的 text），
+          点击热区才能横跨整行宽度 —— 参照 opencode-tokenwatch 的做法。
+          刷新按钮自己再挂一个 onMouseDown 并 stopPropagation，避免点刷新顺带折叠。 */}
       <Match when={asKind(props.block, 'header')}>
         {(b: () => HeaderBlock) => (
           <box flexDirection="row" width="100%" onMouseDown={props.onToggle}>
             <box flexShrink={0}>
               <text fg={props.colorFor(b().collapsed ? 'muted' : 'fresh')}>
                 <b>{b().left}</b>
+              </text>
+            </box>
+            {/* 刷新按钮：热区 = 「空格 + 字形」两个格子，点它只刷新、不折叠 */}
+            <box
+              flexShrink={0}
+              onMouseDown={(event) => {
+                event.stopPropagation();
+                props.onRefresh();
+              }}
+            >
+              <text fg={props.refreshing ? props.colorFor('muted') : props.actionColor}>
+                {` ${b().refresh}`}
               </text>
             </box>
             <box flexGrow={1} />
@@ -220,6 +239,9 @@ export default Plugin.define({
     const [now, setNow] = createSignal(Date.now());
     const ticker = setInterval(() => setNow(Date.now()), TICK_MS);
 
+    // 刷新按钮的忙碌态：拉取进行中把它压暗
+    const [refreshing, setRefreshing] = createSignal(false);
+
     /** 最近一次写入的结果，用于在退避期间保留上一轮的值 */
     let latest: ProviderState[] = [];
     const failures = new Map<ProviderId, number>();
@@ -261,6 +283,7 @@ export default Plugin.define({
     /** 单飞：轮询、首次加载、手动刷新共享同一个 in-flight promise */
     function refreshAll(manual = false): Promise<void> {
       if (inFlight) return inFlight;
+      setRefreshing(true);
       const run = async (): Promise<void> => {
         const { config, thresholds, error } = loadConfig();
         const startedAt = Date.now();
@@ -282,6 +305,7 @@ export default Plugin.define({
 
       inFlight = run().finally(() => {
         inFlight = null;
+        setRefreshing(false);
       });
       return inFlight;
     }
@@ -295,6 +319,9 @@ export default Plugin.define({
 
     /** 进度条 track 恒为 muted，fill 用 level 色 —— 对比由「灰 vs 亮色」承担 */
     const trackColor = context.theme.text.muted;
+
+    /** 刷新按钮常态色：用中性文字色，避免和红/黄/绿状态色混淆 */
+    const actionColor = context.theme.text.base;
 
     const planInput = (): LayoutInput => ({
       updatedAt: snapshot.updatedAt,
@@ -320,6 +347,17 @@ export default Plugin.define({
       }
     };
 
+    /** 手动刷新：表头按钮点击与斜杠命令 / 快捷键共用，避免两处逻辑漂移 */
+    const manualRefresh = async (): Promise<void> => {
+      await refreshAll(true);
+      const failed = latest.filter((s) => s.error).length;
+      context.ui.toast.show({
+        message: `已刷新 ${latest.length} 家${failed > 0 ? `（${failed} 家失败）` : ''}`,
+        variant: failed > 0 ? 'warning' : 'success',
+        duration: 3000,
+      });
+    };
+
     const unclaim = context.ui.slot({
       append: 'sidebar.content',
       render: () => (
@@ -340,6 +378,9 @@ export default Plugin.define({
                 colorFor={colorFor}
                 trackColor={trackColor}
                 onToggle={() => void toggleCollapsed(false)}
+                onRefresh={() => void manualRefresh()}
+                refreshing={refreshing()}
+                actionColor={actionColor}
               />
             )}
           </For>
@@ -363,20 +404,12 @@ export default Plugin.define({
               bind: 'ctrl+alt+u',
               palette: true,
               slash: { name: 'usage' },
-              run: async () => {
-                await refreshAll(true);
-                const failed = latest.filter((s) => s.error).length;
-                context.ui.toast.show({
-                  message: `已刷新 ${latest.length} 家${failed > 0 ? `（${failed} 家失败）` : ''}`,
-                  variant: failed > 0 ? 'warning' : 'success',
-                  duration: 3000,
-                });
-              },
+              run: manualRefresh,
             },
             {
               id: TOGGLE_COMMAND_ID,
               title: '折叠 / 展开用量侧边栏',
-              description: '折叠后只保留一行「最紧的一家」摘要',
+              description: '折叠后只保留表头一行',
               group: '用量',
               bind: 'ctrl+alt+y',
               palette: true,

@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [opencode-usage-sidebar-refresh-button](history/opencode-usage-sidebar-refresh-button.md)
+- 时间：2026-09-30
+- 范围：用量侧边栏表头「用量」后加可点 `⟳` 刷新按钮（= `/usage`），拉取中变灰；点它只刷新不折叠（`stopPropagation`）
+- 关联：`opencode-plugin/src/{layout,layout.test,tui}.ts(x)`、`opencode-plugin/README.md`
+
 ## [opencode-usage-plugin-helper-cli](plans/opencode-usage-plugin-helper-cli.md) | [history](history/opencode-usage-plugin-helper-cli.md)
 - 时间：2026-09-29
 - 范围：新增 CLI 助手（init / set / doctor / install），让没装桌面程序的 opencode 用户能自助配置用量侧边栏插件；零第三方运行时依赖，两个安全约束（原子写 + 只动自己管的键）

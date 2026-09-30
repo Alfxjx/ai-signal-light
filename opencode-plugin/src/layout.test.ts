@@ -5,6 +5,7 @@ import {
   resetColumnWidth,
   COLLAPSED_GLYPH,
   EXPANDED_GLYPH,
+  REFRESH_GLYPH,
   DOT_EMPTY,
   DOT_FILLED,
   BAR_DOTS,
@@ -58,9 +59,15 @@ describe('表头', () => {
     expect(plan([kimiTwoWindows])[0]).toEqual({
       kind: 'header',
       left: `${EXPANDED_GLYPH} 用量`,
+      refresh: REFRESH_GLYPH,
       right: '2m 前',
       collapsed: false,
     });
+  });
+
+  it('表头带刷新按钮字形，折叠态也保留（随时能手动刷新）', () => {
+    expect(plan([kimiTwoWindows])[0]).toMatchObject({ refresh: REFRESH_GLYPH });
+    expect(plan([], { collapsed: true })[0]).toMatchObject({ refresh: REFRESH_GLYPH });
   });
 
   it('折叠态三角换成 ▸', () => {
