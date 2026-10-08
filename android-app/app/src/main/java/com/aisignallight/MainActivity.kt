@@ -13,7 +13,6 @@ import androidx.navigation.compose.rememberNavController
 import com.aisignallight.domain.model.AppConfig
 import com.aisignallight.domain.repository.ConfigRepository
 import com.aisignallight.ui.home.HomeScreen
-import com.aisignallight.ui.scan.ScanScreen
 import com.aisignallight.ui.settings.SettingsScreen
 import com.aisignallight.ui.theme.AISignalLightTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -49,9 +48,6 @@ private fun AppNavigation() {
         }
         composable("settings") {
             SettingsScreen(navController = navController)
-        }
-        composable("scan") {
-            ScanScreen(navController = navController)
         }
     }
 }

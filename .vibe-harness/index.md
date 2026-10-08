@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [android-usage-only-redesign](plans/android-usage-only-redesign.md) | [history](history/android-usage-only-redesign.md)
+- 时间：2026-10-07
+- 范围：安卓 APP 收敛为独立「AI 用量监控」：删掉扫码/桌面同步整条链路（含 Room、DesktopSyncClient、ClaudeTab，共 18 个文件）、首页改单屏用量列表 + PullToRefreshBox 下拉刷新、设置页改 Material3 分组 ListItem + 对话框即时保存、新增 DataStore 用量快照缓存与 Glance 桌面小组件（进度条/余额/更新时间），依赖增删后 assembleDebug 编译通过
+- 关联：`android-app/app/src/main/java/com/aisignallight/**`（`ui/home`、`ui/settings`、`ui/components`、`data/local`、`data/remote`、`data/repository`、`domain/**`、`widget/`、`worker/`、`di/`）、`android-app/app/src/main/res/{values/strings.xml,xml/usage_widget_info.xml}`、`android-app/app/src/main/AndroidManifest.xml`、`android-app/app/build.gradle.kts`、`android-app/gradle/libs.versions.toml`、`AGENTS.md`
+
 ## [kimi-web-status](plans/kimi-web-status.md) | [history](history/kimi-web-status.md)
 - 时间：2026-09-16
 - 范围：主面板新增「Kimi Code (web)」实时状态卡：连本机 kimi web 服务（WS 订阅 + REST 校准），会话按 metadata.cwd 归并成目录行，头部四态聚合（待审核>编辑>思考>空闲），离线整卡隐藏

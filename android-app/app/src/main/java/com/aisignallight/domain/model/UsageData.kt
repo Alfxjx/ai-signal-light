@@ -1,7 +1,10 @@
 package com.aisignallight.domain.model
 
+import kotlinx.serialization.Serializable
+
 typealias UsageError = String
 
+@Serializable
 data class UsageMetric(
     val limit: Int = 0,
     val used: Int = 0,
@@ -10,11 +13,13 @@ data class UsageMetric(
     val resetTime: String? = null
 )
 
+@Serializable
 data class KimiUsageData(
     val codingWeekly: UsageMetric = UsageMetric(),
     val codingFiveHour: UsageMetric = UsageMetric()
 )
 
+@Serializable
 data class MinimaxUsageData(
     val fiveHourPercent: Int = 0,
     val weeklyPercent: Int = 0,
@@ -22,6 +27,7 @@ data class MinimaxUsageData(
     val weeklyResetTime: String? = null
 )
 
+@Serializable
 data class CopilotPremiumData(
     val limit: Int = 0,
     val remaining: Int = 0,
@@ -30,10 +36,12 @@ data class CopilotPremiumData(
     val resetDateUtc: String? = null
 )
 
+@Serializable
 data class CopilotChatData(
     val percent: Int = 0
 )
 
+@Serializable
 data class CopilotUsageData(
     val premium: CopilotPremiumData = CopilotPremiumData(),
     val chat: CopilotChatData = CopilotChatData(),
@@ -41,12 +49,14 @@ data class CopilotUsageData(
     val licenseType: String? = null
 )
 
+@Serializable
 data class VolcengineUsageData(
     val session: UsageMetric = UsageMetric(),
     val weekly: UsageMetric = UsageMetric(),
     val monthly: UsageMetric = UsageMetric()
 )
 
+@Serializable
 data class DeepseekUsageData(
     val isAvailable: Boolean = false,
     val currency: String? = null,
@@ -55,12 +65,14 @@ data class DeepseekUsageData(
     val toppedUpBalance: Double = 0.0
 )
 
+@Serializable
 data class UsageProviderState<T>(
     val data: T? = null,
     val lastUpdated: String? = null,
     val error: UsageError? = null
 )
 
+@Serializable
 data class UsageSnapshot(
     val kimi: UsageProviderState<KimiUsageData>? = null,
     val minimax: UsageProviderState<MinimaxUsageData>? = null,

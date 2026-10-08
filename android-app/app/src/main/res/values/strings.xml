@@ -1,20 +1,46 @@
 <resources>
     <string name="app_name">AI 状态监控</string>
-    <string name="usage_title">用量</string>
-    <string name="claude_title">项目</string>
+    <string name="home_title">用量监控</string>
     <string name="settings_title">设置</string>
-    <string name="scan_title">扫描二维码</string>
-    <string name="save">保存</string>
     <string name="cancel">取消</string>
-    <string name="refresh">刷新</string>
+    <string name="confirm">确定</string>
     <string name="loading">加载中…</string>
-    <string name="error_no_token">未配置 Token</string>
     <string name="error_disabled">已禁用</string>
-    <string name="last_update">最后更新：%1$s</string>
-    <string name="offline_hint">离线：显示缓存数据</string>
-    <string name="connection_connected">桌面同步已连接</string>
-    <string name="connection_disconnected">桌面同步断开：%1$s</string>
-    <string name="connection_last_sync">最后同步：%1$s</string>
+    <string name="updated_at">更新于 %1$s</string>
+    <string name="not_configured_open_settings">未配置，点我去设置</string>
     <string name="notification_permission_denied">通知权限被拒绝，阈值提醒可能无法送达</string>
-    <string name="settings_scan">扫码导入配置</string>
+
+    <!-- 桌面小组件 -->
+    <string name="widget_title">AI 用量</string>
+    <string name="widget_empty">未配置，打开 APP 设置</string>
+    <string name="widget_description">AI 用量监控小组件</string>
+
+    <!-- 设置页 -->
+    <string name="settings_back">返回</string>
+    <string name="settings_group_general">通用</string>
+    <string name="settings_group_providers">服务商</string>
+    <string name="settings_theme">主题</string>
+    <string name="settings_theme_light">浅色</string>
+    <string name="settings_theme_dark">深色</string>
+    <string name="settings_theme_system">跟随系统</string>
+    <string name="settings_interval">轮询间隔</string>
+    <string name="settings_interval_value">%1$d 分钟</string>
+    <string name="settings_warn">提醒阈值 (Warn)</string>
+    <string name="settings_danger">危险阈值 (Danger)</string>
+    <string name="settings_threshold_value">%1$d%%</string>
+    <string name="settings_threshold_range">请输入 0-100 之间的整数</string>
+    <string name="settings_threshold_invalid">Warn 阈值必须小于 Danger 阈值</string>
+    <string name="settings_proxy">全局代理</string>
+    <string name="settings_proxy_none">未设置</string>
+    <string name="settings_proxy_hint">http://127.0.0.1:7890</string>
+    <string name="settings_provider_enabled">已启用</string>
+    <string name="settings_provider_no_token">未配置 Token</string>
+    <string name="settings_provider_disabled">已停用</string>
+    <string name="settings_token_label">Token</string>
+    <string name="settings_cookie_label">Cookie</string>
+    <string name="settings_csrf_label">x-csrf-token</string>
+    <string name="settings_use_proxy">使用全局代理</string>
+    <string name="settings_show_secret">显示</string>
+    <string name="settings_hide_secret">隐藏</string>
+    <string name="settings_volcengine_help">打开桌面控制台 Coding Plan 页面的 DevTools，复制 GetCodingPlanUsage 请求的 Cookie 与 x-csrf-token。登录过期需重新粘贴。</string>
 </resources>

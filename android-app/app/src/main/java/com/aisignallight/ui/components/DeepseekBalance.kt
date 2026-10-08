@@ -1,13 +1,11 @@
 package com.aisignallight.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -15,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -53,63 +52,17 @@ internal fun formatIsoTime(iso: String): String {
 @Composable
 private fun dsStatusText(data: DeepseekUsageData?, error: String?): String = when (error) {
     "disabled" -> stringResource(R.string.error_disabled)
-    "no_token" -> stringResource(R.string.error_no_token)
+    "no_token" -> stringResource(R.string.not_configured_open_settings)
     null -> if (data != null) "正常" else stringResource(R.string.loading)
     else -> error
 }
 
-/** 网格模式的 DeepSeek 余额 tile：渐变底 + 居中大号余额 */
-@Composable
-fun DeepseekBalanceTile(
-    state: UsageProviderState<DeepseekUsageData>?,
-    modifier: Modifier = Modifier
-) {
-    val data = state?.data
-    val error = state?.error
-    val statusText = dsStatusText(data, error)
-
-    Box(
-        modifier = modifier
-            .background(DsGradient, RoundedCornerShape(16.dp))
-            .padding(horizontal = 12.dp, vertical = 14.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "DeepSeek",
-                style = MaterialTheme.typography.labelMedium,
-                color = Color(DsLabelColor)
-            )
-            if (data != null) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "${deepseekSymbol(data.currency)}${"%.2f".format(data.totalBalance)}",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Text(
-                    text = "余额",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(DsLabelColor)
-                )
-            } else {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = statusText,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (error == null) Color(DsLabelColor) else Color(0xFFFFB4AB)
-                )
-            }
-        }
-    }
-}
-
-/** 单列模式的 DeepSeek 余额条：左侧大号余额 + 赠送明细，右侧更新时间 */
+/** DeepSeek 余额条：左侧大号余额 + 赠送明细，右侧更新时间 */
 @Composable
 fun DeepseekBalanceCard(
     state: UsageProviderState<DeepseekUsageData>?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
 ) {
     val data = state?.data
     val error = state?.error
@@ -118,7 +71,9 @@ fun DeepseekBalanceCard(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(DsGradient, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(DsGradient)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -149,7 +104,7 @@ fun DeepseekBalanceCard(
                     text = statusText,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (error == null) Color(DsLabelColor) else Color(0xFFFFB4AB)
+                    color = if (error == null || error == "no_token") Color(DsLabelColor) else Color(0xFFFFB4AB)
                 )
             }
         }

@@ -10,6 +10,7 @@ import com.aisignallight.domain.model.VolcengineUsageData
 import com.aisignallight.domain.model.DeepseekUsageData
 import com.aisignallight.domain.repository.ConfigRepository
 import com.aisignallight.domain.repository.UsageRepository
+import com.aisignallight.data.local.UsageSnapshotStore
 import com.aisignallight.data.remote.CopilotApi
 import com.aisignallight.data.remote.KimiApi
 import com.aisignallight.data.remote.MinimaxApi
@@ -17,9 +18,12 @@ import com.aisignallight.data.remote.VolcengineApi
 import com.aisignallight.data.remote.DeepseekApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import javax.inject.Inject
@@ -28,6 +32,7 @@ import javax.inject.Singleton
 @Singleton
 class UsageRepositoryImpl @Inject constructor(
     private val configRepository: ConfigRepository,
+    private val snapshotStore: UsageSnapshotStore,
     private val kimiApi: KimiApi,
     private val minimaxApi: MinimaxApi,
     private val copilotApi: CopilotApi,
@@ -35,12 +40,19 @@ class UsageRepositoryImpl @Inject constructor(
     private val deepseekApi: DeepseekApi
 ) : UsageRepository {
 
-    private val _usageFlow = MutableStateFlow(UsageSnapshot())
-    override fun observeUsage(): StateFlow<UsageSnapshot> = _usageFlow.asStateFlow()
+    /** 进程内的最新快照；null 表示本进程还没刷新过 */
+    private val _usageFlow = MutableStateFlow<UsageSnapshot?>(null)
+
+    override fun observeUsage(): Flow<UsageSnapshot> = flow {
+        // 冷启动先用磁盘缓存渲染，refresh 出新值后由内存流接管
+        snapshotStore.snapshotFlow.first()?.let { emit(it) }
+        emitAll(_usageFlow.filterNotNull())
+    }
 
     override suspend fun refresh(): UsageSnapshot {
         val snapshot = fetchAll()
         _usageFlow.value = snapshot
+        snapshotStore.save(snapshot)
         return snapshot
     }
 

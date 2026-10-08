@@ -1,6 +1,7 @@
 package com.aisignallight.worker
 
 import android.content.Context
+import androidx.glance.appwidget.updateAll
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -10,6 +11,7 @@ import androidx.work.WorkerParameters
 import com.aisignallight.data.notification.NotificationHelper
 import com.aisignallight.domain.repository.ConfigRepository
 import com.aisignallight.domain.repository.UsageRepository
+import com.aisignallight.widget.UsageWidget
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
@@ -28,6 +30,7 @@ class UsagePollingWorker @AssistedInject constructor(
             val snapshot = usageRepository.refresh()
             val config = configRepository.getConfig()
             notificationHelper.checkAndNotify(config, snapshot)
+            runCatching { UsageWidget().updateAll(applicationContext) }
             Result.success()
         } catch (e: Exception) {
             Result.retry()
