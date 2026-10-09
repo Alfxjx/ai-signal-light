@@ -2,6 +2,61 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.8.0](https://github.com/Alfxjx/ai-signal-light/compare/v2.6.0...v2.8.0) (2026-10-09)
+
+
+### ✨ 新功能
+
+* **android:** 重构为单一用量监控 APP，新增 Glance 桌面小组件 ([473b68e](https://github.com/Alfxjx/ai-signal-light/commit/473b68ebca50904a1b1f16c7c1f578060c9ab368))
+* **landing:** landing 整页重做为暗色仪表盘风 + README 刷新 ([69ded84](https://github.com/Alfxjx/ai-signal-light/commit/69ded845ac82dae3f55f258adab420f98a2e64a2))
+* **opencode-plugin:** provider 请求封装与本地化错误 ([d62e6b7](https://github.com/Alfxjx/ai-signal-light/commit/d62e6b7c606aa330b3219663d777bb515f634e96))
+* **opencode-plugin:** 五家 provider 取数与响应映射 ([6b3400d](https://github.com/Alfxjx/ai-signal-light/commit/6b3400dbbd340b2101e254820c11f6799915f773))
+* **opencode-plugin:** 侧边栏纯格式化（宽度对齐/条形/倒计时/金额） ([65aeafa](https://github.com/Alfxjx/ai-signal-light/commit/65aeafaead2502dd3b06758fd1dbefa0225038d3))
+* **opencode-plugin:** 单家刷新完成弹带名字的 toast ([8bd6791](https://github.com/Alfxjx/ai-signal-light/commit/8bd6791771e3b31b8c4de8af2d8bafa31b2fc2f8))
+* **opencode-plugin:** 只读解析应用 config.json ([7fd14b6](https://github.com/Alfxjx/ai-signal-light/commit/7fd14b65c7f2e83ddb0626559723d15c5abcf0cb))
+* **opencode-plugin:** 每个 provider 行加单家刷新按钮 ([101bc00](https://github.com/Alfxjx/ai-signal-light/commit/101bc00c49e0767713aa182bd7f2529533fd827d))
+* **opencode-plugin:** 用量侧边栏改用 yoga 布局并支持折叠 ([68ed5f5](https://github.com/Alfxjx/ai-signal-light/commit/68ed5f5026a3e0d8323afab082dfc0d4cce2d2a8))
+* **opencode-plugin:** 用量侧边栏表头加刷新按钮 ([12e70e8](https://github.com/Alfxjx/ai-signal-light/commit/12e70e8247ed62a48141bc7b69d5bdb76de319d7))
+* **opencode-plugin:** 移植火山 V4 签名与官方测试向量 ([b65c698](https://github.com/Alfxjx/ai-signal-light/commit/b65c69883d170fb801173ddb9cacc79e191a2b7c))
+* **opencode-plugin:** 脚手架与最小侧边栏插件，打通加载通路 ([5f18ce9](https://github.com/Alfxjx/ai-signal-light/commit/5f18ce9d2d196948153a37f64c4e5356848824e1))
+* **tooling:** 新增用量插件配置助手 CLI ([46922ef](https://github.com/Alfxjx/ai-signal-light/commit/46922ef753dd9930c04eb00e59c5a36f96ce764e))
+* 悬浮球 LED 右侧显示 Kimi NotifyUser 消息气泡 ([71d4a57](https://github.com/Alfxjx/ai-signal-light/commit/71d4a579ae4608b41e7f4c491b102a7af8870b17))
+* 桌面宠物窗口（Codex 图集播放，独立开关可与悬浮球共存） ([7fae767](https://github.com/Alfxjx/ai-signal-light/commit/7fae767c7b5edba21cde7a14ec7d09acbafa6211))
+* 火山 Coding Plan 支持 AK/SK，新增 MiMo provider，Kimi 列表只显示当日 ([f826630](https://github.com/Alfxjx/ai-signal-light/commit/f826630a03855c9295ca797e315e9186458509f7))
+* 火山引擎改用官方 OpenAPI + V4 签名（AK/SK），移除 Cookie 通道 ([49fde9f](https://github.com/Alfxjx/ai-signal-light/commit/49fde9ff4948255243ee9dc22605a18c77bb400e))
+
+
+### 🐛 修复
+
+* **opencode-plugin:** 单家刷新按钮紧贴供应商名 ([df45f35](https://github.com/Alfxjx/ai-signal-light/commit/df45f3528302fe28cef1e43d468ed1a0d1ff800b))
+
+
+### 📝 文档
+
+* **opencode-plugin:** README、spec 同步与记忆归档 ([b30d5dd](https://github.com/Alfxjx/ai-signal-light/commit/b30d5dd326f3de86c8ca5f6d40746c99f6e1430f))
+* **opencode-plugin:** 收口 spec 陈旧引用与完成标准状态 ([f553efa](https://github.com/Alfxjx/ai-signal-light/commit/f553efa0a206ac2520af57fad76bddd18831c324))
+* **plan:** opencode 供应商用量侧边栏插件实现计划 ([b61a1c3](https://github.com/Alfxjx/ai-signal-light/commit/b61a1c31a2096bf9205efd3677cf7261e8720af2))
+* **plan:** 勾选 Task 1/Task 2 已完成步骤 ([be45742](https://github.com/Alfxjx/ai-signal-light/commit/be45742908f5fc7e144fbbda6a5ac0c59c1cfe5f))
+* **plan:** 勾选 Task 3 已完成步骤 ([1217717](https://github.com/Alfxjx/ai-signal-light/commit/1217717880e029bf2bd8615b41e2f6a5c175b9c7))
+* **plan:** 勾选 Task 4 已完成步骤 ([51c4593](https://github.com/Alfxjx/ai-signal-light/commit/51c459381b130a9b791c7bb38a2987c5c43d4942))
+* **plan:** 勾选 Task 5 已完成步骤 ([ac02ec3](https://github.com/Alfxjx/ai-signal-light/commit/ac02ec36e21b14ea053bf8bfe2282e12e8357725))
+* **plan:** 勾选 Task 6 已完成步骤 ([e76e208](https://github.com/Alfxjx/ai-signal-light/commit/e76e208b1e80e6d0af6cf4e1b52699fcb73ae089))
+* **plan:** 勾选 Task 7 并记录 E2E 实际验证结果 ([aeca21f](https://github.com/Alfxjx/ai-signal-light/commit/aeca21f6498379f91f65adb2da8ebcf414067c8d))
+* **plan:** 新增 landing 重做 + README 刷新计划 ([7747bd3](https://github.com/Alfxjx/ai-signal-light/commit/7747bd3d575e922ae2991d3835fb505ed6811a53))
+* **plan:** 新增智谱 GLM Coding Plan 额度调研 ([37f50d5](https://github.com/Alfxjx/ai-signal-light/commit/37f50d59761fa11d4f12db04acd3578496a9e8d8))
+* **spec:** opencode 供应商用量侧边栏插件设计 ([34c99f3](https://github.com/Alfxjx/ai-signal-light/commit/34c99f3051cd52f8798efcbb9e9675f03a694987))
+
+
+### ♻️ 重构
+
+* **opencode-plugin:** 侧边栏改为每家多行展开，去掉进度条 ([6a829b5](https://github.com/Alfxjx/ai-signal-light/commit/6a829b5bfe43c3dea2fd209603963663fc542c45))
+
+
+### ✅ 测试
+
+* **opencode-plugin:** enabled 过滤抽成 enabledProviders 并补单测；计划同步 keymap/app 插槽修法 ([061ce47](https://github.com/Alfxjx/ai-signal-light/commit/061ce47b03ee0fdfbddb4000fd33b8c18332a188))
+* **opencode-plugin:** 补 configPath 单测，钉死只读正式版 config ([6b09b2b](https://github.com/Alfxjx/ai-signal-light/commit/6b09b2b753941a622dc485457fb0fa78a700321a))
+
 ## [2.7.0](https://github.com/Alfxjx/ai-signal-light/compare/v2.6.0...v2.7.0) (2026-09-28)
 
 
