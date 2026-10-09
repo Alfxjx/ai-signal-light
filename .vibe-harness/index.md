@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [volcengine-aksk](plans/volcengine-aksk.md) | [history](history/volcengine-aksk.md)
+- 时间：2026-10-09
+- 范围：火山引擎改用官方 OpenAPI + V4 签名（AK/SK 长期有效），彻底删除 Cookie / x-csrf-token 通道；桌面与安卓各新增一份签名实现 + 官方测试向量单测（桌面 12 例、安卓 14 例），设置页换 AK/SK 字段
+- 关联：`src/main/{volcengine-sign,volcengine-sign.test,usage-monitor,config,main,pairing,usage-monitor.test}.ts`、`src/shared/types/{config,ipc}.ts`、`src/renderer/src/Settings.vue`、`android-app/.../data/remote/{VolcengineSign,VolcengineApi}.kt`、`android-app/.../app/src/test/.../VolcengineSignTest.kt`、`android-app/.../{domain/model/AppConfig.kt,data/repository/UsageRepositoryImpl.kt,ui/settings/*,widget/UsageWidget.kt,res/values/strings.xml}`、`AGENTS.md`
+
 ## [android-usage-only-redesign](plans/android-usage-only-redesign.md) | [history](history/android-usage-only-redesign.md)
 - 时间：2026-10-07
 - 范围：安卓 APP 收敛为独立「AI 用量监控」：删掉扫码/桌面同步整条链路（含 Room、DesktopSyncClient、ClaudeTab，共 18 个文件）、首页改单屏用量列表 + PullToRefreshBox 下拉刷新、设置页改 Material3 分组 ListItem + 对话框即时保存、新增 DataStore 用量快照缓存与 Glance 桌面小组件（进度条/余额/更新时间），依赖增删后 assembleDebug 编译通过

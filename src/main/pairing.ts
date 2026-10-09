@@ -54,13 +54,13 @@ export function encodeQrPayload(payload: QrPayload): string {
   return JSON.stringify(payload);
 }
 
-/** 投影到移动端订阅的精简配置，去掉 window/hooks/floatingBall/lanMode 等桌面专属字段 */
+/** 投影到移动端订阅的精简配置，去掉 window/hooks/floatingBall/lanMode 等桌面专属字段；
+ *  火山 AK/SK 属于长期有效的控制面密钥，不下发手机（安卓端手动填写）。 */
 export function toMobileConfig(config: AppConfig): MobileAppConfig {
   return {
     kimi: { ...config.kimi },
     minimax: { ...config.minimax },
     copilot: { ...config.copilot },
-    volcengine: { ...config.volcengine },
     deepseek: { ...config.deepseek },
     proxy: { ...config.proxy },
     intervalMinutes: config.intervalMinutes,

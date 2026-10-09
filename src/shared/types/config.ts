@@ -5,8 +5,10 @@ export interface ProviderConfig {
 }
 
 export interface VolcengineProviderConfig {
-  cookie: string;
-  csrfToken: string;
+  /** 火山引擎官方 OpenAPI 的访问密钥 ID（AKLT...，来自 console.volcengine.com/iam/keymanage/） */
+  accessKey: string;
+  /** 火山引擎官方 OpenAPI 的访问密钥 Secret（长期有效，无需像 Cookie 那样定期更换） */
+  secretKey: string;
   enabled: boolean;
   useProxy: boolean;
 }
@@ -75,13 +77,13 @@ export interface AppConfig {
 
 /**
  * 移动端订阅的精简配置：去除 window/hooks/floatingBall/lanMode 等桌面专属字段，
+ * 同时不下发火山 AK/SK（属于长期有效的控制面密钥，安卓端手动填写），
  * 作为 QR 配对后通过 WebSocket 反向拉取的契约。
  */
 export interface MobileAppConfig {
   kimi: ProviderConfig;
   minimax: ProviderConfig;
   copilot: ProviderConfig;
-  volcengine: VolcengineProviderConfig;
   deepseek: ProviderConfig;
   proxy: { url: string };
   intervalMinutes: number;

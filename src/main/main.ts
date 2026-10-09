@@ -915,8 +915,8 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, async () => {
     deepseek: { token: cfg.deepseek.token ? maskToken(cfg.deepseek.token) : '', enabled: cfg.deepseek.enabled, useProxy: cfg.deepseek.useProxy },
     codex:   { enabled: cfg.codex.enabled, useProxy: cfg.codex.useProxy },
     volcengine: {
-      cookie: cfg.volcengine.cookie ? maskToken(cfg.volcengine.cookie) : '',
-      csrfToken: cfg.volcengine.csrfToken ? maskToken(cfg.volcengine.csrfToken) : '',
+      accessKey: cfg.volcengine.accessKey ? maskToken(cfg.volcengine.accessKey) : '',
+      secretKey: cfg.volcengine.secretKey ? maskToken(cfg.volcengine.secretKey) : '',
       enabled: cfg.volcengine.enabled,
       useProxy: cfg.volcengine.useProxy,
     },
@@ -928,8 +928,8 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, async () => {
     hasProxy:        !!(cfg.proxy?.url),
     copilotOAuth: isCopilotOAuthToken(cfg.copilot.token || ''),
     hasDeepseekToken: !!cfg.deepseek.token,
-    hasVolcengineCookie: !!cfg.volcengine.cookie,
-    hasVolcengineCsrfToken: !!cfg.volcengine.csrfToken,
+    hasVolcengineAccessKey: !!cfg.volcengine.accessKey,
+    hasVolcengineSecretKey: !!cfg.volcengine.secretKey,
     codexAutoAvailable: codexAuthAvailable(),
     hooks: {
       enabled: { ...cfg.hooks.enabled },
@@ -995,15 +995,16 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_SAVE, async (_event, partial: Record<string
     delete (next.proxy as Record<string, unknown>).urlChanged;
   }
 
-  // volcengine：cookie 与 csrfToken 各自的变更协议
+  // volcengine：accessKey / secretKey 各自的变更协议（留空保持原值）
   if (next.volcengine && typeof next.volcengine === 'object') {
     const v = next.volcengine as Record<string, unknown>;
-    if (v.cookieChanged) { v.cookie = (v.cookie as string) || ''; }
-    else { v.cookie = current.volcengine.cookie; }
-    if (v.csrfTokenChanged) { v.csrfToken = (v.csrfToken as string) || ''; }
-    else { v.csrfToken = current.volcengine.csrfToken; }
-    delete (next.volcengine as Record<string, unknown>).cookieChanged;
-    delete (next.volcengine as Record<string, unknown>).csrfTokenChanged;
+    const keepOrTake = (field: 'accessKey' | 'secretKey'): void => {
+      if (v[field + 'Changed']) { v[field] = (v[field] as string) || ''; }
+      else { v[field] = current.volcengine[field]; }
+      delete v[field + 'Changed'];
+    };
+    keepOrTake('accessKey');
+    keepOrTake('secretKey');
   }
 
   // LAN 模式：首次开启时自动生成 apiKey

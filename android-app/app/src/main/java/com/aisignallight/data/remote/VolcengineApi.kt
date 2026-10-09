@@ -1,15 +1,14 @@
 package com.aisignallight.data.remote
 
 import com.aisignallight.domain.model.UsageMetric
+import com.aisignallight.domain.model.VolcengineProviderConfig
 import com.aisignallight.domain.model.VolcengineUsageData
-import com.aisignallight.domain.repository.ConfigRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.request.get
 import io.ktor.client.request.header
-import io.ktor.client.request.post
 import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.HttpHeaders
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
@@ -18,62 +17,79 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.time.Instant
 import javax.inject.Inject
 
+/**
+ * 火山方舟 Ark Coding Plan 额度：走官方 OpenAPI + V4 签名（AK/SK 长期有效）。
+ * 签名算法见 [VolcengineSign]，与桌面端 `src/main/volcengine-sign.ts` 一致。
+ */
 class VolcengineApi @Inject constructor(
-    private val clientProvider: KtorClientProvider,
-    private val configRepository: ConfigRepository
+    private val clientProvider: KtorClientProvider
 ) {
     companion object {
-        const val URL =
-            "https://console.volcengine.com/api/top/ark/cn-beijing/2024-01-01/GetCodingPlanUsage"
+        const val OPEN_HOST = "open.volcengineapi.com"
+        const val OPEN_REGION = "cn-beijing"
+        const val OPEN_SERVICE = "ark"
+        const val ACTION = "GetCodingPlanUsage"
+        const val VERSION = "2024-01-01"
+        val QUOTA_LEVELS = listOf("session", "weekly", "monthly")
     }
 
-    suspend fun fetch(cookie: String, csrfToken: String, proxyUrl: String?): VolcengineUsageData {
+    suspend fun fetch(config: VolcengineProviderConfig, proxyUrl: String?): VolcengineUsageData {
+        val accessKey = config.accessKey.trim()
+        val secretKey = config.secretKey.trim()
+        if (accessKey.isBlank() || secretKey.isBlank()) throw ApiException("no_token")
+
         val client: HttpClient = clientProvider.create(proxyUrl)
-        val response: HttpResponse = client.post(URL) {
-            header("Cookie", cookie.trim())
-            header("x-csrf-token", csrfToken.trim())
-            header("Content-Type", "application/json")
-            header("Origin", "https://console.volcengine.com")
-            header("Referer", "https://console.volcengine.com/ark/region:cn-beijing/subscription/coding-plan")
+        val signed = VolcengineSign.sign(
+            VolcengineSign.Input(
+                host = OPEN_HOST,
+                region = OPEN_REGION,
+                service = OPEN_SERVICE,
+                action = ACTION,
+                version = VERSION,
+                query = mapOf("Region" to OPEN_REGION),
+                accessKey = accessKey,
+                secretKey = secretKey,
+                instant = Instant.now()
+            )
+        )
+
+        val response: HttpResponse = client.get(VolcengineSign.buildUrl(OPEN_HOST, signed.canonicalQuery)) {
+            // 注意：此处裸 headers 会解析到 HttpRequestBuilder.headers，必须用 signed. 前缀
+            signed.headers.forEach { (name, value) -> header(name, value) }
         }
 
         // 鉴权失败时可能返回 HTTP 200 + ResponseMetadata.Error，需先检查返回体
         val json = response.body<JsonObject>()
-        val apiErr = json["ResponseMetadata"]?.jsonObject?.get("Error")?.jsonObject
-        val errCode = apiErr?.get("Code")?.jsonPrimitive?.content
+        val errCode = json["ResponseMetadata"]?.jsonObject?.get("Error")?.jsonObject
+            ?.get("Code")?.jsonPrimitive?.content
         if (errCode != null) {
-            if (errCode.contains("csrf", ignoreCase = true) || errCode.contains("token", ignoreCase = true)) {
-                throw ApiException("x-csrf-token 无效或已过期，请从 DevTools 重新复制完整值")
-            }
-            if (errCode.contains("login", ignoreCase = true)
-                || errCode.contains("signature", ignoreCase = true)
-                || errCode.contains("accesskey", ignoreCase = true)
-                || errCode.contains("credential", ignoreCase = true)
-                || errCode.contains("auth", ignoreCase = true)
-                || errCode.contains("session", ignoreCase = true)
-            ) {
-                throw ApiException("登录态已过期，请更新 Cookie / x-csrf-token")
-            }
-            throw ApiException("API 错误: $errCode")
-        }
-        if (response.status.value == 401 || response.status.value == 403) {
-            throw ApiException("登录态已过期，请更新 Cookie / x-csrf-token")
+            throw ApiException("AK/SK 调用失败: $errCode")
         }
         if (response.status.value >= 400) {
-            val body = response.bodyAsText()
-            throw ApiException("HTTP ${response.status.value}: ${body.take(200)}")
+            throw ApiException("AK/SK 调用失败: HTTP ${response.status.value}")
         }
 
-        val quota = json["Result"]?.jsonObject?.get("QuotaUsage")?.jsonArray
-            ?: throw ApiException("invalid response")
+        val quota: List<JsonElement> = json["Result"]?.jsonObject?.get("QuotaUsage")?.jsonArray
+            ?: emptyList()
+        val present = quota.mapNotNull { it.jsonObject["Level"]?.jsonPrimitive?.content }.toSet()
+        val missing = QUOTA_LEVELS.filterNot { present.contains(it) }
+        if (missing.isNotEmpty()) {
+            throw ApiException("AK/SK 响应缺少 ${missing.joinToString("/")} 档")
+        }
 
+        return mapQuota(quota)
+    }
+
+    /** 重置时间字段在不同接口上分别叫 ResetTimestamp / ResetTime，这里兼容两种 */
+    private fun mapQuota(quota: List<JsonElement>): VolcengineUsageData {
         fun metric(level: String): UsageMetric {
             val item = quota.firstOrNull {
                 it.jsonObject["Level"]?.jsonPrimitive?.content == level
             }?.jsonObject
             val percent = item?.get("Percent")?.jsonPrimitive?.doubleOrNull?.toInt() ?: 0
             val limit = item?.get("Cap")?.jsonPrimitive?.doubleOrNull?.toInt() ?: 0
-            val resetSec = item?.get("ResetTimestamp")?.jsonPrimitive?.content?.toLongOrNull()
+            val raw = item?.get("ResetTimestamp") ?: item?.get("ResetTime")
+            val resetSec = raw?.jsonPrimitive?.content?.toLongOrNull()
             val resetTime = if (resetSec != null && resetSec > 0) {
                 Instant.ofEpochSecond(resetSec).toString()
             } else null
@@ -86,26 +102,10 @@ class VolcengineApi @Inject constructor(
             )
         }
 
-        val data = VolcengineUsageData(
+        return VolcengineUsageData(
             session = metric("session"),
             weekly = metric("weekly"),
             monthly = metric("monthly")
         )
-        // 成功后从 Set-Cookie 抓新 csrfToken 并回写，跟随服务端轮换
-        refreshCsrfFromResponse(response, csrfToken)
-        return data
-    }
-
-    /** 从 Set-Cookie 解析新 csrfToken（服务端每次响应会轮换），与当前不同则保存配置 */
-    private suspend fun refreshCsrfFromResponse(response: HttpResponse, currentCsrf: String) {
-        val lines: List<String> = response.headers.getAll(HttpHeaders.SetCookie) ?: return
-        var newCsrf: String? = null
-        for (line in lines) {
-            val m = Regex("(?:^|;\\s*)csrfToken=([^;]+)", RegexOption.IGNORE_CASE).find(line)
-            if (m != null) { newCsrf = m.groupValues[1]; break }
-        }
-        if (newCsrf == null || newCsrf == currentCsrf) return
-        val cur = configRepository.getConfig()
-        configRepository.saveConfig(cur.copy(volcengine = cur.volcengine.copy(csrfToken = newCsrf)))
     }
 }

@@ -71,7 +71,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Token / Cookie 类服务商；火山引擎有两个字段，走 [updateVolcengineConfig] */
+    /** Token 类服务商；火山引擎用 AK/SK 两个字段，走 [updateVolcengineConfig] */
     fun updateProviderToken(provider: SettingsProvider, token: String, useProxy: Boolean) {
         update { config ->
             val value = token.trim()
@@ -85,12 +85,12 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun updateVolcengineConfig(cookie: String, csrfToken: String, useProxy: Boolean) {
+    fun updateVolcengineConfig(accessKey: String, secretKey: String, useProxy: Boolean) {
         update { config ->
             config.copy(
                 volcengine = config.volcengine.copy(
-                    cookie = cookie.trim(),
-                    csrfToken = csrfToken.trim(),
+                    accessKey = accessKey.trim(),
+                    secretKey = secretKey.trim(),
                     useProxy = useProxy
                 )
             )

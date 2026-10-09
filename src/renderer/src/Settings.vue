@@ -31,16 +31,16 @@ const codexEnabled = ref<boolean>(false);
 const codexUseProxy = ref<boolean>(false);
 const codexAutoAvailable = ref<boolean>(false);
 
-const volcengineCookie = ref<string>('');
-const volcengineCsrfToken = ref<string>('');
+const volcengineAccessKey = ref<string>('');
+const volcengineSecretKey = ref<string>('');
 const volcengineEnabled = ref<boolean>(false);
 const volcengineUseProxy = ref<boolean>(false);
-const volcengineCookieChanged = ref<boolean>(false);
-const volcengineCsrfTokenChanged = ref<boolean>(false);
-const volcengineHasCookie = ref<boolean>(false);
-const volcengineHasCsrf = ref<boolean>(false);
-const volcengineShowCookie = ref<boolean>(false);
-const volcengineShowCsrf = ref<boolean>(false);
+const volcengineAccessKeyChanged = ref<boolean>(false);
+const volcengineSecretKeyChanged = ref<boolean>(false);
+const volcengineHasAccessKey = ref<boolean>(false);
+const volcengineHasSecretKey = ref<boolean>(false);
+const volcengineShowAccessKey = ref<boolean>(false);
+const volcengineShowSecretKey = ref<boolean>(false);
 
 const copilotOAuth = ref<boolean>(false);
 const deviceFlowBusy = ref<boolean>(false);
@@ -218,12 +218,12 @@ onMounted(async () => {
 
   volcengineEnabled.value = !!cfg.volcengine?.enabled;
   volcengineUseProxy.value = !!cfg.volcengine?.useProxy;
-  volcengineCookie.value = cfg.hasVolcengineCookie ? (cfg.volcengine?.cookie || '') : '';
-  volcengineCsrfToken.value = cfg.hasVolcengineCsrfToken ? (cfg.volcengine?.csrfToken || '') : '';
-  volcengineCookieChanged.value = false;
-  volcengineCsrfTokenChanged.value = false;
-  volcengineHasCookie.value = !!cfg.hasVolcengineCookie;
-  volcengineHasCsrf.value = !!cfg.hasVolcengineCsrfToken;
+  volcengineAccessKey.value = cfg.hasVolcengineAccessKey ? (cfg.volcengine?.accessKey || '') : '';
+  volcengineSecretKey.value = cfg.hasVolcengineSecretKey ? (cfg.volcengine?.secretKey || '') : '';
+  volcengineAccessKeyChanged.value = false;
+  volcengineSecretKeyChanged.value = false;
+  volcengineHasAccessKey.value = !!cfg.hasVolcengineAccessKey;
+  volcengineHasSecretKey.value = !!cfg.hasVolcengineSecretKey;
 
   proxyUrl.value = cfg.hasProxy ? (cfg.proxy?.url || '') : '';
   hasProxy.value = !!cfg.hasProxy;
@@ -289,10 +289,10 @@ async function onSave() {
       },
       codex: { enabled: codexEnabled.value, useProxy: codexUseProxy.value },
       volcengine: {
-        cookie: volcengineCookie.value.trim(),
-        cookieChanged: volcengineCookieChanged.value,
-        csrfToken: volcengineCsrfToken.value.trim(),
-        csrfTokenChanged: volcengineCsrfTokenChanged.value,
+        accessKey: volcengineAccessKey.value.trim(),
+        accessKeyChanged: volcengineAccessKeyChanged.value,
+        secretKey: volcengineSecretKey.value.trim(),
+        secretKeyChanged: volcengineSecretKeyChanged.value,
         enabled: volcengineEnabled.value,
         useProxy: volcengineUseProxy.value,
       },
@@ -554,40 +554,40 @@ async function openQrCode() {
           </label>
         </div>
         <div class="settings-field">
-          <label class="settings-label" for="volcengineCookie">Cookie</label>
+          <label class="settings-label" for="volcengineAccessKey">Access Key ID</label>
           <div class="settings-input-wrap">
             <input
-              :type="volcengineShowCookie ? 'text' : 'password'"
-              id="volcengineCookie"
+              :type="volcengineShowAccessKey ? 'text' : 'password'"
+              id="volcengineAccessKey"
               class="settings-input"
-              v-model="volcengineCookie"
-              :placeholder="volcengineHasCookie ? '留空保持原值' : '粘贴整段 Cookie'"
+              v-model="volcengineAccessKey"
+              :placeholder="volcengineHasAccessKey ? '留空保持原值' : 'AKLT...'"
               autocomplete="off" spellcheck="false"
-              @input="volcengineCookieChanged = true"
+              @input="volcengineAccessKeyChanged = true"
             >
-            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="volcengineShowCookie = !volcengineShowCookie">
-              {{ volcengineShowCookie ? '🔒' : '👁' }}
+            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="volcengineShowAccessKey = !volcengineShowAccessKey">
+              {{ volcengineShowAccessKey ? '🔒' : '👁' }}
             </button>
           </div>
         </div>
         <div class="settings-field">
-          <label class="settings-label" for="volcengineCsrf">x-csrf-token</label>
+          <label class="settings-label" for="volcengineSecretKey">Secret Access Key</label>
           <div class="settings-input-wrap">
             <input
-              :type="volcengineShowCsrf ? 'text' : 'password'"
-              id="volcengineCsrf"
+              :type="volcengineShowSecretKey ? 'text' : 'password'"
+              id="volcengineSecretKey"
               class="settings-input"
-              v-model="volcengineCsrfToken"
-              :placeholder="volcengineHasCsrf ? '留空保持原值' : '粘贴 x-csrf-token'"
+              v-model="volcengineSecretKey"
+              :placeholder="volcengineHasSecretKey ? '留空保持原值' : '粘贴 Secret Access Key'"
               autocomplete="off" spellcheck="false"
-              @input="volcengineCsrfTokenChanged = true"
+              @input="volcengineSecretKeyChanged = true"
             >
-            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="volcengineShowCsrf = !volcengineShowCsrf">
-              {{ volcengineShowCsrf ? '🔒' : '👁' }}
+            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="volcengineShowSecretKey = !volcengineShowSecretKey">
+              {{ volcengineShowSecretKey ? '🔒' : '👁' }}
             </button>
           </div>
           <div class="settings-hint">
-            在 console.volcengine.com 的 Coding Plan 页面打开 DevTools，复制 <code>GetCodingPlanUsage</code> 请求的整段 Cookie 与 x-csrf-token。Cookie 过期后需重新粘贴。
+            在 console.volcengine.com/iam/keymanage/ 创建访问密钥（区域 cn-beijing）。AK/SK 长期有效，无需再维护 Cookie。
           </div>
         </div>
       </div>

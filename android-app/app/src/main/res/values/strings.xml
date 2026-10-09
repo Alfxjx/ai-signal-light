@@ -37,10 +37,10 @@
     <string name="settings_provider_no_token">未配置 Token</string>
     <string name="settings_provider_disabled">已停用</string>
     <string name="settings_token_label">Token</string>
-    <string name="settings_cookie_label">Cookie</string>
-    <string name="settings_csrf_label">x-csrf-token</string>
+    <string name="settings_access_key_label">Access Key ID</string>
+    <string name="settings_secret_key_label">Secret Access Key</string>
     <string name="settings_use_proxy">使用全局代理</string>
     <string name="settings_show_secret">显示</string>
     <string name="settings_hide_secret">隐藏</string>
-    <string name="settings_volcengine_help">打开桌面控制台 Coding Plan 页面的 DevTools，复制 GetCodingPlanUsage 请求的 Cookie 与 x-csrf-token。登录过期需重新粘贴。</string>
+    <string name="settings_volcengine_help">在 console.volcengine.com/iam/keymanage/ 创建访问密钥（区域 cn-beijing）。AK/SK 长期有效，无需再维护 Cookie。</string>
 </resources>

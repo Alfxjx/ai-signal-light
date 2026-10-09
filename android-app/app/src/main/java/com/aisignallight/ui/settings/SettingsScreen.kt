@@ -75,7 +75,7 @@ private fun AppConfig.tokenValue(provider: SettingsProvider): String = when (pro
     SettingsProvider.MINIMAX -> minimax.token
     SettingsProvider.COPILOT -> copilot.token
     SettingsProvider.DEEPSEEK -> deepseek.token
-    SettingsProvider.VOLCENGINE -> volcengine.cookie
+    SettingsProvider.VOLCENGINE -> volcengine.accessKey
 }
 
 private fun AppConfig.useProxyValue(provider: SettingsProvider): Boolean = when (provider) {
@@ -86,9 +86,9 @@ private fun AppConfig.useProxyValue(provider: SettingsProvider): Boolean = when 
     SettingsProvider.VOLCENGINE -> volcengine.useProxy
 }
 
-/** 火山引擎需要 Cookie + x-csrf-token 两个字段才算配置完成 */
+/** 火山引擎需要 Access Key ID + Secret Access Key 两个字段才算配置完成 */
 private fun AppConfig.isConfigured(provider: SettingsProvider): Boolean = when (provider) {
-    SettingsProvider.VOLCENGINE -> volcengine.cookie.isNotBlank() && volcengine.csrfToken.isNotBlank()
+    SettingsProvider.VOLCENGINE -> volcengine.accessKey.isNotBlank() && volcengine.secretKey.isNotBlank()
     else -> tokenValue(provider).isNotBlank()
 }
 
@@ -249,27 +249,30 @@ fun SettingsScreen(
     }
 
     editingProvider?.let { provider ->
-        val isVolcengine = provider == SettingsProvider.VOLCENGINE
-        ProviderDialog(
-            title = provider.displayName,
-            tokenLabel = stringResource(
-                if (isVolcengine) R.string.settings_cookie_label else R.string.settings_token_label
-            ),
-            showCsrfField = isVolcengine,
-            initialToken = config.tokenValue(provider),
-            initialCsrfToken = config.volcengine.csrfToken,
-            initialUseProxy = config.useProxyValue(provider),
-            helpText = if (isVolcengine) stringResource(R.string.settings_volcengine_help) else null,
-            onConfirm = { token, csrfToken, useProxy ->
-                if (isVolcengine) {
-                    viewModel.updateVolcengineConfig(token, csrfToken, useProxy)
-                } else {
+        if (provider == SettingsProvider.VOLCENGINE) {
+            VolcengineConfigDialog(
+                initialAccessKey = config.volcengine.accessKey,
+                initialSecretKey = config.volcengine.secretKey,
+                initialUseProxy = config.volcengine.useProxy,
+                onConfirm = { accessKey, secretKey, useProxy ->
+                    viewModel.updateVolcengineConfig(accessKey, secretKey, useProxy)
+                    editingProvider = null
+                },
+                onDismiss = { editingProvider = null }
+            )
+        } else {
+            ProviderDialog(
+                title = provider.displayName,
+                tokenLabel = stringResource(R.string.settings_token_label),
+                initialToken = config.tokenValue(provider),
+                initialUseProxy = config.useProxyValue(provider),
+                onConfirm = { token, useProxy ->
                     viewModel.updateProviderToken(provider, token, useProxy)
-                }
-                editingProvider = null
-            },
-            onDismiss = { editingProvider = null }
-        )
+                    editingProvider = null
+                },
+                onDismiss = { editingProvider = null }
+            )
+        }
     }
 }
 
@@ -492,19 +495,14 @@ private fun ProxyDialog(
 private fun ProviderDialog(
     title: String,
     tokenLabel: String,
-    showCsrfField: Boolean,
     initialToken: String,
-    initialCsrfToken: String,
     initialUseProxy: Boolean,
-    helpText: String?,
-    onConfirm: (token: String, csrfToken: String, useProxy: Boolean) -> Unit,
+    onConfirm: (token: String, useProxy: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     var token by remember { mutableStateOf(initialToken) }
-    var csrfToken by remember { mutableStateOf(initialCsrfToken) }
     var useProxy by remember { mutableStateOf(initialUseProxy) }
     var tokenVisible by remember { mutableStateOf(false) }
-    var csrfVisible by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -519,42 +517,11 @@ private fun ProviderDialog(
                     onToggleVisible = { tokenVisible = !tokenVisible }
                 )
 
-                if (showCsrfField) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    SecretField(
-                        value = csrfToken,
-                        onValueChange = { csrfToken = it },
-                        label = stringResource(R.string.settings_csrf_label),
-                        visible = csrfVisible,
-                        onToggleVisible = { csrfVisible = !csrfVisible }
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(checked = useProxy, onCheckedChange = { useProxy = it })
-                    Text(
-                        text = stringResource(R.string.settings_use_proxy),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-
-                helpText?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
+                UseProxyRow(checked = useProxy, onCheckedChange = { useProxy = it })
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(token, csrfToken, useProxy) }) {
+            TextButton(onClick = { onConfirm(token, useProxy) }) {
                 Text(stringResource(R.string.confirm))
             }
         },
@@ -562,6 +529,81 @@ private fun ProviderDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
+}
+
+/** 火山引擎专用：Access Key ID + Secret Access Key（官方 OpenAPI 长期凭证，不再用 Cookie） */
+@Composable
+private fun VolcengineConfigDialog(
+    initialAccessKey: String,
+    initialSecretKey: String,
+    initialUseProxy: Boolean,
+    onConfirm: (accessKey: String, secretKey: String, useProxy: Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var accessKey by remember { mutableStateOf(initialAccessKey) }
+    var secretKey by remember { mutableStateOf(initialSecretKey) }
+    var useProxy by remember { mutableStateOf(initialUseProxy) }
+    var accessKeyVisible by remember { mutableStateOf(false) }
+    var secretKeyVisible by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(SettingsProvider.VOLCENGINE.displayName) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                SecretField(
+                    value = accessKey,
+                    onValueChange = { accessKey = it },
+                    label = stringResource(R.string.settings_access_key_label),
+                    visible = accessKeyVisible,
+                    onToggleVisible = { accessKeyVisible = !accessKeyVisible }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                SecretField(
+                    value = secretKey,
+                    onValueChange = { secretKey = it },
+                    label = stringResource(R.string.settings_secret_key_label),
+                    visible = secretKeyVisible,
+                    onToggleVisible = { secretKeyVisible = !secretKeyVisible }
+                )
+
+                UseProxyRow(checked = useProxy, onCheckedChange = { useProxy = it })
+
+                Text(
+                    text = stringResource(R.string.settings_volcengine_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(accessKey, secretKey, useProxy) }) {
+                Text(stringResource(R.string.confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        }
+    )
+}
+
+@Composable
+private fun UseProxyRow(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+        Text(
+            text = stringResource(R.string.settings_use_proxy),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
 }
 
 @Composable

@@ -117,13 +117,13 @@ class UsageRepositoryImpl @Inject constructor(
     ): UsageProviderState<VolcengineUsageData> {
         val cfg = config.volcengine
         if (!cfg.enabled) return UsageProviderState(error = "disabled", lastUpdated = now)
-        if (cfg.cookie.isBlank() || cfg.csrfToken.isBlank()) {
+        if (cfg.accessKey.isBlank() || cfg.secretKey.isBlank()) {
             return UsageProviderState(error = "no_token", lastUpdated = now)
         }
         return try {
             val proxy = if (cfg.useProxy) proxyUrl else null
             UsageProviderState(
-                data = volcengineApi.fetch(cfg.cookie, cfg.csrfToken, proxy),
+                data = volcengineApi.fetch(cfg, proxy),
                 lastUpdated = now, error = null
             )
         } catch (e: Exception) {

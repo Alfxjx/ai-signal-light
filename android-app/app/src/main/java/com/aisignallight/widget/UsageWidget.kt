@@ -234,8 +234,8 @@ private fun buildRows(config: AppConfig, snapshot: UsageSnapshot?): List<WidgetR
     }
 
     if (config.volcengine.enabled &&
-        config.volcengine.cookie.isNotBlank() &&
-        config.volcengine.csrfToken.isNotBlank()
+        config.volcengine.accessKey.isNotBlank() &&
+        config.volcengine.secretKey.isNotBlank()
     ) {
         val used = snapshot?.volcengine?.data?.let {
             maxOf(it.session.percent, it.weekly.percent, it.monthly.percent)

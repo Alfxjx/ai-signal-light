@@ -8,8 +8,8 @@ export interface SettingsPayload extends AppConfig {
   copilotOAuth: boolean;
   hasDeepseekToken: boolean;
   codexAutoAvailable: boolean;
-  hasVolcengineCookie: boolean;
-  hasVolcengineCsrfToken: boolean;
+  hasVolcengineAccessKey: boolean;
+  hasVolcengineSecretKey: boolean;
 }
 
 export interface SettingsSavePayload {
@@ -19,8 +19,8 @@ export interface SettingsSavePayload {
   deepseek: { token: string; tokenChanged: boolean; enabled: boolean; useProxy: boolean };
   codex?: { enabled: boolean; useProxy: boolean };
   volcengine?: {
-    cookie: string; cookieChanged: boolean;
-    csrfToken: string; csrfTokenChanged: boolean;
+    accessKey: string; accessKeyChanged: boolean;
+    secretKey: string; secretKeyChanged: boolean;
     enabled: boolean; useProxy: boolean;
   };
   proxy: { url: string; urlChanged: boolean };

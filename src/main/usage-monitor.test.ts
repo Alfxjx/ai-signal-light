@@ -88,6 +88,20 @@ describe('mapVolcengineUsage', () => {
     expect(r.session.percent).toBe(0);
     expect(r.monthly.resetTime).toBeNull();
   });
+  it('重置时间兼容 ResetTime 命名', () => {
+    const r = mapVolcengineUsage({
+      Result: {
+        QuotaUsage: [
+          { Level: 'session', Percent: 10, ResetTime: 1787639742, Cap: 100 },
+          { Level: 'weekly', Percent: 0, ResetTime: 1788105600, Cap: 100 },
+          { Level: 'monthly', Percent: 0, ResetTime: 1790351999, Cap: 100 },
+        ],
+      },
+    } as unknown as Record<string, unknown>);
+    expect(r.session.percent).toBe(10);
+    expect(r.session.resetTime).toMatch(/^2026-/);
+    expect(r.weekly.resetTime).toMatch(/^2026-/);
+  });
 });
 
 describe('calcPercent', () => {

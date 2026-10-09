@@ -6,9 +6,10 @@
 
 import axios, { AxiosError, AxiosProxyConfig } from 'axios';
 import type { ConfigStore } from './config';
-import type { ProviderConfig } from '../shared/types/config';
+import type { ProviderConfig, VolcengineProviderConfig } from '../shared/types/config';
 import { CopilotSessionCache, fetchCopilotUser, isCopilotOAuthToken } from './copilot-auth';
 import { getCodexAuth } from './codex-credentials';
+import { signVolcengineRequest, buildVolcengineUrl } from './volcengine-sign';
 import type {
   ProviderId,
   UsageMetric,
@@ -29,7 +30,11 @@ const MINIMAX_API = 'https://www.minimaxi.com/v1/api/openplatform/coding_plan/re
 const COPILOT_API = 'https://github.com/github-copilot/chat/entitlement';
 const DEEPSEEK_API = 'https://api.deepseek.com/user/balance';
 const CODEX_USAGE_API = 'https://chatgpt.com/backend-api/wham/usage';
-const VOLCENGINE_API = 'https://console.volcengine.com/api/top/ark/cn-beijing/2024-01-01/GetCodingPlanUsage';
+// 火山官方 OpenAPI：AK/SK + V4 签名，不依赖控制台登录态（Cookie 通道已移除）
+const VOLCENGINE_OPEN_HOST = 'open.volcengineapi.com';
+const VOLCENGINE_OPEN_REGION = 'cn-beijing';
+const VOLCENGINE_OPEN_SERVICE = 'ark';
+const VOLCENGINE_QUOTA_LEVELS = ['session', 'weekly', 'monthly'] as const;
 const REQUEST_TIMEOUT_MS = 8000;
 
 // 浏览器风格的 UA,避免被部分 API 当作 node 客户端拒绝
@@ -141,7 +146,7 @@ export class UsageMonitor {
     const proxyConfig = cfg.useProxy && globalProxy ? parseProxyUrl(globalProxy) : null;
 
     // 手动 token 优先；为空时尝试自动来源（如 Codex 本地 CLI 凭证）
-    // volcengine 无 token 字段，凭证（cookie/csrf）由 fetchVolcengine 内部读取并校验，
+    // volcengine 无 token 字段，AK/SK 由 fetchVolcengine 内部读取并校验，
     // 这里用一个非空占位避免触发 no_token 提前返回。
     let token = provider === 'volcengine'
       ? 'volcengine'
@@ -381,70 +386,59 @@ export class UsageMonitor {
 
   // ==================== Volcengine ====================
 
+  // 只走 AK/SK：官方 OpenAPI + V4 签名，长期有效。
   // token 参数为占位（_safeRun 的签名），实际凭证从配置 store 读取
   private async fetchVolcengine(_token: string, proxyConfig: AxiosProxyConfig | null): Promise<VolcengineUsageData> {
     const cfg = this.configStore.get().volcengine;
-    if (!cfg.cookie || !cfg.csrfToken) throw new Error('no_token');
-    const headers: Record<string, string> = {
-      'Cookie': cfg.cookie.trim(),
-      'x-csrf-token': cfg.csrfToken.trim(),
-      'Content-Type': 'application/json',
-      'Origin': 'https://console.volcengine.com',
-      'Referer': 'https://console.volcengine.com/ark/region:cn-beijing/subscription/coding-plan',
-    };
-    const reqConfig: { headers: Record<string, string>; proxy?: AxiosProxyConfig } = { headers };
+    if (!cfg.accessKey?.trim() || !cfg.secretKey?.trim()) throw new Error('no_token');
+    return this.fetchVolcengineByAksk(cfg, proxyConfig);
+  }
+
+  /** AK/SK 通道：官方 OpenAPI + V4 签名，失败时原样抛出真实错误码 */
+  private async fetchVolcengineByAksk(cfg: VolcengineProviderConfig, proxyConfig: AxiosProxyConfig | null): Promise<VolcengineUsageData> {
+    const signed = signVolcengineRequest({
+      method: 'GET',
+      host: VOLCENGINE_OPEN_HOST,
+      region: VOLCENGINE_OPEN_REGION,
+      service: VOLCENGINE_OPEN_SERVICE,
+      action: 'GetCodingPlanUsage',
+      version: '2024-01-01',
+      query: { Region: VOLCENGINE_OPEN_REGION },
+      accessKey: cfg.accessKey.trim(),
+      secretKey: cfg.secretKey.trim(),
+      date: new Date(),
+    });
+    const reqConfig: { headers: Record<string, string>; proxy?: AxiosProxyConfig } = { headers: signed.headers };
     if (proxyConfig) reqConfig.proxy = proxyConfig;
-    const res = await http.post<unknown>(VOLCENGINE_API, undefined, reqConfig);
+    const res = await http.get<unknown>(
+      buildVolcengineUrl(VOLCENGINE_OPEN_HOST, signed.canonicalQuery),
+      reqConfig
+    );
 
     const json = (typeof res.data === 'object' && res.data) ? (res.data as Record<string, unknown>) : {};
     const apiErr = (json?.ResponseMetadata as Record<string, unknown> | undefined)?.Error as Record<string, unknown> | undefined;
     const errCode = apiErr?.Code ? String(apiErr.Code) : null;
-    // 火山引擎鉴权失败时返回 HTTP 200 + ResponseMetadata.Error（InvalidCSRFToken 等），
-    // 因此不能只按 status 判断，必须同时看返回体里的 Error。
+    // 火山鉴权/参数错误返回 HTTP 200 + ResponseMetadata.Error，因此不能只按 status 判断
     if (errCode) {
-      if (/csrf|token/i.test(errCode)) {
-        throw new Error('x-csrf-token 无效或已过期，请从 DevTools 重新复制完整值');
-      }
-      if (/login|signature|access.?key|credential|auth|session/i.test(errCode)) {
-        throw new Error('登录态已过期，请更新 Cookie / x-csrf-token');
-      }
-      console.error(`[usage:volcengine] api error ${errCode}\n  body: ${JSON.stringify(json).slice(0, 500)}`);
-      throw new Error(`API 错误: ${errCode}`);
+      console.error(`[usage:volcengine] OpenAPI error ${errCode}\n  body: ${JSON.stringify(apiErr).slice(0, 500)}`);
+      throw new Error(`AK/SK 调用失败: ${errCode}`);
     }
     if (res.status >= 400) {
       const bodyText = typeof res.data === 'string' ? res.data : JSON.stringify(json || {});
-      if (res.status === 401 || res.status === 403) {
-        throw new Error('登录态已过期，请更新 Cookie / x-csrf-token');
-      }
       console.error(`[usage:volcengine] HTTP ${res.status}\n  body: ${bodyText.slice(0, 500)}`);
-      throw new Error(`HTTP ${res.status}: ${bodyText.slice(0, 200)}`);
+      throw new Error(`AK/SK 调用失败: HTTP ${res.status}`);
     }
 
-    if (!(json.Result as { QuotaUsage?: unknown } | undefined)?.QuotaUsage) {
-      throw new Error('invalid response');
+    const quota = (json?.Result as Record<string, unknown> | undefined)?.QuotaUsage as Record<string, unknown>[] | undefined;
+    const present = new Set((Array.isArray(quota) ? quota : []).map((q) => String(q?.Level)));
+    const missing = VOLCENGINE_QUOTA_LEVELS.filter((l) => !present.has(l));
+    if (missing.length > 0) {
+      throw new Error(`AK/SK 响应缺少 ${missing.join('/')} 档`);
     }
+
     const data = mapVolcengineUsage(json);
-    console.log('[usage:volcengine] fetched data:', JSON.stringify(data));
-    // 成功后从 Set-Cookie 抓新 csrfToken 并回写，跟随服务端轮换
-    this.syncVolcengineCsrf(res);
+    console.log('[usage:volcengine] fetched via AK/SK:', JSON.stringify(data));
     return data;
-  }
-
-  /** 从 Set-Cookie 解析新 csrfToken（服务端每次响应会轮换），与现有不同则回写配置 */
-  private syncVolcengineCsrf(res: { headers: Record<string, unknown> }): void {
-    const setCookie = res.headers['set-cookie'];
-    const lines = Array.isArray(setCookie) ? setCookie : (setCookie ? [setCookie] : []);
-    let newCsrf: string | null = null;
-    for (const line of lines) {
-      const m = /(?:^|;\s*)csrfToken=([^;]+)/i.exec(String(line));
-      if (m) { newCsrf = m[1]; break; }
-    }
-    if (!newCsrf) return;
-    const cur = this.configStore.get().volcengine.csrfToken;
-    if (newCsrf !== cur) {
-      this.configStore.update({ volcengine: { csrfToken: newCsrf } });
-      console.log('[usage:volcengine] csrfToken auto-refreshed');
-    }
   }
 
   // 对外提供快照(用于 init 推送)
@@ -524,7 +518,8 @@ export function mapWhamUsage(json: Record<string, unknown>): CodexUsageData {
 }
 
 // Volcengine GetCodingPlanUsage 响应映射（纯函数，便于测试）
-// QuotaUsage 每档只给 Percent(已用%) 与 Cap(上限) 与 ResetTimestamp(秒级 Unix)。
+// QuotaUsage 每档只给 Percent(已用%) 与 Cap(上限) 与重置时间；重置字段历史上出现过
+// ResetTimestamp 与 ResetTime 两种命名，这里都兼容。
 export function mapVolcengineUsage(json: Record<string, unknown>): VolcengineUsageData {
   const quota = (json?.Result as Record<string, unknown> | undefined)?.QuotaUsage as unknown[] || [];
   const toMetric = (level: string): UsageMetric => {
@@ -533,7 +528,7 @@ export function mapVolcengineUsage(json: Record<string, unknown>): VolcengineUsa
     ) as Record<string, unknown> | undefined;
     const percent = Number(item?.Percent);
     const limit = Number(item?.Cap);
-    const resetSec = Number(item?.ResetTimestamp);
+    const resetSec = Number(item?.ResetTimestamp ?? item?.ResetTime);
     return {
       limit: limit || 0,
       // 接口只给百分比与上限，没有 used 量

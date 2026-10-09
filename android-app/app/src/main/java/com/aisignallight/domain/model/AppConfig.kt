@@ -9,10 +9,15 @@ data class ProviderConfig(
     val useProxy: Boolean = false
 )
 
+/**
+ * 火山引擎凭证来自官方 OpenAPI 的长期凭证（Access Key ID / Secret Access Key，
+ * 在 console.volcengine.com/iam/keymanage/ 创建），不再使用控制台 Cookie。
+ * 旧配置里的 cookie / csrfToken 字段由 SecureConfigStore 的 ignoreUnknownKeys 自动忽略。
+ */
 @Serializable
 data class VolcengineProviderConfig(
-    val cookie: String = "",
-    val csrfToken: String = "",
+    val accessKey: String = "",
+    val secretKey: String = "",
     val enabled: Boolean = true,
     val useProxy: Boolean = false
 )

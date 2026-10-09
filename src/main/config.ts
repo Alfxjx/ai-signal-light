@@ -15,7 +15,7 @@ const DEFAULTS: AppConfig = {
   copilot: { token: '', enabled: true, useProxy: false },
   deepseek: { token: '', enabled: true, useProxy: false },
   codex:   { token: '', enabled: true, useProxy: false },
-  volcengine: { cookie: '', csrfToken: '', enabled: true, useProxy: false },
+  volcengine: { accessKey: '', secretKey: '', enabled: true, useProxy: false },
   proxy: { url: '' },
   intervalMinutes: 10,
   window: { width: 240, height: 550, x: null, y: null, isCompact: true, dockedTop: false },
@@ -67,13 +67,21 @@ export class ConfigStore {
       }
       const raw = fs.readFileSync(this.configPath, 'utf8');
       const parsed = JSON.parse(raw) as Partial<AppConfig>;
+      // 火山只挑 AK/SK 等新键：旧 config.json 中的 cookie / csrfToken 已废弃，
+      // 不能靠 spread 带进内存（否则会随下次 _save 长期残留）
+      const legacyVolcengine = (parsed.volcengine || {}) as Record<string, unknown>;
       return {
         kimi:    { ...DEFAULTS.kimi,    ...(parsed.kimi    || {}) },
         minimax: { ...DEFAULTS.minimax, ...(parsed.minimax || {}) },
         copilot: { ...DEFAULTS.copilot, ...(parsed.copilot || {}) },
         deepseek: { ...DEFAULTS.deepseek, ...(parsed.deepseek || {}) },
         codex:   { ...DEFAULTS.codex,   ...(parsed.codex   || {}) },
-        volcengine: { ...DEFAULTS.volcengine, ...(parsed.volcengine || {}) },
+        volcengine: {
+          accessKey: typeof legacyVolcengine.accessKey === 'string' ? legacyVolcengine.accessKey : DEFAULTS.volcengine.accessKey,
+          secretKey: typeof legacyVolcengine.secretKey === 'string' ? legacyVolcengine.secretKey : DEFAULTS.volcengine.secretKey,
+          enabled: typeof legacyVolcengine.enabled === 'boolean' ? legacyVolcengine.enabled : DEFAULTS.volcengine.enabled,
+          useProxy: typeof legacyVolcengine.useProxy === 'boolean' ? legacyVolcengine.useProxy : DEFAULTS.volcengine.useProxy
+        },
         proxy:   { ...DEFAULTS.proxy,   ...(parsed.proxy   || {}) },
         window:  { ...DEFAULTS.window,  ...(parsed.window  || {}) },
         hooks: {
