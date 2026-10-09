@@ -11,12 +11,17 @@ android {
     namespace = "com.aisignallight"
     compileSdk = 35
 
+    // build number 取当前分支的 git 提交数，保证每次打包都严格递增；无 git 环境时回退为 1
+    val buildNumber = providers.exec {
+        commandLine("git", "rev-list", "--count", "HEAD")
+    }.standardOutput.asText.map { it.trim().toIntOrNull() ?: 1 }
+
     defaultConfig {
         applicationId = "com.aisignallight"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = buildNumber.get()
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
