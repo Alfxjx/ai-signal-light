@@ -1,4 +1,4 @@
-export type ProviderId = 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex' | 'volcengine';
+export type ProviderId = 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex' | 'volcengine' | 'mimo';
 export type UsageError = 'no_token' | 'disabled' | string;
 
 export interface UsageMetric {
@@ -67,7 +67,15 @@ export interface VolcengineUsageData {
   monthly:  UsageMetric;  // 月周期
 }
 
-export type ProviderUsageData = KimiUsageData | MinimaxUsageData | CopilotUsageData | DeepseekUsageData | CodexUsageData | VolcengineUsageData;
+export interface MimoUsageData {
+  isAvailable: boolean;
+  currency: string | null;
+  totalBalance: number;
+  grantedBalance: number;
+  paidBalance: number;
+}
+
+export type ProviderUsageData = KimiUsageData | MinimaxUsageData | CopilotUsageData | DeepseekUsageData | CodexUsageData | VolcengineUsageData | MimoUsageData;
 
 export interface UsageProviderState {
   data: ProviderUsageData | null;

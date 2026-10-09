@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapPhase, aggregateState, buildProjects, reconcile } from './kimi-monitor';
+import { mapPhase, aggregateState, buildProjects, reconcile, parseNotifyCall } from './kimi-monitor';
 import type { RestSession } from '../shared/types/kimi';
 
 describe('mapPhase', () => {
@@ -134,5 +134,38 @@ describe('reconcile', () => {
     busy.set('a', 'thinking');
     const changed = reconcile(busy, [rest({ id: 'a', busy: true })]);
     expect(changed).toBe(false);
+  });
+});
+
+describe('parseNotifyCall', () => {
+  function event(partial: Record<string, unknown>): Record<string, unknown> {
+    return { type: 'tool.call.started', session_id: 's1', payload: { tool_call_id: 'tc1', tool_name: 'NotifyUser', input: { message: '正在编译中，稍候' } }, ...partial };
+  }
+
+  it('tool.call.started + NotifyUser + input.message 命中', () => {
+    const n = parseNotifyCall(event({}));
+    expect(n).not.toBeNull();
+    expect(n!.message).toBe('正在编译中，稍候');
+    expect(typeof n!.ts).toBe('number');
+  });
+
+  it('tool.result 变体同样命中', () => {
+    const n = parseNotifyCall(event({ type: 'tool.result' }));
+    expect(n?.message).toBe('正在编译中，稍候');
+  });
+
+  it('arguments.message / payload.message 兜底形状命中', () => {
+    expect(parseNotifyCall(event({ payload: { tool_name: 'NotifyUser', arguments: { message: 'A' } } }))?.message).toBe('A');
+    expect(parseNotifyCall(event({ payload: { tool_name: 'NotifyUser', message: 'B' } }))?.message).toBe('B');
+  });
+
+  it('非 NotifyUser 工具返回 null', () => {
+    expect(parseNotifyCall(event({ payload: { tool_name: 'Bash', input: { command: 'ls' } } }))).toBeNull();
+  });
+
+  it('缺 message / 无 tool_name / 未知 type 返回 null', () => {
+    expect(parseNotifyCall(event({ payload: { tool_name: 'NotifyUser', input: {} } }))).toBeNull();
+    expect(parseNotifyCall(event({ payload: { input: { message: 'x' } } }))).toBeNull();
+    expect(parseNotifyCall(event({ type: 'agent.status.updated' }))).toBeNull();
   });
 });

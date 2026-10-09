@@ -5,10 +5,13 @@ const isOpen = ref(false);
 
 const links = [
   { label: '功能', href: '#features' },
-  { label: '使用', href: '#how-it-works' },
+  { label: '上手', href: '#how-it-works' },
   { label: 'FAQ', href: '#faq' },
-  { label: '下载', href: 'https://github.com/Alfxjx/ai-signal-light/releases' },
+  { label: '下载', href: '#download' },
 ];
+
+const REPO = 'https://github.com/Alfxjx/ai-signal-light';
+const RELEASES = `${REPO}/releases`;
 
 function close() {
   isOpen.value = false;
@@ -16,79 +19,85 @@ function close() {
 </script>
 
 <template>
-  <header class="fixed top-0 left-0 right-0 z-50">
-    <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-      <nav class="glass-panel flex items-center justify-between px-5 py-3">
-        <a href="#hero" class="flex items-center gap-3">
-          <img src="/src/assets/technical-support.png" alt="" class="h-8 w-8" />
-          <span class="text-lg font-semibold tracking-tight">AI 状态随身看</span>
+  <header class="fixed inset-x-0 top-0 z-50">
+    <div class="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
+      <nav class="panel flex items-center gap-4 px-4 py-2.5">
+        <a href="#hero" class="flex items-center gap-2.5">
+          <span class="led led-green led-dim" />
+          <span class="text-[15px] font-semibold tracking-tight text-white">AI状态监控</span>
+          <span class="label hidden sm:inline">local dashboard</span>
         </a>
 
-        <!-- Desktop nav -->
-        <div class="hidden items-center gap-6 md:flex">
+        <!-- Desktop -->
+        <div class="ml-auto hidden items-center gap-6 md:flex">
           <a
             v-for="link in links"
             :key="link.href"
             :href="link.href"
-            class="text-sm text-gray-300 transition-colors hover:text-white"
+            class="text-[13px] text-gray-400 transition-colors hover:text-white"
           >
             {{ link.label }}
           </a>
-          <a
-            href="https://github.com/Alfxjx/ai-signal-light"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="rounded-lg bg-white/10 px-4 py-2 text-sm font-medium transition-colors hover:bg-white/20"
-          >
+          <a :href="REPO" target="_blank" rel="noopener noreferrer" class="btn btn-ghost !px-4 !py-2 !text-[13px]">
             GitHub
+          </a>
+          <a :href="RELEASES" target="_blank" rel="noopener noreferrer" class="btn btn-primary !px-4 !py-2 !text-[13px]">
+            免费下载
           </a>
         </div>
 
-        <!-- Mobile hamburger -->
+        <!-- Mobile toggle -->
         <button
-          class="flex h-10 w-10 flex-col items-center justify-center gap-1.5 md:hidden"
+          class="ml-auto flex h-9 w-9 flex-col items-center justify-center gap-1.5 md:hidden"
           aria-label="打开菜单"
+          :aria-expanded="isOpen"
           @click="isOpen = !isOpen"
         >
           <span
-            class="block h-0.5 w-6 bg-white transition-transform"
-            :class="{ 'translate-y-2 rotate-45': isOpen }"
+            class="block h-px w-5 bg-white transition-transform"
+            :class="{ 'translate-y-[3.5px] rotate-45': isOpen }"
           />
+          <span class="block h-px w-5 bg-white transition-opacity" :class="{ 'opacity-0': isOpen }" />
           <span
-            class="block h-0.5 w-6 bg-white transition-opacity"
-            :class="{ 'opacity-0': isOpen }"
-          />
-          <span
-            class="block h-0.5 w-6 bg-white transition-transform"
-            :class="{ '-translate-y-2 -rotate-45': isOpen }"
+            class="block h-px w-5 bg-white transition-transform"
+            :class="{ '-translate-y-[3.5px] -rotate-45': isOpen }"
           />
         </button>
       </nav>
     </div>
 
-    <!-- Mobile menu overlay -->
+    <!-- Mobile menu -->
     <div
       v-if="isOpen"
-      class="fixed inset-0 z-40 flex flex-col items-center justify-center gap-8 bg-[#0a0a12]/95 backdrop-blur-xl md:hidden"
+      class="fixed inset-0 z-40 flex flex-col items-center justify-center gap-7 bg-ink-950/96 backdrop-blur-xl md:hidden"
       @click.self="close"
     >
       <a
         v-for="link in links"
         :key="link.href"
         :href="link.href"
-        class="text-2xl font-medium text-gray-200 transition-colors hover:text-white"
+        class="num text-2xl text-gray-200 transition-colors hover:text-led-green"
         @click="close"
       >
         {{ link.label }}
       </a>
       <a
-        href="https://github.com/Alfxjx/ai-signal-light"
+        :href="REPO"
         target="_blank"
         rel="noopener noreferrer"
-        class="rounded-lg bg-white/10 px-6 py-3 text-lg font-medium transition-colors hover:bg-white/20"
+        class="btn btn-ghost"
         @click="close"
       >
         GitHub
+      </a>
+      <a
+        :href="RELEASES"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="btn btn-primary"
+        @click="close"
+      >
+        免费下载
       </a>
     </div>
   </header>

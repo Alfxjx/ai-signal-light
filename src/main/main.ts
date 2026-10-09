@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen, shell } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen, shell, Notification } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -10,9 +10,10 @@ import { KimiMonitor } from './kimi-monitor';
 import { startDeviceFlow, pollDeviceFlow, isCopilotOAuthToken } from './copilot-auth';
 import { codexAuthAvailable } from './codex-credentials';
 import { TopEdgeDock, type DockState } from './edge-dock';
+import { PetStore } from './pet-store';
 import { WS_PORT } from '../shared/constants';
 import { IPC_CHANNELS } from '../shared/types/ipc';
-import type { HooksInstallResult, HooksUninstallResult } from '../shared/types/ipc';
+import type { HooksInstallResult, HooksUninstallResult, PetInstallInput } from '../shared/types/ipc';
 import { buildQrPayload, encodeQrPayload, generateApiKey, getLanIp } from './pairing';
 
 // 统一 dev 与打包后的 userData 目录名，并刻意区分二者。
@@ -28,6 +29,7 @@ let mainWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let floatingBallWindow: BrowserWindow | null = null;
 let floatingBallDropdownWindow: BrowserWindow | null = null;
+let petWindow: BrowserWindow | null = null;
 let qrWindow: BrowserWindow | null = null;
 let trayHoverWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -35,6 +37,7 @@ let server: StatusServer | null = null;
 let configStore: ConfigStore | null = null;
 let usageMonitor: UsageMonitor | null = null;
 let kimiMonitor: KimiMonitor | null = null;
+let petStore: PetStore | null = null;
 let copilotDeviceCancelled = false;
 let isQuitting = false;
 let dock: TopEdgeDock | null = null;
@@ -247,7 +250,9 @@ function isRectVisible(x: number, y: number, w: number, h: number): boolean {
 // ==================== 托盘 hover 弹窗 ====================
 
 const TH_WIDTH = 200;   // 与 tray-hover.css 的 html/body width 保持一致
-const TH_HEIGHT = 260;  // 单列分段：header + 5 个 provider section + padding
+const TH_HEIGHT = 260;  // 初始高度；渲染层回报内容高度后会覆盖（provider 数量会变）
+// 弹窗当前高度，由渲染层通过 TRAY_HOVER_RESIZE 上报驱动
+let trayHoverHeight = TH_HEIGHT;
 
 // 创建托盘 hover 弹窗（首次 hover 时创建，之后复用）
 function createTrayHoverWindow(): BrowserWindow {
@@ -321,12 +326,13 @@ function positionTrayHover(): void {
 
   let x: number;
   let y: number;
+  const h = trayHoverHeight;
   if (taskbarLeft || taskbarRight) {
     // 任务栏在左/右：贴内侧边，竖直居中于图标
     x = taskbarLeft ? wa.x : wa.x + wa.width - TH_WIDTH;
-    y = Math.round(centerY - TH_HEIGHT / 2);
+    y = Math.round(centerY - h / 2);
     if (y < wa.y) y = wa.y;
-    if (y + TH_HEIGHT > wa.y + wa.height) y = wa.y + wa.height - TH_HEIGHT;
+    if (y + h > wa.y + wa.height) y = wa.y + wa.height - h;
   } else if (taskbarTop) {
     // 任务栏在顶部：图标下方，水平居中，顶部贴任务栏
     x = Math.round(centerX - TH_WIDTH / 2);
@@ -334,13 +340,13 @@ function positionTrayHover(): void {
   } else {
     // 默认任务栏在底部：图标上方，水平居中，底部贴任务栏
     x = Math.round(centerX - TH_WIDTH / 2);
-    y = wa.y + wa.height - TH_HEIGHT;
+    y = wa.y + wa.height - h;
   }
   if (x < wa.x) x = wa.x;
   if (x + TH_WIDTH > wa.x + wa.width) x = wa.x + wa.width - TH_WIDTH;
 
-  console.log('[tray-hover] position:', { icon, centerX, centerY, x, y, wa });
-  trayHoverWindow.setBounds({ x, y, width: TH_WIDTH, height: TH_HEIGHT });
+  console.log('[tray-hover] position:', { icon, centerX, centerY, x, y, h, wa });
+  trayHoverWindow.setBounds({ x, y, width: TH_WIDTH, height: h });
 }
 
 function clearTrayHoverTimers(): void {
@@ -381,6 +387,19 @@ ipcMain.on(IPC_CHANNELS.TRAY_HOVER_POINTER, (_event, inside: boolean) => {
   } else {
     // 光标离开弹窗 → 如果也不在托盘上，就排队隐藏
     if (!pointerInsideTray) scheduleHideTrayHover();
+  }
+});
+
+// 托盘弹窗渲染层回报：内容高度（provider 数量会变，窗口高度跟着内容走）
+ipcMain.on(IPC_CHANNELS.TRAY_HOVER_RESIZE, (_event, height: number) => {
+  const h = Math.round(Number(height));
+  // 上下各留 4px 余量，并夹在合理区间内防住异常上报
+  if (!Number.isFinite(h) || h <= 0) return;
+  const next = Math.min(Math.max(h + 8, 120), 900);
+  if (next === trayHoverHeight) return;
+  trayHoverHeight = next;
+  if (trayHoverWindow && !trayHoverWindow.isDestroyed() && trayHoverWindow.isVisible()) {
+    positionTrayHover();
   }
 });
 
@@ -434,6 +453,7 @@ function buildTrayMenu(): Electron.Menu {
   return Menu.buildFromTemplate([
     { label: '显示/隐藏面板', click: () => toggleWindow() },
     { label: '显示/隐藏悬浮球', click: () => toggleFloatingBall() },
+    { label: '显示/隐藏宠物', click: () => togglePet() },
     { type: 'separator' },
     {
       label: '启用 Kimi',
@@ -758,6 +778,171 @@ function syncFloatingBallFromConfig(): void {
   }
 }
 
+// ==================== 桌面宠物窗口（Codex 图集宠物，独立于悬浮球） ====================
+
+// Codex 图集单元：每格 192x208，窗口尺寸随缩放变化
+const PET_CELL_W = 192;
+const PET_CELL_H = 208;
+
+function petWindowSize(scale: number): { width: number; height: number } {
+  const s = Math.min(150, Math.max(50, scale)) / 100;
+  return { width: Math.round(PET_CELL_W * s), height: Math.round(PET_CELL_H * s) };
+}
+
+// 创建宠物窗口（透明、无边框、置顶、不抢焦点；拖动由渲染层自绘）
+function createPetWindow(): void {
+  if (petWindow && !petWindow.isDestroyed()) {
+    return;
+  }
+  if (!configStore) return;
+  const cfg = configStore.get().pet;
+  const { width, height } = petWindowSize(cfg.scale);
+
+  const winOpts: Electron.BrowserWindowConstructorOptions = {
+    width,
+    height,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    focusable: false,
+    hasShadow: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    },
+    show: false
+  };
+
+  // 持久化坐标校验：必须落在某个显示器工作区
+  if (cfg.x != null && cfg.y != null && isRectVisible(cfg.x, cfg.y, width, height)) {
+    winOpts.x = cfg.x;
+    winOpts.y = cfg.y;
+  } else {
+    // 默认贴光标所在屏右下角
+    const cursor = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(cursor) || screen.getPrimaryDisplay();
+    const wa = display.workArea;
+    winOpts.x = wa.x + wa.width - width - 20;
+    winOpts.y = wa.y + wa.height - height - 20;
+  }
+
+  petWindow = new BrowserWindow(winOpts);
+  petWindow.loadURL(`${RENDERER_BASE}/pet.html`);
+  petWindow.once('ready-to-show', () => petWindow?.show());
+
+  // 拖动持久化（debounce 400ms，复用悬浮球模式）
+  const savePetBounds = () => {
+    if (!petWindow || petWindow.isDestroyed() || !configStore) return;
+    const b = petWindow.getBounds();
+    configStore.update({ pet: { x: b.x, y: b.y } });
+  };
+  let petTimer: NodeJS.Timeout | null = null;
+  const schedulePetSave = () => {
+    if (petTimer) clearTimeout(petTimer);
+    petTimer = setTimeout(savePetBounds, 400);
+  };
+  petWindow.on('moved', schedulePetSave);
+
+  // 关闭按钮只是隐藏窗口（和主窗口一致）
+  petWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      petWindow?.hide();
+    }
+  });
+
+  petWindow.on('closed', () => {
+    petWindow = null;
+  });
+}
+
+function togglePet(): void {
+  if (!configStore) return;
+  if (!configStore.get().pet.enabled) {
+    // 首次从托盘点开：强制启用
+    configStore.update({ pet: { enabled: true, isVisible: true } });
+  }
+  if (!petWindow || petWindow.isDestroyed()) {
+    createPetWindow();
+    return;
+  }
+  if (petWindow.isVisible()) {
+    petWindow.hide();
+    if (configStore) configStore.update({ pet: { isVisible: false } });
+    hideFloatingBallDropdown();
+  } else {
+    petWindow.show();
+    if (configStore) configStore.update({ pet: { isVisible: true } });
+  }
+}
+
+function hidePet(): void {
+  if (petWindow && !petWindow.isDestroyed() && petWindow.isVisible()) {
+    petWindow.hide();
+    if (configStore) configStore.update({ pet: { isVisible: false } });
+  }
+  // 宠物收起时连带关掉下拉
+  hideFloatingBallDropdown();
+}
+
+// 宠物开关同步：启用且有活动宠物才显示窗口（未安装宠物时不占屏）
+function syncPetFromConfig(): void {
+  if (!configStore) return;
+  const cfg = configStore.get().pet;
+  const hasPet = !!cfg.activePetId && !!petStore?.get(cfg.activePetId);
+  if (cfg.enabled && cfg.isVisible && hasPet) {
+    if (!petWindow || petWindow.isDestroyed()) {
+      createPetWindow();
+    } else if (!petWindow.isVisible()) {
+      petWindow.show();
+    }
+  } else {
+    if (petWindow && !petWindow.isDestroyed()) {
+      petWindow.hide();
+    }
+  }
+}
+
+// 通知宠物窗口：活动宠物或缩放变化，渲染层据此重建播放器
+function notifyPetChanged(): void {
+  if (petWindow && !petWindow.isDestroyed()) {
+    petWindow.webContents.send(IPC_CHANNELS.PET_CHANGED);
+  }
+}
+
+// 单击宠物：打开本地 Kimi Code Web。
+// 浏览器对完全相同的 URL 会自动聚焦已有标签页而非新开标签，
+// 因此"已打开"时不会重复打开，而是把已有页面带到前台。
+function openPetWeb(): { ok: boolean; url?: string; error?: string } {
+  const url = kimiMonitor?.getWebUrl();
+  if (!url) {
+    new Notification({ title: 'AI状态监控', body: 'Kimi Code Web 服务未启动，无法打开' }).show();
+    return { ok: false, error: 'kimi-web-unavailable' };
+  }
+  shell.openExternal(url).catch(() => {});
+  return { ok: true, url };
+}
+
+// 右键宠物：原生菜单（打开 Kimi Web / 打开设置 / 隐藏宠物）
+function showPetMenu(): void {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  const cursor = screen.getCursorScreenPoint();
+  const menu = Menu.buildFromTemplate([
+    { label: '打开 Kimi Web', click: () => { openPetWeb(); } },
+    { label: '打开设置', click: () => { openSettingsWindow(); } },
+    { type: 'separator' },
+    { label: '隐藏宠物', click: () => { hidePet(); } },
+  ]);
+  menu.popup({ window: petWindow, x: cursor.x, y: cursor.y });
+}
+
 // ==================== 悬浮球下拉窗口（Kimi 状态 + 用量） ====================
 
 const DD_WIDTH = 260;
@@ -799,17 +984,18 @@ function createFloatingBallDropdown(): void {
   floatingBallDropdownWindow.on('closed', () => { floatingBallDropdownWindow = null; });
 }
 
-// 把下拉窗口锚定到悬浮球正下方：水平居中于球，顶部贴球底部；越界时夹进工作区
-function positionFloatingBallDropdown(): void {
+// 把下拉窗口锚定到触发源（悬浮球或宠物）正下方：水平居中于源窗口，顶部贴其底部；越界时夹进工作区
+function positionFloatingBallDropdown(anchor?: BrowserWindow | null): void {
   if (!floatingBallDropdownWindow || floatingBallDropdownWindow.isDestroyed()) return;
-  if (!floatingBallWindow || floatingBallWindow.isDestroyed()) return;
+  const source = anchor && !anchor.isDestroyed() ? anchor : floatingBallWindow;
+  if (!source || source.isDestroyed()) return;
 
-  const ball = floatingBallWindow.getBounds();
+  const ball = source.getBounds();
   const display = screen.getDisplayNearestPoint({ x: ball.x, y: ball.y }) || screen.getPrimaryDisplay();
   const wa = display.workArea;
 
   let x = Math.round(ball.x + ball.width / 2 - DD_WIDTH / 2);
-  let y = ball.y + ball.height + 6; // 球正下方 + 6px 间隙
+  let y = ball.y + ball.height + 6; // 源窗口正下方 + 6px 间隙
 
   if (x < wa.x) x = wa.x;
   if (x + DD_WIDTH > wa.x + wa.width) x = wa.x + wa.width - DD_WIDTH;
@@ -819,18 +1005,20 @@ function positionFloatingBallDropdown(): void {
   floatingBallDropdownWindow.setBounds({ x, y, width: DD_WIDTH, height: DD_HEIGHT });
 }
 
-function toggleFloatingBallDropdown(): void {
-  if (!floatingBallWindow || floatingBallWindow.isDestroyed() || !floatingBallWindow.isVisible()) return;
+function toggleFloatingBallDropdown(anchor?: BrowserWindow | null): void {
   if (!floatingBallDropdownWindow || floatingBallDropdownWindow.isDestroyed()) {
     createFloatingBallDropdown();
   }
   if (floatingBallDropdownWindow!.isVisible()) {
+    // 已显示：直接收起（Esc 关闭不依赖锚点窗口是否存活）
     floatingBallDropdownWindow!.hide();
-  } else {
-    positionFloatingBallDropdown();
-    floatingBallDropdownWindow!.show();
-    floatingBallDropdownWindow!.focus();
+    return;
   }
+  const source = anchor && !anchor.isDestroyed() ? anchor : floatingBallWindow;
+  if (!source || source.isDestroyed() || !source.isVisible()) return;
+  positionFloatingBallDropdown(source);
+  floatingBallDropdownWindow!.show();
+  floatingBallDropdownWindow!.focus();
 }
 
 // 应用就绪
@@ -843,6 +1031,9 @@ app.whenReady().then(() => {
 
   // 2.1 创建 Kimi Code (web) 状态监控（注入到 server 中以便广播 + 走 refresh）
   kimiMonitor = new KimiMonitor();
+
+  // 2.2 创建桌面宠物素材库（磁盘存储）
+  petStore = new PetStore(path.join(app.getPath('userData'), 'pets'));
 
   // 3. 启动状态服务器（注入 configStore + usageMonitor 让它能广播用量）
   server = new StatusServer(WS_PORT, { configStore, usageMonitor, kimiMonitor });
@@ -864,8 +1055,9 @@ app.whenReady().then(() => {
   createWindow();
   createTray();
 
-  // 6. 如果上次退出时悬浮球是显示的，自动恢复
+  // 6. 如果上次退出时悬浮球/宠物是显示的，自动恢复
   syncFloatingBallFromConfig();
+  syncPetFromConfig();
 
   // 6. 生成 Claude Code hooks helper 脚本（每次启动覆盖以保证最新）
   try { ensureHookHelper(); } catch (e) { console.warn('[hooks] ensureHookHelper failed:', (e as Error).message); }
@@ -928,14 +1120,17 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, async () => {
     hasProxy:        !!(cfg.proxy?.url),
     copilotOAuth: isCopilotOAuthToken(cfg.copilot.token || ''),
     hasDeepseekToken: !!cfg.deepseek.token,
-    hasVolcengineAccessKey: !!cfg.volcengine.accessKey,
+hasVolcengineAccessKey: !!cfg.volcengine.accessKey,
     hasVolcengineSecretKey: !!cfg.volcengine.secretKey,
+    mimo: { token: cfg.mimo.token ? maskToken(cfg.mimo.token) : '', enabled: cfg.mimo.enabled, useProxy: cfg.mimo.useProxy },
+    hasMimoCookie: !!cfg.mimo.token,
     codexAutoAvailable: codexAuthAvailable(),
     hooks: {
       enabled: { ...cfg.hooks.enabled },
       endpoint: { autoInstalled: !!cfg.hooks.endpoint.autoInstalled }
     },
     floatingBall: { enabled: !!cfg.floatingBall.enabled },
+    pet: { enabled: !!cfg.pet?.enabled },
     thresholds: { ...cfg.thresholds },
     lanMode: { enabled: !!cfg.lanMode?.enabled, apiKey: cfg.lanMode?.apiKey || '' }
   };
@@ -984,6 +1179,17 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_SAVE, async (_event, partial: Record<string
     }
     delete (next.deepseek as Record<string, unknown>).tokenChanged;
   }
+  // mimo：token 字段存控制台 Cookie，沿用同一套变更协议
+  if (next.mimo && typeof next.mimo === 'object') {
+    const mimo = next.mimo as Record<string, unknown>;
+    if (mimo.tokenChanged) {
+      next.mimo = { ...mimo, token: (mimo.token as string) || '' };
+    } else {
+      next.mimo = { ...mimo, token: current.mimo.token };
+    }
+    delete (next.mimo as Record<string, unknown>).tokenChanged;
+  }
+
   // proxy 使用同样的变更协议
   if (next.proxy && typeof next.proxy === 'object') {
     const proxy = next.proxy as Record<string, unknown>;
@@ -995,7 +1201,7 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_SAVE, async (_event, partial: Record<string
     delete (next.proxy as Record<string, unknown>).urlChanged;
   }
 
-  // volcengine：accessKey / secretKey 各自的变更协议（留空保持原值）
+// volcengine：accessKey / secretKey 各自的变更协议（留空保持原值）
   if (next.volcengine && typeof next.volcengine === 'object') {
     const v = next.volcengine as Record<string, unknown>;
     const keepOrTake = (field: 'accessKey' | 'secretKey'): void => {
@@ -1020,8 +1226,9 @@ ipcMain.handle(IPC_CHANNELS.SETTINGS_SAVE, async (_event, partial: Record<string
   configStore.update(next as Parameters<ConfigStore['update']>[0]);
   rebuildTray();
   if (usageMonitor) usageMonitor.checkAll();
-  // 悬浮球开关同步：启用即开窗口；关闭即隐藏
+  // 悬浮球/宠物开关同步：启用即开窗口；关闭即隐藏
   syncFloatingBallFromConfig();
+  syncPetFromConfig();
   return { success: true };
 });
 
@@ -1108,6 +1315,14 @@ ipcMain.on(IPC_CHANNELS.FLOATING_BALL_MOVE, (_event, dx: number, dy: number) => 
   }
 });
 
+// 悬浮球动态宽度：气泡展开/收起（setSize 保持左上角锚点，只向右扩展）
+ipcMain.handle(IPC_CHANNELS.FLOATING_BALL_SET_WIDTH, async (_event, width: number) => {
+  if (floatingBallWindow && !floatingBallWindow.isDestroyed() && Number.isFinite(width)) {
+    const w = Math.max(FB_WIDTH, Math.round(width));
+    floatingBallWindow.setSize(w, FB_HEIGHT);
+  }
+});
+
 // 悬浮球：读取当前状态
 ipcMain.handle(IPC_CHANNELS.FLOATING_BALL_GET_STATE, async () => {
   if (!configStore) return { visible: false, enabled: false };
@@ -1123,6 +1338,92 @@ ipcMain.handle(IPC_CHANNELS.FLOATING_BALL_NOTIFY_CLEARED, async (_event, cwd: st
   if (server && typeof cwd === 'string') {
     server.clearPendingByCwd(cwd);
   }
+});
+
+// ==================== 桌面宠物 IPC ====================
+
+ipcMain.handle(IPC_CHANNELS.PET_GET, async () => {
+  if (!configStore || !petStore) return { pet: null, scale: 100 };
+  const cfg = configStore.get().pet;
+  const pet = cfg.activePetId ? petStore.get(cfg.activePetId) : null;
+  return { pet, scale: cfg.scale };
+});
+
+ipcMain.handle(IPC_CHANNELS.PET_LIST, async () => {
+  return petStore ? petStore.list() : [];
+});
+
+// 渲染层已下载并校验好素材，这里持久化并设为活动
+ipcMain.handle(IPC_CHANNELS.PET_INSTALL, async (_event, input: PetInstallInput) => {
+  if (!petStore || !configStore) throw new Error('宠物存储未就绪');
+  const meta = petStore.add(input);
+  configStore.update({ pet: { activePetId: meta.id } });
+  syncPetFromConfig();
+  notifyPetChanged();
+  return meta;
+});
+
+ipcMain.handle(IPC_CHANNELS.PET_SET_ACTIVE, async (_event, id: string) => {
+  if (!configStore) return;
+  if (typeof id !== 'string') return;
+  if (id && !petStore?.get(id)) throw new Error('宠物不存在');
+  configStore.update({ pet: { activePetId: id || null } });
+  syncPetFromConfig();
+  notifyPetChanged();
+});
+
+ipcMain.handle(IPC_CHANNELS.PET_REMOVE, async (_event, id: string) => {
+  if (!petStore || !configStore) return;
+  if (typeof id !== 'string') return;
+  petStore.remove(id);
+  const cfg = configStore.get().pet;
+  if (cfg.activePetId === id) {
+    // 删掉当前只：自动落到剩下的第一只（没有则清空，宠物窗口不再显示）
+    const rest = petStore.list();
+    configStore.update({ pet: { activePetId: rest[0]?.id ?? null } });
+  }
+  syncPetFromConfig();
+  notifyPetChanged();
+});
+
+ipcMain.handle(IPC_CHANNELS.PET_TOGGLE, async () => {
+  togglePet();
+});
+
+// 单击宠物：打开本地 Kimi Code Web
+ipcMain.handle(IPC_CHANNELS.PET_OPEN_WEB, async () => {
+  return openPetWeb();
+});
+
+// 左键长按：切换下方下拉窗口（锚定宠物窗口）
+ipcMain.handle(IPC_CHANNELS.PET_TOGGLE_DROPDOWN, async () => {
+  toggleFloatingBallDropdown(petWindow);
+});
+
+// 宠物窗口自绘拖动：渲染层回报位移增量（dx/dy）
+ipcMain.on(IPC_CHANNELS.PET_MOVE, (_event, dx: number, dy: number) => {
+  if (petWindow && !petWindow.isDestroyed() && (Number.isFinite(dx) && Number.isFinite(dy))) {
+    const b = petWindow.getBounds();
+    petWindow.setBounds({ x: b.x + dx, y: b.y + dy, width: b.width, height: b.height });
+  }
+});
+
+// 右键宠物：弹出原生菜单
+ipcMain.handle(IPC_CHANNELS.PET_SHOW_MENU, async () => {
+  showPetMenu();
+});
+
+// 调整显示缩放：重设窗口尺寸 + 通知渲染层重建播放器
+ipcMain.handle(IPC_CHANNELS.PET_SET_SCALE, async (_event, scale: number) => {
+  if (!configStore) return;
+  const s = Math.min(150, Math.max(50, Math.round(scale)));
+  configStore.update({ pet: { scale: s } });
+  if (petWindow && !petWindow.isDestroyed()) {
+    const b = petWindow.getBounds();
+    const size = petWindowSize(s);
+    petWindow.setBounds({ x: b.x, y: b.y, width: size.width, height: size.height });
+  }
+  notifyPetChanged();
 });
 
 // 主窗口调整大小（保持宽度+位置，只调高度。多屏下 setSize 会被某些 Windows DPI

@@ -60,6 +60,7 @@ private val SettingsProvider.displayName: String
         SettingsProvider.COPILOT -> "Copilot"
         SettingsProvider.DEEPSEEK -> "DeepSeek"
         SettingsProvider.VOLCENGINE -> "火山引擎"
+        SettingsProvider.MIMO -> "小米 MiMo"
     }
 
 private fun AppConfig.isEnabled(provider: SettingsProvider): Boolean = when (provider) {
@@ -68,6 +69,7 @@ private fun AppConfig.isEnabled(provider: SettingsProvider): Boolean = when (pro
     SettingsProvider.COPILOT -> copilot.enabled
     SettingsProvider.DEEPSEEK -> deepseek.enabled
     SettingsProvider.VOLCENGINE -> volcengine.enabled
+    SettingsProvider.MIMO -> mimo.enabled
 }
 
 private fun AppConfig.tokenValue(provider: SettingsProvider): String = when (provider) {
@@ -76,6 +78,7 @@ private fun AppConfig.tokenValue(provider: SettingsProvider): String = when (pro
     SettingsProvider.COPILOT -> copilot.token
     SettingsProvider.DEEPSEEK -> deepseek.token
     SettingsProvider.VOLCENGINE -> volcengine.accessKey
+    SettingsProvider.MIMO -> mimo.token
 }
 
 private fun AppConfig.useProxyValue(provider: SettingsProvider): Boolean = when (provider) {
@@ -84,6 +87,7 @@ private fun AppConfig.useProxyValue(provider: SettingsProvider): Boolean = when 
     SettingsProvider.COPILOT -> copilot.useProxy
     SettingsProvider.DEEPSEEK -> deepseek.useProxy
     SettingsProvider.VOLCENGINE -> volcengine.useProxy
+    SettingsProvider.MIMO -> mimo.useProxy
 }
 
 /** 火山引擎需要 Access Key ID + Secret Access Key 两个字段才算配置完成 */
@@ -263,7 +267,8 @@ fun SettingsScreen(
         } else {
             ProviderDialog(
                 title = provider.displayName,
-                tokenLabel = stringResource(R.string.settings_token_label),
+                tokenLabel = if (provider == SettingsProvider.MIMO) "控制台 Cookie"
+                            else stringResource(R.string.settings_token_label),
                 initialToken = config.tokenValue(provider),
                 initialUseProxy = config.useProxyValue(provider),
                 onConfirm = { token, useProxy ->

@@ -58,15 +58,34 @@ data class VolcengineUsageData(
 
 @Serializable
 data class DeepseekUsageData(
-    val isAvailable: Boolean = false,
-    val currency: String? = null,
-    val totalBalance: Double = 0.0,
-    val grantedBalance: Double = 0.0,
+    override val isAvailable: Boolean = false,
+    override val currency: String? = null,
+    override val totalBalance: Double = 0.0,
+    override val grantedBalance: Double = 0.0,
     val toppedUpBalance: Double = 0.0
-)
+) : BalanceData
 
+/** 小米 MiMo 余额（api-platform_serviceToken 等 Cookie 鉴权，sk- 开头的 API Key 查不到） */
 @Serializable
-data class UsageProviderState<T>(
+data class MimoUsageData(
+    override val isAvailable: Boolean = false,
+    override val currency: String? = null,
+    override val totalBalance: Double = 0.0,
+    override val grantedBalance: Double = 0.0,
+    val paidBalance: Double = 0.0
+) : BalanceData
+
+/** 余额型 provider 的共同形状，供 UI 复用同一套余额卡（DeepSeek / MiMo） */
+interface BalanceData {
+    val isAvailable: Boolean
+    val currency: String?
+    val totalBalance: Double
+    val grantedBalance: Double
+}
+
+// T 只出现在 data: T? 这一协变位，放宽为 out 以便余额卡接受任意 BalanceData 实现
+@Serializable
+data class UsageProviderState<out T>(
     val data: T? = null,
     val lastUpdated: String? = null,
     val error: UsageError? = null
@@ -78,7 +97,8 @@ data class UsageSnapshot(
     val minimax: UsageProviderState<MinimaxUsageData>? = null,
     val copilot: UsageProviderState<CopilotUsageData>? = null,
     val volcengine: UsageProviderState<VolcengineUsageData>? = null,
-    val deepseek: UsageProviderState<DeepseekUsageData>? = null
+    val deepseek: UsageProviderState<DeepseekUsageData>? = null,
+    val mimo: UsageProviderState<MimoUsageData>? = null
 )
 
 enum class ProviderId(val value: String) {
@@ -86,7 +106,8 @@ enum class ProviderId(val value: String) {
     MINIMAX("minimax"),
     COPILOT("copilot"),
     VOLCENGINE("volcengine"),
-    DEEPSEEK("deepseek")
+    DEEPSEEK("deepseek"),
+    MIMO("mimo")
 }
 
 sealed class ProviderUsageData {

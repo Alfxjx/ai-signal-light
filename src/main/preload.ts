@@ -1,32 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-
-/** IPC 通道名称常量（与主进程保持一致） */
-const IPC_CHANNELS = {
-  TOGGLE_ALWAYS_ON_TOP: 'toggle-always-on-top',
-  SETTINGS_GET: 'settings:get',
-  SETTINGS_SAVE: 'settings:save',
-  SETTINGS_CLOSE: 'settings:close',
-  SETTINGS_OPEN: 'settings:open',
-  WINDOW_RESIZE: 'window:resize',
-  WINDOW_GET_STATE: 'window:get-state',
-  WINDOW_SET_COMPACT: 'window:set-compact',
-  HOOKS_GET_SNIPPET: 'hooks:get-snippet',
-  HOOKS_INSTALL: 'hooks:install',
-  HOOKS_UNINSTALL: 'hooks:uninstall',
-  QR_OPEN: 'qr:open',
-  COPILOT_DEVICE_START: 'copilot:device-start',
-  COPILOT_DEVICE_CANCEL: 'copilot:device-cancel',
-  COPILOT_DEVICE_RESULT: 'copilot:device-result',
-  FLOATING_BALL_TOGGLE: 'floating-ball:toggle',
-  FLOATING_BALL_OPEN_MAIN: 'floating-ball:open-main',
-  FLOATING_BALL_GET_STATE: 'floating-ball:get-state',
-  FLOATING_BALL_NOTIFY_CLEARED: 'floating-ball:notify-cleared',
-  FLOATING_BALL_TOGGLE_DROPDOWN: 'floating-ball:toggle-dropdown',
-  FLOATING_BALL_MOVE: 'floating-ball:move',
-  WINDOW_DOCK_STATE: 'window:dock-state',
-  WINDOW_DOCK_ANIM: 'window:dock-anim',
-  TRAY_HOVER_POINTER: 'tray-hover:pointer',
-} as const;
+import { IPC_CHANNELS } from '../shared/types/ipc';
 
 // 安全地暴露 API 给渲染进程
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -77,11 +50,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
     notifyCleared: (cwd: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_NOTIFY_CLEARED, cwd),
     toggleDropdown: () => ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_TOGGLE_DROPDOWN),
-    moveBy: (dx: number, dy: number) => ipcRenderer.send(IPC_CHANNELS.FLOATING_BALL_MOVE, dx, dy)
+    moveBy: (dx: number, dy: number) => ipcRenderer.send(IPC_CHANNELS.FLOATING_BALL_MOVE, dx, dy),
+    setWidth: (width: number) => ipcRenderer.invoke(IPC_CHANNELS.FLOATING_BALL_SET_WIDTH, width)
+  },
+
+  // 桌面宠物
+  pet: {
+    get: () => ipcRenderer.invoke(IPC_CHANNELS.PET_GET),
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.PET_LIST),
+    install: (input: unknown) => ipcRenderer.invoke(IPC_CHANNELS.PET_INSTALL, input),
+    setActive: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.PET_SET_ACTIVE, id),
+    remove: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.PET_REMOVE, id),
+    toggle: () => ipcRenderer.invoke(IPC_CHANNELS.PET_TOGGLE),
+    openWeb: () => ipcRenderer.invoke(IPC_CHANNELS.PET_OPEN_WEB),
+    toggleDropdown: () => ipcRenderer.invoke(IPC_CHANNELS.PET_TOGGLE_DROPDOWN),
+    moveBy: (dx: number, dy: number) => ipcRenderer.send(IPC_CHANNELS.PET_MOVE, dx, dy),
+    showMenu: () => ipcRenderer.invoke(IPC_CHANNELS.PET_SHOW_MENU),
+    setScale: (scale: number) => ipcRenderer.invoke(IPC_CHANNELS.PET_SET_SCALE, scale),
+    onChanged: (cb: () => void) =>
+      ipcRenderer.on(IPC_CHANNELS.PET_CHANGED, () => cb())
   },
 
   // 托盘 hover 弹窗：渲染层回报指针是否在窗口内
   trayHover: {
-    pointer: (inside: boolean) => ipcRenderer.send(IPC_CHANNELS.TRAY_HOVER_POINTER, inside)
+    pointer: (inside: boolean) => ipcRenderer.send(IPC_CHANNELS.TRAY_HOVER_POINTER, inside),
+    resize: (height: number) => ipcRenderer.send(IPC_CHANNELS.TRAY_HOVER_RESIZE, height)
   }
 });

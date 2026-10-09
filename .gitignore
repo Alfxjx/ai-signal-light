@@ -17,4 +17,7 @@
 *.swp
 *.swo
 *.idea
-*.iml   
+*.iml
+/opencode-plugin/node_modules
+/opencode-usage-plugin-helper-cli/node_modules
+/opencode-usage-plugin-helper-cli/dist

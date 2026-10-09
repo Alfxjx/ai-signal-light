@@ -20,6 +20,7 @@ export type {
   CodexUsageData,
   CodexWindowData,
   VolcengineUsageData,
+  MimoUsageData,
   UsageProviderState,
   UsageUpdatePayload,
 } from '../../../shared/types/usage';
@@ -51,6 +52,7 @@ export interface UsageState {
   deepseek: import('../../../shared/types/usage').UsageProviderState | null;
   codex: import('../../../shared/types/usage').UsageProviderState | null;
   volcengine: import('../../../shared/types/usage').UsageProviderState | null;
+  mimo: import('../../../shared/types/usage').UsageProviderState | null;
   enabled: Record<string, boolean>;
   thresholds: import('../../../shared/types/config').UsageThresholds;
 }
@@ -63,6 +65,7 @@ export interface UsageInitPayload {
   deepseek: import('../../../shared/types/usage').UsageProviderState | null;
   codex: import('../../../shared/types/usage').UsageProviderState | null;
   volcengine: import('../../../shared/types/usage').UsageProviderState | null;
+  mimo: import('../../../shared/types/usage').UsageProviderState | null;
   enabled?: Record<string, boolean>;
   intervalMinutes?: number;
   thresholds?: import('../../../shared/types/config').UsageThresholds;

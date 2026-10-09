@@ -25,7 +25,8 @@ enum class SettingsProvider {
     MINIMAX,
     COPILOT,
     DEEPSEEK,
-    VOLCENGINE
+    VOLCENGINE,
+    MIMO
 }
 
 @HiltViewModel
@@ -67,6 +68,7 @@ class SettingsViewModel @Inject constructor(
                 SettingsProvider.COPILOT -> config.copy(copilot = config.copilot.copy(enabled = enabled))
                 SettingsProvider.DEEPSEEK -> config.copy(deepseek = config.deepseek.copy(enabled = enabled))
                 SettingsProvider.VOLCENGINE -> config.copy(volcengine = config.volcengine.copy(enabled = enabled))
+                SettingsProvider.MIMO -> config.copy(mimo = config.mimo.copy(enabled = enabled))
             }
         }
     }
@@ -80,6 +82,7 @@ class SettingsViewModel @Inject constructor(
                 SettingsProvider.MINIMAX -> config.copy(minimax = config.minimax.copy(token = value, useProxy = useProxy))
                 SettingsProvider.COPILOT -> config.copy(copilot = config.copilot.copy(token = value, useProxy = useProxy))
                 SettingsProvider.DEEPSEEK -> config.copy(deepseek = config.deepseek.copy(token = value, useProxy = useProxy))
+                SettingsProvider.MIMO -> config.copy(mimo = config.mimo.copy(token = value, useProxy = useProxy))
                 SettingsProvider.VOLCENGINE -> config
             }
         }

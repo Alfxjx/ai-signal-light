@@ -25,7 +25,7 @@ import com.aisignallight.domain.model.UsageProviderState
 import com.aisignallight.domain.model.UsageSnapshot
 import com.aisignallight.domain.model.VolcengineUsageData
 import com.aisignallight.domain.utils.calcPace
-import com.aisignallight.ui.components.DeepseekBalanceCard
+import com.aisignallight.ui.components.BalanceCard
 import com.aisignallight.ui.components.ProviderCard
 import com.aisignallight.ui.components.UsageBarItem
 import com.aisignallight.ui.components.toBarItem
@@ -117,6 +117,7 @@ fun UsageList(
 ) {
     val models = buildProviderModels(usage, config)
     val deepseekNeedsSetup = usage.deepseek?.error == "no_token"
+    val mimoNeedsSetup = usage.mimo?.error == "no_token"
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -125,9 +126,19 @@ fun UsageList(
     ) {
         if (config.deepseek.enabled) {
             item(key = "deepseek") {
-                DeepseekBalanceCard(
+                BalanceCard(
+                    title = "DeepSeek",
                     state = usage.deepseek,
                     onClick = if (deepseekNeedsSetup) onOpenSettings else null
+                )
+            }
+        }
+        if (config.mimo.enabled) {
+            item(key = "mimo") {
+                BalanceCard(
+                    title = "MiMo",
+                    state = usage.mimo,
+                    onClick = if (mimoNeedsSetup) onOpenSettings else null
                 )
             }
         }
@@ -306,4 +317,5 @@ private fun allEmpty(usage: UsageSnapshot, config: AppConfig): Boolean {
         && (!config.copilot.enabled || usage.copilot == null)
         && (!config.volcengine.enabled || usage.volcengine == null)
         && (!config.deepseek.enabled || usage.deepseek == null)
+        && (!config.mimo.enabled || usage.mimo == null)
 }

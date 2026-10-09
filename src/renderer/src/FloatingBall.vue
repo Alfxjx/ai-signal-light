@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch, onBeforeUnmount } from 'vue';
 import { useUsageState } from './composables/useUsageState';
 import type { KimiAggregateState } from './types/messages';
 
-const { kimiState, kimiAvailable } = useUsageState();
+const { kimiState, kimiAvailable, kimiStatus } = useUsageState();
 
 // 窗口不再用 -webkit-app-region: drag（drag 区会吞点击事件，且与"点击弹下拉"互斥）。
 // 改为自绘拖动：mousedown 记录起点，mousemove 通过 IPC moveBy 移动窗口，
@@ -75,6 +75,43 @@ const STATE_TEXT: Record<KimiAggregateState, string> = {
   offline: '离线',
 };
 const ledTitle = computed(() => `Kimi · ${STATE_TEXT[kimiState.value]}`);
+
+// ===== Kimi NotifyUser 气泡（悬浮球右侧，15s 自动隐藏） =====
+const FB_WIDTH = 72;      // 球区基准宽（与 main.ts 的 FB_WIDTH 保持一致）
+const BUBBLE_W = 260;     // 气泡区宽度
+const HIDE_DELAY_MS = 15000;
+
+const notifyMsg = computed(() => kimiStatus.value?.notify?.message ?? '');
+const bubbleVisible = ref(false);
+let notifyTimer: ReturnType<typeof setTimeout> | null = null;
+
+function setBubbleWidth(show: boolean): void {
+  const api = window.electronAPI?.floatingBall;
+  if (!api?.setWidth) return;
+  api.setWidth(show ? FB_WIDTH + BUBBLE_W : FB_WIDTH).catch((e: unknown) => {
+    console.error('[FloatingBall] setWidth failed:', e);
+  });
+}
+
+watch(notifyMsg, (msg) => {
+  if (notifyTimer) { clearTimeout(notifyTimer); notifyTimer = null; }
+  if (msg) {
+    bubbleVisible.value = true;
+    setBubbleWidth(true);
+    notifyTimer = setTimeout(() => {
+      notifyTimer = null;
+      bubbleVisible.value = false;
+      setBubbleWidth(false);
+    }, HIDE_DELAY_MS);
+  } else {
+    bubbleVisible.value = false;
+    setBubbleWidth(false);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (notifyTimer) { clearTimeout(notifyTimer); notifyTimer = null; }
+});
 </script>
 
 <template>
@@ -84,5 +121,7 @@ const ledTitle = computed(() => `Kimi · ${STATE_TEXT[kimiState.value]}`);
          @mousedown="onMouseDown">
       <div class="led-lens"></div>
     </div>
+    <!-- Kimi NotifyUser 消息气泡（右侧，15s 自动隐藏） -->
+    <div class="fb-bubble" :class="{ 'fb-bubble--hidden': !bubbleVisible }">{{ notifyMsg }}</div>
   </div>
 </template>

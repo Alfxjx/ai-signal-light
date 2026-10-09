@@ -47,6 +47,8 @@ data class AppConfig(
     val copilot: ProviderConfig = ProviderConfig(),
     val volcengine: VolcengineProviderConfig = VolcengineProviderConfig(),
     val deepseek: ProviderConfig = ProviderConfig(),
+    /** token 字段存 platform.xiaomimimo.com 控制台复制的整段 Cookie */
+    val mimo: ProviderConfig = ProviderConfig(),
     val proxy: ProxyConfig = ProxyConfig(),
     val intervalMinutes: Int = 10,
     val thresholds: UsageThresholds = UsageThresholds(),

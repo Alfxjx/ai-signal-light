@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import type { SettingsSavePayload } from './types/electron';
+import type { SettingsSavePayload, PetMeta } from './types/electron';
 import { DEFAULT_USAGE_THRESHOLDS } from './types/messages';
+import { parseInput, fetchPet } from './pet/pet-install';
 
 interface ProviderState {
   enabled: boolean;
@@ -27,6 +28,7 @@ const kimi = reactive<ProviderState>(makeProvider());
 const minimax = reactive<ProviderState>(makeProvider());
 const copilot = reactive<ProviderState>(makeProvider());
 const deepseek = reactive<ProviderState>(makeProvider());
+const mimo = reactive<ProviderState>(makeProvider());
 const codexEnabled = ref<boolean>(false);
 const codexUseProxy = ref<boolean>(false);
 const codexAutoAvailable = ref<boolean>(false);
@@ -76,6 +78,71 @@ const intervalMinutes = ref<number>(10);
 const saving = ref<boolean>(false);
 const floatingBallEnabled = ref<boolean>(false);
 const lanModeEnabled = ref<boolean>(false);
+
+// ---- 桌面宠物 ----
+const petEnabled = ref<boolean>(false);
+const petScale = ref<number>(100);
+const petLibrary = ref<PetMeta[]>([]);
+const petActiveId = ref<string>('');
+const petShowInstall = ref<boolean>(false);
+const petInstallInput = ref<string>('');
+const petInstallBusy = ref<boolean>(false);
+const petInstallStatus = ref<string>('');
+
+const PET_SCALE_MIN = 50;
+const PET_SCALE_MAX = 150;
+const PET_SCALE_STEP = 10;
+
+async function refreshPetLibrary(): Promise<void> {
+  if (!window.electronAPI?.pet) return;
+  petLibrary.value = await window.electronAPI.pet.list();
+  const r = await window.electronAPI.pet.get();
+  petActiveId.value = r.pet?.id ?? '';
+  petScale.value = r.scale;
+}
+
+function applyPetScale(value: number): void {
+  const next = Math.min(PET_SCALE_MAX, Math.max(PET_SCALE_MIN, Math.round(value)));
+  if (next === petScale.value) return;
+  petScale.value = next;
+  window.electronAPI?.pet?.setScale(next);
+}
+
+async function onPetInstall(): Promise<void> {
+  if (!window.electronAPI?.pet) return;
+  petInstallBusy.value = true;
+  petInstallStatus.value = '下载中…';
+  try {
+    const plan = parseInput(petInstallInput.value);
+    const { dataUrl, info } = await fetchPet(plan);
+    await window.electronAPI.pet.install({
+      name: info.name,
+      author: info.author,
+      source: info.source,
+      dataUrl,
+    });
+    petInstallInput.value = '';
+    petShowInstall.value = false;
+    petInstallStatus.value = '安装成功，已切换为新宠物';
+    await refreshPetLibrary();
+  } catch (e) {
+    petInstallStatus.value = '安装失败：' + (e instanceof Error ? e.message : String(e));
+  } finally {
+    petInstallBusy.value = false;
+  }
+}
+
+async function onPetSwitch(id: string): Promise<void> {
+  if (!window.electronAPI?.pet) return;
+  await window.electronAPI.pet.setActive(id);
+  await refreshPetLibrary();
+}
+
+async function onPetRemove(id: string): Promise<void> {
+  if (!window.electronAPI?.pet) return;
+  await window.electronAPI.pet.remove(id);
+  await refreshPetLibrary();
+}
 
 // ---- 用量阈值 ----
 const warnThreshold = ref<number>(DEFAULT_USAGE_THRESHOLDS.warn);
@@ -212,6 +279,11 @@ onMounted(async () => {
   deepseek.token = cfg.hasDeepseekToken ? (cfg.deepseek.token || '') : '';
   deepseek.hasToken = !!cfg.hasDeepseekToken;
 
+  mimo.enabled = !!cfg.mimo?.enabled;
+  mimo.useProxy = !!cfg.mimo?.useProxy;
+  mimo.token = cfg.hasMimoCookie ? (cfg.mimo?.token || '') : '';
+  mimo.hasToken = !!cfg.hasMimoCookie;
+
   codexEnabled.value = !!cfg.codex?.enabled;
   codexUseProxy.value = !!cfg.codex?.useProxy;
   codexAutoAvailable.value = !!cfg.codexAutoAvailable;
@@ -220,7 +292,7 @@ onMounted(async () => {
   volcengineUseProxy.value = !!cfg.volcengine?.useProxy;
   volcengineAccessKey.value = cfg.hasVolcengineAccessKey ? (cfg.volcengine?.accessKey || '') : '';
   volcengineSecretKey.value = cfg.hasVolcengineSecretKey ? (cfg.volcengine?.secretKey || '') : '';
-  volcengineAccessKeyChanged.value = false;
+volcengineAccessKeyChanged.value = false;
   volcengineSecretKeyChanged.value = false;
   volcengineHasAccessKey.value = !!cfg.hasVolcengineAccessKey;
   volcengineHasSecretKey.value = !!cfg.hasVolcengineSecretKey;
@@ -237,12 +309,14 @@ onMounted(async () => {
   }
   hookAutoInstalled.value = !!cfg.hooks?.endpoint?.autoInstalled;
   floatingBallEnabled.value = !!cfg.floatingBall?.enabled;
+  petEnabled.value = !!cfg.pet?.enabled;
   lanModeEnabled.value = !!cfg.lanMode?.enabled;
   if (cfg.thresholds) {
     warnThreshold.value = cfg.thresholds.warn;
     dangerThreshold.value = cfg.thresholds.danger;
   }
   await refreshHelperPath();
+  await refreshPetLibrary();
 
   window.electronAPI.onCopilotDeviceResult((r) => {
     deviceFlowBusy.value = false;
@@ -288,12 +362,18 @@ async function onSave() {
         useProxy: deepseek.useProxy,
       },
       codex: { enabled: codexEnabled.value, useProxy: codexUseProxy.value },
+      mimo: {
+        token: mimo.token.trim(),
+        tokenChanged: mimo.tokenChanged,
+        enabled: mimo.enabled,
+        useProxy: mimo.useProxy,
+      },
       volcengine: {
         accessKey: volcengineAccessKey.value.trim(),
         accessKeyChanged: volcengineAccessKeyChanged.value,
         secretKey: volcengineSecretKey.value.trim(),
         secretKeyChanged: volcengineSecretKeyChanged.value,
-        enabled: volcengineEnabled.value,
+enabled: volcengineEnabled.value,
         useProxy: volcengineUseProxy.value,
       },
       proxy: {
@@ -303,6 +383,7 @@ async function onSave() {
       intervalMinutes: intervalMinutes.value,
       hooks: { enabled: { ...hookEnabled } },
       floatingBall: { enabled: floatingBallEnabled.value },
+      pet: { enabled: petEnabled.value },
       thresholds: {
         warn: warnThreshold.value,
         danger: dangerThreshold.value,
@@ -587,7 +668,48 @@ async function openQrCode() {
             </button>
           </div>
           <div class="settings-hint">
-            在 console.volcengine.com/iam/keymanage/ 创建访问密钥（区域 cn-beijing）。AK/SK 长期有效，无需再维护 Cookie。
+在 console.volcengine.com/iam/keymanage/ 创建访问密钥（区域 cn-beijing）。AK/SK 长期有效，无需再维护 Cookie。
+          </div>
+        </div>
+      </div>
+
+      <!-- 小米 MiMo -->
+      <div class="settings-section" data-provider="mimo">
+        <div class="settings-section-header">
+          <span class="settings-section-title">小米 MiMo</span>
+          <label class="settings-toggle">
+            <input type="checkbox" v-model="mimo.enabled">
+            <span class="settings-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <label class="settings-toggle-label">
+            <input type="checkbox" v-model="mimo.useProxy">
+            <span>使用代理</span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="mimoCookie">控制台 Cookie</label>
+          <div class="settings-input-wrap">
+            <input
+              :type="mimo.showToken ? 'text' : 'password'"
+              id="mimoCookie"
+              class="settings-input"
+              v-model="mimo.token"
+              :placeholder="mimo.hasToken ? '留空保持原值' : '粘贴整段 Cookie'"
+              autocomplete="off"
+              spellcheck="false"
+              @input="mimo.tokenChanged = true"
+            >
+            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="mimo.showToken = !mimo.showToken">
+              {{ mimo.showToken ? '🔒' : '👁' }}
+            </button>
+          </div>
+          <div class="settings-hint">
+            MiMo 余额只由网页控制台接口暴露，调模型的 <code>sk-</code> API Key 查不到。
+            打开 <code>platform.xiaomimimo.com/#/console/balance</code> → F12 → Network → 刷新 →
+            找到 <code>api/v1/balance</code> 请求 → 复制整段 <code>Cookie</code> 请求头
+            （需含 <code>api-platform_serviceToken</code> 与 <code>userId</code>）。会话过期后需重新粘贴。
           </div>
         </div>
       </div>
@@ -647,6 +769,69 @@ async function openQrCode() {
         </div>
         <div class="settings-field">
           <div class="settings-hint">桌面右下角常驻 80×80 状态指示器：中心 5h 剩余百分比、底部多模型 mini bar、有通知时顶部亮红点。单击切到主窗口，可拖动改位置。</div>
+        </div>
+      </div>
+
+      <!-- 桌面宠物 -->
+      <div class="settings-section" data-section="pet">
+        <div class="settings-section-header">
+          <span class="settings-section-title">桌面宠物</span>
+          <label class="settings-toggle">
+            <input type="checkbox" v-model="petEnabled">
+            <span class="settings-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="settings-field">
+          <div class="settings-hint">养一只像素宠物，跟随 Kimi 工作状态变换动作。单击打开 Kimi Web，长按看用量，右键菜单，可拖动。</div>
+        </div>
+
+        <div class="settings-field">
+          <div class="settings-label">我的宠物</div>
+          <div v-if="petLibrary.length === 0" class="settings-hint">尚未安装宠物</div>
+          <div v-for="p in petLibrary" :key="p.id" class="settings-row pet-row">
+            <span class="settings-label-inline pet-name" :title="p.author ? `${p.name} by ${p.author}` : p.name">
+              {{ p.name }}<template v-if="p.author"> · {{ p.author }}</template>
+            </span>
+            <span class="settings-spacer"></span>
+            <span v-if="p.id === petActiveId" class="pet-badge">当前</span>
+            <button v-else type="button" class="btn-secondary btn-tiny" @click="onPetSwitch(p.id)">切换</button>
+            <button type="button" class="btn-secondary btn-tiny" @click="onPetRemove(p.id)">移除</button>
+          </div>
+        </div>
+
+        <div class="settings-field">
+          <div v-if="!petShowInstall">
+            <button type="button" class="btn-secondary" @click="petShowInstall = true">＋ 安装新宠物</button>
+          </div>
+          <div v-else>
+            <input
+              id="petInstallInput"
+              class="settings-input"
+              v-model="petInstallInput"
+              placeholder="粘贴画廊安装命令或宠物 slug"
+              spellcheck="false"
+              autocomplete="off"
+              @keyup.enter="onPetInstall"
+            >
+            <div class="settings-row">
+              <button type="button" class="btn-secondary" :disabled="petInstallBusy" @click="onPetInstall">
+                {{ petInstallBusy ? '下载中…' : '安装' }}
+              </button>
+              <button type="button" class="btn-secondary" @click="petShowInstall = false">取消</button>
+            </div>
+          </div>
+          <div class="settings-hint" v-if="petInstallStatus">{{ petInstallStatus }}</div>
+          <div class="settings-hint">从宠物画廊（<code>codexpet.top</code> / <code>petdex.dev</code> 等）复制安装命令粘贴到上方，只下载素材、不执行脚本。</div>
+        </div>
+
+        <div class="settings-field">
+          <div class="settings-row">
+            <span class="settings-label-inline">大小</span>
+            <button type="button" class="btn-secondary btn-tiny" @click="applyPetScale(petScale - PET_SCALE_STEP)">−</button>
+            <button type="button" class="btn-secondary btn-tiny" @click="applyPetScale(100)">重置</button>
+            <button type="button" class="btn-secondary btn-tiny" @click="applyPetScale(petScale + PET_SCALE_STEP)">＋</button>
+            <span class="settings-label-inline">{{ petScale }}%</span>
+          </div>
         </div>
       </div>
 

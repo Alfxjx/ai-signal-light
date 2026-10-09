@@ -5,7 +5,7 @@ export interface ProviderConfig {
 }
 
 export interface VolcengineProviderConfig {
-  /** 火山引擎官方 OpenAPI 的访问密钥 ID（AKLT...，来自 console.volcengine.com/iam/keymanage/） */
+/** 火山引擎官方 OpenAPI 的访问密钥 ID（AKLT...，来自 console.volcengine.com/iam/keymanage/） */
   accessKey: string;
   /** 火山引擎官方 OpenAPI 的访问密钥 Secret（长期有效，无需像 Cookie 那样定期更换） */
   secretKey: string;
@@ -45,6 +45,18 @@ export interface FloatingBallConfig {
   isVisible: boolean;
 }
 
+/** 桌面宠物（与悬浮球独立开关，可共存） */
+export interface PetConfig {
+  enabled: boolean;
+  /** 当前活动宠物 id，null 表示未安装/未选中 */
+  activePetId: string | null;
+  /** 显示缩放 %（50–150，默认 100），窗口尺寸随之变化 */
+  scale: number;
+  x: number | null;
+  y: number | null;
+  isVisible: boolean;
+}
+
 export interface UsageThresholds {
   /** 超过该已用 % 进入 warn (黄) */
   warn: number;
@@ -66,11 +78,14 @@ export interface AppConfig {
   deepseek: ProviderConfig;
   codex: ProviderConfig;
   volcengine: VolcengineProviderConfig;
+  /** token 字段存 platform.xiaomimimo.com 复制的整段 Cookie（api-platform_serviceToken / userId 等） */
+  mimo: ProviderConfig;
   proxy: { url: string };
   intervalMinutes: number;
   window: WindowConfig;
   hooks: HooksConfig;
   floatingBall: FloatingBallConfig;
+  pet: PetConfig;
   thresholds: UsageThresholds;
   lanMode: LanModeConfig;
 }
@@ -85,18 +100,20 @@ export interface MobileAppConfig {
   minimax: ProviderConfig;
   copilot: ProviderConfig;
   deepseek: ProviderConfig;
+  mimo: ProviderConfig;
   proxy: { url: string };
   intervalMinutes: number;
   thresholds: UsageThresholds;
 }
 
-export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex' | 'volcengine' | 'window' | 'proxy' | 'floatingBall' | 'thresholds' | 'lanMode'>> & {
+export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex' | 'volcengine' | 'mimo' | 'window' | 'proxy' | 'floatingBall' | 'pet' | 'thresholds' | 'lanMode'>> & {
   kimi?: Partial<ProviderConfig>;
   minimax?: Partial<ProviderConfig>;
   copilot?: Partial<ProviderConfig>;
   deepseek?: Partial<ProviderConfig>;
   codex?: Partial<ProviderConfig>;
   volcengine?: Partial<VolcengineProviderConfig>;
+  mimo?: Partial<ProviderConfig>;
   proxy?: Partial<{ url: string }>;
   window?: Partial<WindowConfig>;
   hooks?: Partial<{
@@ -104,6 +121,7 @@ export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax'
     endpoint?: Partial<HooksEndpointConfig>;
   }>;
   floatingBall?: Partial<FloatingBallConfig>;
+  pet?: Partial<PetConfig>;
   thresholds?: Partial<UsageThresholds>;
   lanMode?: Partial<LanModeConfig>;
 };

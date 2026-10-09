@@ -13,6 +13,8 @@ import type {
   MinimaxUsageData,
   CopilotUsageData,
   CodexUsageData,
+  VolcengineUsageData,
+  UsageMetric,
   KimiStatus,
 } from '../types/messages';
 import { DEFAULT_USAGE_THRESHOLDS } from '../types/messages';
@@ -38,6 +40,7 @@ export interface FiveHourSlot {
 
 const WINDOW_5H_MS = 5 * 60 * 60 * 1000;
 const WINDOW_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const WINDOW_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 
 // 小于 365 天的毫秒数视为"相对剩余时间"，否则视为绝对时间戳
 const MAX_RELATIVE_MS = 365 * 24 * 60 * 60 * 1000;
@@ -48,6 +51,8 @@ export function useUsageState() {
   const copilot = ref<UsageProviderState | null>(null);
   const deepseek = ref<UsageProviderState | null>(null);
   const codex = ref<UsageProviderState | null>(null);
+  const mimo = ref<UsageProviderState | null>(null);
+  const volcengine = ref<UsageProviderState | null>(null);
   const enabled = reactive<Record<string, boolean>>({});
   const pendingByCwd = reactive<Record<string, PendingHook>>({});
   const thresholds = reactive<{ warn: number; danger: number }>({ ...DEFAULT_USAGE_THRESHOLDS });
@@ -67,6 +72,8 @@ export function useUsageState() {
         if (msg.data.usage.copilot) copilot.value = msg.data.usage.copilot;
         if (msg.data.usage.deepseek) deepseek.value = msg.data.usage.deepseek;
         if (msg.data.usage.codex)    codex.value    = msg.data.usage.codex;
+        if (msg.data.usage.mimo)     mimo.value     = msg.data.usage.mimo;
+        if (msg.data.usage.volcengine) volcengine.value = msg.data.usage.volcengine;
         const en = msg.data.usage.enabled;
         if (en) {
           for (const k of Object.keys(en)) enabled[k] = !!en[k];
@@ -83,6 +90,8 @@ export function useUsageState() {
       if (msg.data.copilot) copilot.value = msg.data.copilot;
       if (msg.data.deepseek) deepseek.value = msg.data.deepseek;
       if (msg.data.codex)    codex.value    = msg.data.codex;
+      if (msg.data.mimo)     mimo.value     = msg.data.mimo;
+      if (msg.data.volcengine) volcengine.value = msg.data.volcengine;
       const en = (msg.data as { enabled?: Record<string, boolean> }).enabled;
       if (en) for (const k of Object.keys(en)) enabled[k] = !!en[k];
       const t = (msg.data as { thresholds?: { warn: number; danger: number } }).thresholds;
@@ -100,6 +109,8 @@ export function useUsageState() {
       if (msg.provider === 'copilot') copilot.value = { ...(copilot.value || {} as UsageProviderState), ...update };
       if (msg.provider === 'deepseek') deepseek.value = { ...(deepseek.value || {} as UsageProviderState), ...update };
       if (msg.provider === 'codex')    codex.value    = { ...(codex.value    || {} as UsageProviderState), ...update };
+      if (msg.provider === 'mimo')     mimo.value     = { ...(mimo.value     || {} as UsageProviderState), ...update };
+      if (msg.provider === 'volcengine') volcengine.value = { ...(volcengine.value || {} as UsageProviderState), ...update };
     } else if (msg.type === 'pendingChanged') {
       for (const k of Object.keys(pendingByCwd)) delete pendingByCwd[k];
       Object.assign(pendingByCwd, msg.byCwd);
@@ -258,14 +269,38 @@ export function useUsageState() {
     return slot;
   });
 
-  const isProviderVisible = (id: 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex') => {
+  const isProviderVisible = (id: 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex' | 'mimo' | 'volcengine') => {
     const err = id === 'kimi' ? kimi.value?.error
               : id === 'minimax' ? minimax.value?.error
               : id === 'deepseek' ? deepseek.value?.error
               : id === 'codex' ? codex.value?.error
+              : id === 'mimo' ? mimo.value?.error
+              : id === 'volcengine' ? volcengine.value?.error
               : copilot.value?.error;
     return err !== 'no_token' && err !== 'disabled';
   };
+
+  // 火山 Ark Coding Plan 的三档窗口（session=5h / weekly=7d / monthly=月）
+  const volcengineSlots = computed<{ session: FiveHourSlot; weekly: FiveHourSlot; monthly: FiveHourSlot }>(() => {
+    const state = volcengine.value;
+    const data = state?.data as VolcengineUsageData | undefined;
+    const empty = (): FiveHourSlot =>
+      ({ percent: 0, resetTime: null, resetText: '', level: 'muted', pace: null, paceDelta: null, expectedPercent: null });
+    if (!state || state.error || !data) {
+      return { session: empty(), weekly: empty(), monthly: empty() };
+    }
+    const slot = (key: keyof VolcengineUsageData, windowMs: number): FiveHourSlot => {
+      const m = data[key] as UsageMetric | undefined;
+      if (!m || !m.limit) return empty();
+      const percent = Math.max(0, Math.min(100, m.percent ?? 0));
+      return buildSlot(percent, m.resetTime ?? null, windowMs, barLevel(percent, thresholds));
+    };
+    return {
+      session: slot('session', WINDOW_5H_MS),
+      weekly: slot('weekly', WINDOW_WEEK_MS),
+      monthly: slot('monthly', WINDOW_MONTH_MS),
+    };
+  });
 
   const pendingCount = computed<number>(() => Object.keys(pendingByCwd).length);
 
@@ -277,7 +312,7 @@ export function useUsageState() {
   const kimiRecentProjects = computed(() =>
     filterRecentProjects(kimiStatus.value?.projects ?? [], Date.now()));
 
-  // 最近一次用量刷新时间戳（5 个 provider 取最新），用于顶部"X 分钟前更新"展示
+  // 最近一次用量刷新时间戳（各 provider 取最新），用于顶部"X 分钟前更新"展示
   const lastUpdatedTs = computed<number | null>(() => {
     const ts = [
       kimi.value?.lastUpdated,
@@ -285,6 +320,8 @@ export function useUsageState() {
       copilot.value?.lastUpdated,
       deepseek.value?.lastUpdated,
       codex.value?.lastUpdated,
+      volcengine.value?.lastUpdated,
+      mimo.value?.lastUpdated,
     ]
       .filter((v): v is string => typeof v === 'string')
       .map((v) => new Date(v).getTime())
@@ -301,6 +338,7 @@ export function useUsageState() {
     minimaxWeekly,
     copilotSlot,
     codexSlot,
+    volcengineSlots,
     isProviderVisible,
     pendingCount,
     pendingByCwd,
@@ -312,7 +350,7 @@ export function useUsageState() {
     // 原始 state refs：tray-hover 弹窗需要 deepseek 余额 + codex primary windowSeconds 展示
     deepseek,
     codex,
-    // 暴露 WS send，供 tray-hover 在显示时主动请求刷新
+    mimo,    // 暴露 WS send，供 tray-hover 在显示时主动请求刷新
     send,
   };
 }

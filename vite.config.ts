@@ -21,6 +21,7 @@ export default defineConfig({
         'floating-ball': resolve(RENDERER_SRC, 'floating-ball.html'),
         'tray-hover': resolve(RENDERER_SRC, 'tray-hover.html'),
         dropdown: resolve(RENDERER_SRC, 'dropdown.html'),
+        pet: resolve(RENDERER_SRC, 'pet.html'),
       },
     },
   },

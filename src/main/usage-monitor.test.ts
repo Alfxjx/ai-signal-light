@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcPercent, parseProxyUrl, formatAxiosError, mapDeepseekBalance, mapWhamUsage, mapKimiUsages, mapVolcengineUsage } from './usage-monitor';
+import { calcPercent, parseProxyUrl, formatAxiosError, mapDeepseekBalance, mapWhamUsage, mapKimiUsages, mapVolcengineUsage, mapMimoBalance } from './usage-monitor';
 import type { AxiosProxyConfig } from 'axios';
 
 describe('mapKimiUsages', () => {
@@ -88,19 +88,62 @@ describe('mapVolcengineUsage', () => {
     expect(r.session.percent).toBe(0);
     expect(r.monthly.resetTime).toBeNull();
   });
-  it('重置时间兼容 ResetTime 命名', () => {
-    const r = mapVolcengineUsage({
+it('兼容 AK/SK 通道的 ResetTime 字段名', () => {
+    const json = {
       Result: {
         QuotaUsage: [
-          { Level: 'session', Percent: 10, ResetTime: 1787639742, Cap: 100 },
-          { Level: 'weekly', Percent: 0, ResetTime: 1788105600, Cap: 100 },
-          { Level: 'monthly', Percent: 0, ResetTime: 1790351999, Cap: 100 },
+          { Level: 'session', Percent: 12.5, Cap: 100, ResetTime: 1787639742 },
+          { Level: 'weekly', Percent: 30, Cap: 100, ResetTime: 1788105600 },
+          { Level: 'monthly', Percent: 45, Cap: 100, ResetTime: 1790351999 },
         ],
       },
-    } as unknown as Record<string, unknown>);
-    expect(r.session.percent).toBe(10);
-    expect(r.session.resetTime).toMatch(/^2026-/);
-    expect(r.weekly.resetTime).toMatch(/^2026-/);
+    } as unknown as Record<string, unknown>;
+    const r = mapVolcengineUsage(json);
+    expect(r.session.percent).toBe(13);
+    expect(r.session.resetTime).toBe(new Date(1787639742 * 1000).toISOString());
+    expect(r.weekly.resetTime).toBe(new Date(1788105600 * 1000).toISOString());
+  });
+});
+
+describe('mapMimoBalance', () => {
+  it('解析 data 信封内的总额/赠送/充值', () => {
+    const json = {
+      code: 0,
+      data: { currency: 'CNY', totalBalance: '21.66', grantedBalance: '1.66', paidBalance: '20.00' },
+    };
+    expect(mapMimoBalance(json)).toEqual({
+      isAvailable: true, currency: 'CNY',
+      totalBalance: 21.66, grantedBalance: 1.66, paidBalance: 20,
+    });
+  });
+  it('兼容 snake_case 字段名与嵌套 balance 对象', () => {
+    const json = { data: { balance: { total_balance: '30.5', granted_balance: '0.5' } } };
+    const r = mapMimoBalance(json);
+    expect(r.totalBalance).toBe(30.5);
+    expect(r.grantedBalance).toBe(0.5);
+    // 只给总额 + 赠送时，充值额用减法补齐
+    expect(r.paidBalance).toBe(30);
+    expect(r.currency).toBe('CNY');
+  });
+  it('balance 为嵌套对象时也能取到总额', () => {
+    const r = mapMimoBalance({ balance: { total: 12.34, paid: 12.34, granted: 0 } });
+    expect(r.totalBalance).toBe(12.34);
+    expect(r.paidBalance).toBe(12.34);
+    expect(r.grantedBalance).toBe(0);
+  });
+  it('带 scale 倍率字段时换算金额单位', () => {
+    const r = mapMimoBalance({ data: { scale: 100, totalBalance: 2166, grantedBalance: 166 } });
+    expect(r.totalBalance).toBe(21.66);
+    expect(r.grantedBalance).toBe(1.66);
+  });
+  it('只有总额时全额算赠送，余额为 0 视为不可用', () => {
+    const r = mapMimoBalance({ data: { totalBalance: 0 } });
+    expect(r.isAvailable).toBe(false);
+    expect(r.grantedBalance).toBe(0);
+    expect(r.paidBalance).toBe(0);
+  });
+  it('找不到任何余额字段时抛错', () => {
+    expect(() => mapMimoBalance({ data: { foo: 1 } })).toThrow('no balance info');
   });
 });
 

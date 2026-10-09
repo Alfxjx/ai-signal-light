@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [merge-landing-update-into-main](plans/merge-landing-update-into-main.md) | [history](history/merge-landing-update-into-main.md)
+- 时间：2026-10-09
+- 范围：把 `landing-update` 分支（opencode 插件 + 配置助手 CLI + landing 重做，均为 `opencode-feat` 的超集）合进 main，21 个冲突手工解决；火山通道取 main 的官方 OpenAPI V4（删 Cookie），MiMo 保留，安卓 UI 取 main 后手工移植 MiMo；typecheck / assembleDebug 通过，3 个测试失败为分支原有问题
+- 关联：`src/shared/types/{config,ipc}.ts`、`src/main/{config,main,pairing,usage-monitor,usage-monitor.test}.ts`、`src/renderer/src/Settings.vue`、`android-app/.../{data/remote/VolcengineApi.kt,domain/model/{AppConfig,UsageData}.kt,data/repository/UsageRepositoryImpl.kt,ui/components/BalanceCard.kt,ui/home/UsageTab.kt,ui/settings/*}`、`AGENTS.md`
+
 ## [volcengine-aksk](plans/volcengine-aksk.md) | [history](history/volcengine-aksk.md)
 - 时间：2026-10-09
 - 范围：火山引擎改用官方 OpenAPI + V4 签名（AK/SK 长期有效），彻底删除 Cookie / x-csrf-token 通道；桌面与安卓各新增一份签名实现 + 官方测试向量单测（桌面 12 例、安卓 14 例），设置页换 AK/SK 字段
@@ -16,6 +21,72 @@
 - 时间：2026-10-07
 - 范围：安卓 APP 收敛为独立「AI 用量监控」：删掉扫码/桌面同步整条链路（含 Room、DesktopSyncClient、ClaudeTab，共 18 个文件）、首页改单屏用量列表 + PullToRefreshBox 下拉刷新、设置页改 Material3 分组 ListItem + 对话框即时保存、新增 DataStore 用量快照缓存与 Glance 桌面小组件（进度条/余额/更新时间），依赖增删后 assembleDebug 编译通过
 - 关联：`android-app/app/src/main/java/com/aisignallight/**`（`ui/home`、`ui/settings`、`ui/components`、`data/local`、`data/remote`、`data/repository`、`domain/**`、`widget/`、`worker/`、`di/`）、`android-app/app/src/main/res/{values/strings.xml,xml/usage_widget_info.xml}`、`android-app/app/src/main/AndroidManifest.xml`、`android-app/app/build.gradle.kts`、`android-app/gradle/libs.versions.toml`、`AGENTS.md`
+
+## [landing-update](plans/landing-update.md) | [history](history/landing-update.md)
+- 时间：2026-09-30
+- 范围：landing 整页重做为暗色仪表盘 / LED 风（9 段结构 + 6 个纯 CSS mock，删占位 PNG），README 按真实能力刷新（7 家 provider 鉴权表、脚本表、项目结构、Kimi web 检测原理）；分支 `landing-update`
+- 关联：`landing/**`、`README.md`
+
+## [opencode-usage-sidebar-refresh-button](history/opencode-usage-sidebar-refresh-button.md)
+- 时间：2026-09-30
+- 范围：用量侧边栏刷新按钮：表头「用量」后一个（= `/usage`，刷新全部）+ 每个 provider 行右端一个（只刷该家）；拉取中变灰，点刷新不折叠（`stopPropagation`）
+- 关联：`opencode-plugin/src/{layout,layout.test,tui}.ts(x)`、`opencode-plugin/README.md`
+
+## [opencode-usage-plugin-helper-cli](plans/opencode-usage-plugin-helper-cli.md) | [history](history/opencode-usage-plugin-helper-cli.md)
+- 时间：2026-09-29
+- 范围：新增 CLI 助手（init / set / doctor / install），让没装桌面程序的 opencode 用户能自助配置用量侧边栏插件；零第三方运行时依赖，两个安全约束（原子写 + 只动自己管的键）
+- 关联：`opencode-usage-plugin-helper-cli/**`
+
+
+## [opencode-usage-sidebar-redesign](plans/opencode-usage-sidebar-redesign.md) | [history](history/opencode-usage-sidebar-redesign.md)
+- 时间：2026-09-29
+- 范围：把 opencode TUI 用量侧边栏从「裸文本 + 手工列宽」改成 yoga flexbox 布局 + 加回进度条 + 新增可折叠栏；**侧边栏宽度不能自己测（会量到脏值导致进度条消失），一律交给布局引擎**
+- 涉及：`opencode-plugin/src/{format,layout,tui}.ts(x)` + 各自 `.test.ts`、`opencode-plugin/README.md`
+
+## [zhipu-glm-coding-plan-provider](plans/zhipu-glm-coding-plan-provider.md) ⏸️ 待开发
+- 时间：2026-09-29
+- 范围：**调研存档（未开工）**：智谱 GLM Coding Plan 额度查询接口形态（端点/鉴权/响应字段/解析坑）、未订阅时的行为盲区、开发前待验证清单与实施计划草案
+- 关联：`.vibe-harness/plans/zhipu-glm-coding-plan-provider.md`、`src/main/usage-monitor.ts`、`src/shared/types/usage.ts`
+
+## [opencode-usage-sidebar](plans/opencode-usage-sidebar.md) | [history](history/opencode-usage-sidebar.md)
+- 时间：2026-09-28
+- 范围：新增 opencode TUI 侧边栏插件（独立 npm 包 opencode-plugin/），显示 Kimi/MiniMax/火山/DeepSeek/MiMo 五家用量；凭据只读 %APPDATA%\AI状态监控\config.json；5 分钟轮询 + 失败退避 + 手动刷新
+- 关联：`opencode-plugin/**`、`.gitignore`、`~/.config/opencode/plugins/usage-sidebar/tui.ts`、`docs/superpowers/specs/2026-09-28-opencode-usage-sidebar-design.md`
+
+## [android-aksk-and-mimo](plans/android-aksk-and-mimo.md) | [history](history/android-aksk-and-mimo.md)
+- 时间：2026-09-28
+- 范围：安卓端火山接入 AK/SK 官方 OpenAPI（与桌面共用同一套官方测试向量，Cookie 降级回退）；新增 MiMo 余额 provider；修安卓侧 cookie jar 只回写 csrfToken 的老 bug、修重新扫码冲掉手填 AK/SK 的问题
+- 关联：`android-app/.../data/remote/{VolcengineSign,VolcengineApi,MimoApi}.kt`、`android-app/.../domain/model/{AppConfig,UsageData}.kt`、`android-app/.../ui/{home/UsageTab,components/BalanceCard,settings/*,scan/ScanViewModel}.kt`、`android-app/app/src/test/.../VolcengineSignTest.kt`、`AGENTS.md`
+
+## [tray-hover-volcengine](plans/tray-hover-volcengine.md) | [history](history/tray-hover-volcengine.md)
+- 时间：2026-09-28
+- 范围：托盘「用量速览」补上火山 Ark Coding Plan（session/weekly/monthly 三档，此前从未接入）；弹窗高度由写死 260 改为渲染层上报内容高度动态计算
+- 关联：`src/renderer/src/{TrayHover.vue,composables/useUsageState.ts}`、`src/shared/types/ipc.ts`、`src/main/{main,preload}.ts`
+
+## [volcengine-aksk](plans/volcengine-aksk.md) | [history](history/volcengine-aksk.md)
+- 时间：2026-09-28
+- 范围：火山 Coding Plan 额度改用官方 OpenAPI + AK/SK V4 签名（cookie 一天就过期 → 长期有效凭证，cookie 降级回退）；顺带修 cookie jar 只回写 csrfToken 的 bug；AK/SK 不下发手机端
+- 关联：`src/main/{volcengine-sign,volcengine-sign.test,usage-monitor,usage-monitor.test,config,main,pairing}.ts`、`src/shared/types/{config,ipc}.ts`、`src/renderer/src/Settings.vue`、`AGENTS.md`
+
+## [kimi-card-today-only](plans/kimi-card-today-only.md) | [history](history/kimi-card-today-only.md)
+- 时间：2026-09-28
+- 范围：主面板「Kimi Code (web)」目录列表只显示当日活动过的项目（非空闲/pending 强留），悬浮球下拉维持 3 天窗口
+- 关联：`src/renderer/src/utils/kimiFilter.ts`、`src/renderer/src/utils/kimiFilter.test.ts`、`src/renderer/src/components/KimiCard.vue`、`AGENTS.md`
+
+## [mimo-balance-monitor](../AI代码/徐剑祥/mimo-balance-monitor.md) | [history](history/mimo-balance-monitor.md)
+- 时间：2026-09-25
+- 范围：新增小米 MiMo 用量 provider（余额型）：调 `platform.xiaomimimo.com/api/v1/balance`，鉴权用控制台会话 Cookie（`sk-` API Key 查不到余额）；主面板 + 托盘弹窗展示余额与赠送
+- 关联：`src/shared/types/{usage,config,ipc}.ts`、`src/main/{usage-monitor,usage-monitor.test,config,main,server,pairing}.ts`、`src/renderer/src/{Settings.vue,App.vue,TrayHover.vue,components/UsageCard.vue,composables/useUsageState.ts,types/messages.ts}`
+
+## [kimi-notify-bubble](plans/kimi-notify-bubble.md) | [history](history/kimi-notify-bubble.md)
+- 时间：2026-09-20
+- 范围：悬浮球 LED 右侧显示 Kimi NotifyUser 消息气泡（web 模式经 WS tool.call.* 捕获，15s 自动隐藏，窗口动态加宽）；TUI 无此通道，web 模式走官方 API
+- 关联：`src/shared/types/{kimi,ipc}.ts`、`src/main/{kimi-monitor,kimi-monitor.test,main,preload}.ts`、`src/renderer/src/{FloatingBall.vue,styles/floating-ball.css}`
+
+## [desktop-pet](plans/desktop-pet.md) | [history](history/desktop-pet.md)
+- 时间：2026-09-20
+- 范围：桌面宠物（独立开关，可与悬浮球共存）：粘贴画廊命令导入 Codex 素材（awesome-codex-pet slug / codex-pets.net zip / petdex.dev）、主进程磁盘素材库、官方图集播放器跟随 Kimi 状态；单击打开本地 Kimi Web（相同 URL 浏览器自动聚焦不重复开）、长按弹下拉、右键原生菜单、可拖动
+- 关联：`src/main/{pet-store,pet-store.test,main,kimi-monitor,preload,config}.ts`、`src/renderer/src/{PetView.vue,pet.ts,pet.html,pet.css,pet/pet-install.ts,pet/pet-install.test.ts,pet/pet-sprites.ts,Settings.vue,styles/settings.css}`、`src/shared/types/{config,ipc}.ts`、`vite.config.ts`
 
 ## [kimi-web-status](plans/kimi-web-status.md) | [history](history/kimi-web-status.md)
 - 时间：2026-09-16
@@ -120,3 +191,4 @@
 - 时间：2026-06-18
 - 范围：electron-builder files 漏声明 `dist/shared/**/*`，打包后主进程 require `../shared/constants` 失败；追加该 glob 修复
 - 关联：`package.json`
+

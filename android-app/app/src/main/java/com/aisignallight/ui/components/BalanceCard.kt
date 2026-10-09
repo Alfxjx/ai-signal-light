@@ -3,9 +3,12 @@ package com.aisignallight.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -13,7 +16,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -21,15 +23,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aisignallight.R
-import com.aisignallight.domain.model.DeepseekUsageData
+import com.aisignallight.domain.model.BalanceData
 import com.aisignallight.domain.model.UsageProviderState
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/** DeepSeek 卡片专属深色渐变（深/浅主题共用） */
-private val DsGradient = Brush.linearGradient(listOf(Color(0xFF20304F), Color(0xFF2C2350)))
-private const val DsLabelColor = 0xFFB8C4E8
+/** 余额卡专属深色渐变（深/浅主题共用） */
+private val BalanceGradient = Brush.linearGradient(listOf(Color(0xFF20304F), Color(0xFF2C2350)))
+private const val BalanceLabelColor = 0xFFB8C4E8
 
 /** 币种 -> 货币符号（与桌面端一致） */
 internal fun deepseekSymbol(currency: String?): String = when (currency) {
@@ -50,29 +52,79 @@ internal fun formatIsoTime(iso: String): String {
 }
 
 @Composable
-private fun dsStatusText(data: DeepseekUsageData?, error: String?): String = when (error) {
+private fun balanceStatusText(data: BalanceData?, error: String?): String = when (error) {
     "disabled" -> stringResource(R.string.error_disabled)
     "no_token" -> stringResource(R.string.not_configured_open_settings)
     null -> if (data != null) "正常" else stringResource(R.string.loading)
     else -> error
 }
 
-/** DeepSeek 余额条：左侧大号余额 + 赠送明细，右侧更新时间 */
+/** 网格模式的余额 tile：渐变底 + 居中大号余额。DeepSeek / MiMo 等余额型 provider 共用。 */
 @Composable
-fun DeepseekBalanceCard(
-    state: UsageProviderState<DeepseekUsageData>?,
+fun BalanceTile(
+    title: String,
+    state: UsageProviderState<BalanceData>?,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null
 ) {
     val data = state?.data
     val error = state?.error
-    val statusText = dsStatusText(data, error)
+    val statusText = balanceStatusText(data, error)
+
+    Box(
+        modifier = modifier
+            .background(BalanceGradient, RoundedCornerShape(16.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 12.dp, vertical = 14.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(BalanceLabelColor)
+            )
+            if (data != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "${deepseekSymbol(data.currency)}${"%.2f".format(data.totalBalance)}",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    text = "余额",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(BalanceLabelColor)
+                )
+            } else {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (error == null) Color(BalanceLabelColor) else Color(0xFFFFB4AB)
+                )
+            }
+        }
+    }
+}
+
+/** 单列模式的余额条：左侧大号余额 + 赠送明细，右侧更新时间。DeepSeek / MiMo 共用。 */
+@Composable
+fun BalanceCard(
+    title: String,
+    state: UsageProviderState<BalanceData>?,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
+) {
+    val data = state?.data
+    val error = state?.error
+    val statusText = balanceStatusText(data, error)
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(DsGradient)
+            .background(BalanceGradient, RoundedCornerShape(16.dp))
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -80,9 +132,9 @@ fun DeepseekBalanceCard(
     ) {
         Column {
             Text(
-                text = "DeepSeek 余额",
+                text = "$title 余额",
                 style = MaterialTheme.typography.labelMedium,
-                color = Color(DsLabelColor)
+                color = Color(BalanceLabelColor)
             )
             if (data != null) {
                 Text(
@@ -96,7 +148,7 @@ fun DeepseekBalanceCard(
                     Text(
                         text = "含赠送 ${deepseekSymbol(data.currency)}${"%.2f".format(data.grantedBalance)}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(DsLabelColor)
+                        color = Color(BalanceLabelColor)
                     )
                 }
             } else {
@@ -104,7 +156,7 @@ fun DeepseekBalanceCard(
                     text = statusText,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (error == null || error == "no_token") Color(DsLabelColor) else Color(0xFFFFB4AB)
+                    color = if (error == null || error == "no_token") Color(BalanceLabelColor) else Color(0xFFFFB4AB)
                 )
             }
         }
@@ -113,12 +165,12 @@ fun DeepseekBalanceCard(
                 Text(
                     text = formatIsoTime(it),
                     style = MaterialTheme.typography.labelMedium,
-                    color = Color(DsLabelColor)
+                    color = Color(BalanceLabelColor)
                 )
                 Text(
                     text = "更新",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(DsLabelColor)
+                    color = Color(BalanceLabelColor)
                 )
             }
         }

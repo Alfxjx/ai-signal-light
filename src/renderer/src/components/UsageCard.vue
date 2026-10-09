@@ -10,6 +10,7 @@ import type {
   CodexUsageData,
   CodexWindowData,
   VolcengineUsageData,
+  MimoUsageData,
   UsageMetric,
 } from '../types/messages';
 import { formatAge, formatResetTime, barClass } from '../utils/time';
@@ -202,6 +203,24 @@ const deepseekGrantedText = computed<string>(() => {
   return `含赠送 ${d.grantedBalance.toFixed(2)}`;
 });
 
+// ---- MiMo 专用（余额型，同 DeepSeek）----
+const mimoData = computed<MimoUsageData | null>(() => {
+  return (props.usage.mimo?.data as MimoUsageData | undefined) ?? null;
+});
+
+const mimoBalanceText = computed<string>(() => {
+  const d = mimoData.value;
+  if (!d) return '—';
+  const symbol = d.currency === 'CNY' ? '¥' : d.currency === 'USD' ? '$' : (d.currency ? d.currency + ' ' : '');
+  return `${symbol}${d.totalBalance.toFixed(2)}`;
+});
+
+const mimoGrantedText = computed<string>(() => {
+  const d = mimoData.value;
+  if (!d || !d.grantedBalance) return '';
+  return `含赠送 ${d.grantedBalance.toFixed(2)}`;
+});
+
 // ---- Codex 专用 ----
 const codexData = computed<CodexUsageData | null>(() => {
   return (props.usage.codex?.data as CodexUsageData | undefined) ?? null;
@@ -259,6 +278,7 @@ const usageLastTs = computed<number | null>(() => {
     props.usage.deepseek?.lastUpdated,
     props.usage.codex?.lastUpdated,
     props.usage.volcengine?.lastUpdated,
+    props.usage.mimo?.lastUpdated,
   ].filter((v): v is string => typeof v === 'string')
     .map((v) => new Date(v).getTime())
     .filter((t) => !Number.isNaN(t))) as number[];
@@ -273,7 +293,8 @@ const allNoToken = computed<boolean>(() => {
   const deepseekNoToken = props.usage.deepseek?.error === 'no_token';
   const codexNoToken = props.usage.codex?.error === 'no_token';
   const volcengineNoToken = props.usage.volcengine?.error === 'no_token';
-  return kimiNoToken && miniNoToken && copilotNoToken && deepseekNoToken && codexNoToken && volcengineNoToken;
+  const mimoNoToken = props.usage.mimo?.error === 'no_token';
+  return kimiNoToken && miniNoToken && copilotNoToken && deepseekNoToken && codexNoToken && volcengineNoToken && mimoNoToken;
 });
 </script>
 
@@ -424,6 +445,25 @@ const allNoToken = computed<boolean>(() => {
             <span class="usage-bar-value">{{ deepseekBalanceText }}</span>
           </div>
           <div class="usage-bar-meta" v-if="deepseekGrantedText">{{ deepseekGrantedText }}</div>
+        </div>
+      </div>
+
+      <!-- MiMo -->
+      <div class="usage-row" v-if="!isProviderDisabled('mimo')"
+        :data-disabled="String(isProviderDisabled('mimo'))" data-provider="mimo">
+        <div class="usage-row-header">
+          <span class="usage-name">MiMo</span>
+          <div class="usage-status-wrapper">
+            <span class="usage-status" :class="usageStatusClass('mimo')"
+              :title="usage.mimo?.error || usageStatusText('mimo')"></span>
+          </div>
+        </div>
+        <div class="usage-bar-block" v-if="showUsageBars('mimo')">
+          <div class="usage-bar-label">
+            <span>balance</span>
+            <span class="usage-bar-value">{{ mimoBalanceText }}</span>
+          </div>
+          <div class="usage-bar-meta" v-if="mimoGrantedText">{{ mimoGrantedText }}</div>
         </div>
       </div>
 
