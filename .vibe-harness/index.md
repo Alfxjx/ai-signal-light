@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [fix-preload-sandbox-require](history/fix-preload-sandbox-require.md)
+- 时间：2026-10-12
+- 范围：修复主面板按钮与设置窗口全部点击无反应——沙箱 preload 无法相对 require `../shared/types/ipc` 导致 electronAPI 注入失败；preload.ts 改为自包含通道表
+- 关联：`src/main/preload.ts`、`src/shared/types/ipc.ts`
+
 ## [merge-landing-update-into-main](plans/merge-landing-update-into-main.md) | [history](history/merge-landing-update-into-main.md)
 - 时间：2026-10-09
 - 范围：把 `landing-update` 分支（opencode 插件 + 配置助手 CLI + landing 重做，均为 `opencode-feat` 的超集）合进 main，21 个冲突手工解决；火山通道取 main 的官方 OpenAPI V4（删 Cookie），MiMo 保留，安卓 UI 取 main 后手工移植 MiMo；typecheck / assembleDebug 通过，3 个测试失败为分支原有问题

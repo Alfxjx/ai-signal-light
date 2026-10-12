@@ -178,7 +178,9 @@ export interface ElectronAPI {
   };
 }
 
-/** IPC 通道名称常量（主进程和 preload 共用） */
+/** IPC 通道名称常量（主进程和渲染层类型定义共用）。
+ *  注意：src/main/preload.ts 里有一份手工拷贝（沙箱 preload 无法相对 require），
+ *  改动这里必须同步 preload.ts。 */
 export const IPC_CHANNELS = {
   TOGGLE_ALWAYS_ON_TOP: 'toggle-always-on-top',
   SETTINGS_GET: 'settings:get',

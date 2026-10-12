@@ -1,5 +1,51 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC_CHANNELS } from '../shared/types/ipc';
+
+// ⚠️ preload 运行在 Electron 沙箱里（sandbox 默认开启），沙箱版 preload 的
+// require 是简化实现，无法解析 '../shared/...' 这类相对 require（实测报
+// "module not found"，导致 electronAPI 整个注入失败、所有 IPC 按钮失灵）。
+// 因此本文件必须保持自包含，只允许 require('electron')。
+// 下面这份通道表是 src/shared/types/ipc.ts 中 IPC_CHANNELS 的拷贝，
+// 新增/修改通道时两处必须同步。
+const IPC_CHANNELS = {
+  TOGGLE_ALWAYS_ON_TOP: 'toggle-always-on-top',
+  SETTINGS_GET: 'settings:get',
+  SETTINGS_SAVE: 'settings:save',
+  SETTINGS_CLOSE: 'settings:close',
+  SETTINGS_OPEN: 'settings:open',
+  WINDOW_RESIZE: 'window:resize',
+  WINDOW_GET_STATE: 'window:get-state',
+  WINDOW_SET_COMPACT: 'window:set-compact',
+  HOOKS_GET_SNIPPET: 'hooks:get-snippet',
+  HOOKS_INSTALL: 'hooks:install',
+  HOOKS_UNINSTALL: 'hooks:uninstall',
+  QR_OPEN: 'qr:open',
+  COPILOT_DEVICE_START: 'copilot:device-start',
+  COPILOT_DEVICE_CANCEL: 'copilot:device-cancel',
+  COPILOT_DEVICE_RESULT: 'copilot:device-result',
+  FLOATING_BALL_TOGGLE: 'floating-ball:toggle',
+  FLOATING_BALL_OPEN_MAIN: 'floating-ball:open-main',
+  FLOATING_BALL_GET_STATE: 'floating-ball:get-state',
+  FLOATING_BALL_NOTIFY_CLEARED: 'floating-ball:notify-cleared',
+  FLOATING_BALL_TOGGLE_DROPDOWN: 'floating-ball:toggle-dropdown',
+  FLOATING_BALL_MOVE: 'floating-ball:move',
+  FLOATING_BALL_SET_WIDTH: 'floating-ball:set-width',
+  PET_GET: 'pet:get',
+  PET_LIST: 'pet:list',
+  PET_INSTALL: 'pet:install',
+  PET_SET_ACTIVE: 'pet:set-active',
+  PET_REMOVE: 'pet:remove',
+  PET_TOGGLE: 'pet:toggle',
+  PET_OPEN_WEB: 'pet:open-web',
+  PET_TOGGLE_DROPDOWN: 'pet:toggle-dropdown',
+  PET_MOVE: 'pet:move',
+  PET_SHOW_MENU: 'pet:show-menu',
+  PET_SET_SCALE: 'pet:set-scale',
+  PET_CHANGED: 'pet:changed',
+  WINDOW_DOCK_STATE: 'window:dock-state',
+  WINDOW_DOCK_ANIM: 'window:dock-anim',
+  TRAY_HOVER_POINTER: 'tray-hover:pointer',
+  TRAY_HOVER_RESIZE: 'tray-hover:resize',
+} as const;
 
 // 安全地暴露 API 给渲染进程
 contextBridge.exposeInMainWorld('electronAPI', {
