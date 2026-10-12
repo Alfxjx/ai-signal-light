@@ -68,10 +68,11 @@ cookie / CSRF 的续期回写由桌面应用独占，两边同时写会互相覆
 
 本插件通过 opencode 的**全局插件发现目录**加载，**不要**写进 `cli.json` 的 `plugins`（实测无效）。
 
-`C:\Users\cari\.config\opencode\plugins\usage-sidebar\tui.ts`：
+`C:\Users\<你>\.config\opencode\plugins\usage-sidebar\tui.ts`：
 
 ```ts
-export { default } from '../../../../Documents/kimi/Workspaces/ai-signal-light/opencode-plugin/src/tui.tsx';
+// 路径指向你本地 clone 的插件仓库
+export { default } from '<插件仓库的绝对路径>/src/tui.tsx';
 ```
 
 - 该文件在仓库外，**不受版本控制** —— 换机器/迁移仓库时要手动重建，路径也要跟着改。
@@ -84,8 +85,8 @@ export { default } from '../../../../Documents/kimi/Workspaces/ai-signal-light/o
 
 | 写法 | 结果 |
 |---|---|
-| `"file:///C:/Users/cari/Documents/kimi/Workspaces/ai-signal-light/opencode-plugin"` | 不加载 |
-| `"C:/Users/cari/Documents/kimi/Workspaces/ai-signal-light/opencode-plugin"` | 不加载 |
+| `"file:///C:/Users/<你>/path/to/opencode-plugin"` | 不加载 |
+| `"C:/Users/<你>/path/to/opencode-plugin"` | 不加载 |
 | 上面两种 + 给包补 `"."` 主入口（`exports` 同时含 `"."` 与 `"./tui"`） | 不加载 |
 
 判定方法（二选一）：
