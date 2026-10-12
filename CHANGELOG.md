@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.8.1](https://github.com/Alfxjx/ai-signal-light/compare/v2.8.0...v2.8.1) (2026-10-12)
+
+
+### 🐛 修复
+
+* **preload:** 沙箱 preload 无法相对 require 导致 electronAPI 注入失败 ([568fa7f](https://github.com/Alfxjx/ai-signal-light/commit/568fa7fa5a8eccc1fc5ba465c783f5347143f751))
+
 ## [2.8.0](https://github.com/Alfxjx/ai-signal-light/compare/v2.6.0...v2.8.0) (2026-10-09)
 
 
