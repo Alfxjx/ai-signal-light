@@ -26,6 +26,8 @@ export interface RawAppConfig {
   deepseek?: RawProviderConfig;
   mimo?: RawProviderConfig;
   volcengine?: RawVolcengineConfig;
+  /** Codex 无 token 字段，凭证自动读 ~/.codex/auth.json；这里只用 enabled 开关 */
+  codex?: RawProviderConfig;
   thresholds?: { warn?: number; danger?: number };
 }
 

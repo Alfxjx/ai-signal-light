@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { PROVIDERS, enabledProviders } from './index';
 
 describe('PROVIDERS 注册表', () => {
-  it('五家顺序固定：Kimi / MiniMax / 火山 / DeepSeek / MiMo', () => {
-    expect(PROVIDERS.map((p) => p.id)).toEqual(['kimi', 'minimax', 'volcengine', 'deepseek', 'mimo']);
+  it('六家顺序固定：Kimi / MiniMax / 火山 / DeepSeek / MiMo / Codex', () => {
+    expect(PROVIDERS.map((p) => p.id)).toEqual(['kimi', 'minimax', 'volcengine', 'deepseek', 'mimo', 'codex']);
   });
 
   it('每家都有非空显示名，id 与 config.json 字段名一致', () => {

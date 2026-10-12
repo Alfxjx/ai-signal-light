@@ -1,4 +1,4 @@
-export type ProviderId = 'kimi' | 'minimax' | 'volcengine' | 'deepseek' | 'mimo';
+export type ProviderId = 'kimi' | 'minimax' | 'volcengine' | 'deepseek' | 'mimo' | 'codex';
 
 /** 百分比型窗口。percent 一律是「已用 %」（越接近 100 越危险） */
 export interface WindowView {

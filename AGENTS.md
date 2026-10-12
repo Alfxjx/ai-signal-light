@@ -10,7 +10,7 @@ The repository also contains these sibling projects:
 
 - `android-app/` — standalone native Android app (**AI 用量监控**): Kotlin + Jetpack Compose + Hilt. It does **not** talk to the desktop — it calls each provider's usage API directly (Kimi / MiniMax / GitHub Copilot / DeepSeek / 火山引擎 / MiMo), stores config locally in encrypted prefs, and ships a Glance home-screen widget.
 - `landing/` — marketing landing page, deployed to GitHub Pages.
-- `opencode-plugin/` — 用量侧边栏插件，供 **opencode** 在自己的侧边栏里显示各家用量。独立 npm 包，**只读**桌面端的 `config.json`（固定读正式版，不读 dev 版），不含任何写入逻辑。
+- `opencode-plugin/` — 用量侧边栏插件，供 **opencode** 在自己的侧边栏里显示各家用量。独立 npm 包，桌面端的 `config.json` **只读不写**（固定读正式版，不读 dev 版）；唯一例外是 Codex 凭证读 `~/.codex/auth.json` 且过期时刷新写回（与 Codex CLI / 桌面端共用同一文件与原子写约定）。
 - `opencode-usage-plugin-helper-cli/` — 上述插件的配置助手 CLI（`init` / `set` / `doctor` / `install`），让没装桌面程序的 opencode 用户能自助配置。独立 npm 包，原子写且只动自己管的键。
 
 ## Commands

@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [opencode-codex-provider](history/opencode-codex-provider.md)
+- 时间：2026-10-12
+- 范围：opencode 用量侧边栏新增第 6 家 Codex——凭证读 `~/.codex/auth.json`（过期刷新写回），打 wham/usage，primary→5h、secondary→周
+- 关联：`opencode-plugin/src/providers/{codex.ts,codex.test.ts,index.ts}`、`opencode-plugin/src/{types,config}.ts`、`opencode-plugin/README.md`、`AGENTS.md`
+
 ## [fix-preload-sandbox-require](history/fix-preload-sandbox-require.md)
 - 时间：2026-10-12
 - 范围：修复主面板按钮与设置窗口全部点击无反应——沙箱 preload 无法相对 require `../shared/types/ipc` 导致 electronAPI 注入失败；preload.ts 改为自包含通道表

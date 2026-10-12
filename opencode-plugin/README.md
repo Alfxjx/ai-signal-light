@@ -1,11 +1,15 @@
 # opencode-usage-sidebar
 
-opencode TUI 侧边栏插件：显示 Kimi / MiniMax / 火山 Coding Plan / DeepSeek / MiMo 用量。
+opencode TUI 侧边栏插件：显示 Kimi / MiniMax / 火山 Coding Plan / DeepSeek / MiMo / Codex 用量。
 
 ## 数据来源
 
-只读 `%APPDATA%\AI状态监控\config.json`（正式版 userData），**绝不写回** ——
+只读 `%APPDATA%\AI状态监控\config.json`（正式版 userData），**绝不写回 config.json** ——
 cookie / CSRF 的续期回写由桌面应用独占，两边同时写会互相覆盖。
+
+唯一的写操作例外：Codex 的凭证不在 config.json 里，而是读本机 Codex CLI 的
+`~/.codex/auth.json`；access_token 过期时会走 refresh_token 刷新并**原子写回该文件**
+（与 Codex CLI 自身和桌面应用的行为一致，三方共用同一份文件、同一种 tmp+rename 写法）。
 
 只渲染 `enabled === true` 的 provider；`enabled` 但 `token` 为空的那家会显示成灰色「未配置」（不静默隐藏）。
 
@@ -13,7 +17,7 @@ cookie / CSRF 的续期回写由桌面应用独占，两边同时写会互相覆
 
 ## 界面
 
-- 表头一行 `▾ 用量 ⟳` + 右侧 `刷新新鲜度`（首屏拉取中显示 `拉取中…`），下面接五家。
+- 表头一行 `▾ 用量 ⟳` + 右侧 `刷新新鲜度`（首屏拉取中显示 `拉取中…`），下面接六家。
   - 表头左侧的 `⟳` 是**刷新按钮**：点它立即重拉（等价 `/usage` / `Ctrl+Alt+U`），
     拉取进行中会变灰当忙碌指示。它自己 `stopPropagation`，所以点它只刷新、**不会顺带折叠**。
 - **每个 provider 的名字后面紧贴一个单家刷新按钮 `⟳`**（百分比型的标题行、余额行、以及出错的 provider 行）：
@@ -194,13 +198,14 @@ npm run typecheck
 | `src/providers/deepseek.ts` | `src/main/usage-monitor.ts` 的 `mapDeepseekBalance` |
 | `src/providers/mimo.ts` | `src/main/usage-monitor.ts` 的 `mapMimoBalance` |
 | `src/providers/volcengine.ts` | `src/main/usage-monitor.ts` 的 `fetchVolcengine*` / `mapVolcengineUsage` |
+| `src/providers/codex.ts` | `src/main/codex-credentials.ts`（auth.json 读取/刷新）+ `src/main/usage-monitor.ts` 的 `fetchCodex` / `mapWhamUsage` |
 
 火山 V4 签名两条实现共享同一批官方测试向量（`volcengine-sign.test.ts`），是防漂移锚点。
 
 ## 已知限制（v1）
 
-- 不做 Copilot / Codex
-- 不支持代理转发（`useProxy`）；五家当前均为 false
+- 不做 Copilot
+- 不支持代理转发（`useProxy`）；六家当前均为 false（注意：Codex 走的 chatgpt.com 在国内通常需要代理，没配系统代理时这家会一直网络错误）
 - 火山 cookie 过期后只报错，不自动续期
 - 主题色在 setup 时取一次，运行中切换主题需要重开
 - 折叠/展开状态存在 `context.storage`，跟随 session 持久化

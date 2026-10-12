@@ -5,6 +5,7 @@ import { fetchMiniMax } from './minimax';
 import { fetchVolcengine } from './volcengine';
 import { fetchDeepseek } from './deepseek';
 import { fetchMimo } from './mimo';
+import { fetchCodex } from './codex';
 
 export interface ProviderDefinition {
   id: ProviderId;
@@ -43,6 +44,11 @@ export const PROVIDERS: ProviderDefinition[] = [
     id: 'mimo',
     name: 'MiMo',
     fetch: async (raw) => ({ windows: [], balance: await fetchMimo(raw) }),
+  },
+  {
+    id: 'codex',
+    name: 'Codex',
+    fetch: (raw) => quotaFetch(fetchCodex(raw)),
   },
 ];
 
