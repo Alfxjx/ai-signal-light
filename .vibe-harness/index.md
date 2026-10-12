@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [desktop-shadcn-redesign](plans/desktop-shadcn-redesign.md) | [history](history/desktop-shadcn-redesign.md)
+- 时间：2026-10-12
+- 范围：桌面端主面板/设置/悬浮球下拉/托盘弹窗 4 窗口迁移 shadcn-vue + Tailwind v3.4，新增明/暗/跟随系统三档主题（config.appearance.theme + theme:changed 广播）；4 份窗口 CSS 从 1399 行删到 105 行
+- 关联：`tailwind.config.js`、`postcss.config.js`、`components.json`、`src/renderer/src/{styles/globals.css,lib/utils.ts,composables/useTheme.ts,components/ui/**}`、`src/renderer/src/{App,Settings,Dropdown,TrayHover}.vue`、`src/renderer/src/components/{TitleBar,ClaudeCard,KimiCard,UsageCard}.vue`、`src/shared/types/{config,ipc}.ts`、`src/main/{config,main,preload}.ts`、`AGENTS.md`
+
 ## [opencode-codex-provider](history/opencode-codex-provider.md)
 - 时间：2026-10-12
 - 范围：opencode 用量侧边栏新增第 6 家 Codex——凭证读 `~/.codex/auth.json`（过期刷新写回），打 wham/usage，primary→5h、secondary→周

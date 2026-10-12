@@ -45,6 +45,7 @@ const IPC_CHANNELS = {
   WINDOW_DOCK_ANIM: 'window:dock-anim',
   TRAY_HOVER_POINTER: 'tray-hover:pointer',
   TRAY_HOVER_RESIZE: 'tray-hover:resize',
+  THEME_CHANGED: 'theme:changed',
 } as const;
 
 // 安全地暴露 API 给渲染进程
@@ -72,6 +73,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 顶部吸附动画：收到补偿值后做 CSS transform 滑动
   onDockAnim: (cb: (payload: { compensationY: number }) => void) =>
     ipcRenderer.on(IPC_CHANNELS.WINDOW_DOCK_ANIM, (_e, payload) => cb(payload)),
+
+  // 主题：主进程广播主题变化（明/暗/跟随系统），渲染层据此切 <html> 的 dark class
+  onThemeChanged: (cb: (theme: string) => void) =>
+    ipcRenderer.on(IPC_CHANNELS.THEME_CHANGED, (_e, theme) => cb(theme)),
 
   // Claude Code hooks
   getHooksSnippet: (enabledOverride?: unknown) =>

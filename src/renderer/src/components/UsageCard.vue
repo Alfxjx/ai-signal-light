@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { Rows3, RefreshCw } from 'lucide-vue-next';
+import { Button } from '@/components/ui/button';
 import type {
   UsageState,
   ProviderId,
@@ -72,10 +74,11 @@ function slotPace(usedPercent: number, resetRaw: string | number | null | undefi
   return calcUsagePace(usedPercent, parseResetMs(resetRaw), windowMs, props.now);
 }
 
+// 状态圆点 / pace 徽章着色（走 CSS 变量，背景用 color-mix 柔和化）
 function paceClass(pace: 'fast' | 'slow' | 'average' | null): string {
-  if (pace === 'fast') return 'pace-fast';
-  if (pace === 'slow') return 'pace-slow';
-  if (pace === 'average') return 'pace-average';
+  if (pace === 'fast') return 'bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] text-[var(--danger)]';
+  if (pace === 'slow') return 'bg-[color-mix(in_srgb,var(--fresh)_15%,transparent)] text-[var(--fresh)]';
+  if (pace === 'average') return 'bg-muted/50 text-muted-foreground/70';
   return '';
 }
 
@@ -88,11 +91,11 @@ function paceTooltip(pace: 'fast' | 'slow' | 'average' | null, delta: number | n
 
 function usageStatusClass(provider: ProviderId): string {
   const state = props.usage[provider];
-  if (!state) return '';
-  if (state.error === 'disabled') return 'disabled';
-  if (state.error === 'no_token') return 'no_token';
-  if (state.error) return 'error';
-  return '';
+  if (!state) return 'bg-[var(--fresh)]';
+  if (state.error === 'disabled') return 'bg-foreground/25';
+  if (state.error === 'no_token') return 'bg-[var(--warn)]';
+  if (state.error) return 'bg-[var(--danger)]';
+  return 'bg-[var(--fresh)]';
 }
 
 // ---- Kimi 专用 ----
@@ -299,40 +302,45 @@ const allNoToken = computed<boolean>(() => {
 </script>
 
 <template>
-  <div class="usage-card" data-assistant="usage">
-    <div class="usage-header">
-      <div class="header-left">
-        <span class="usage-title">Usage</span>
-        <span class="usage-updated" :data-ts="usageLastTs">{{ formatAge(usageLastTs, now) }}</span>
+  <div data-assistant="usage" class="py-2">
+    <div class="mb-2 flex items-center justify-between px-1">
+      <div class="flex items-center gap-2">
+        <span class="text-[13px] font-medium text-foreground/85">Usage</span>
+        <span class="text-[11px] tabular-nums text-muted-foreground/70" :data-ts="usageLastTs">{{ formatAge(usageLastTs, now) }}</span>
       </div>
-      <div class="header-controls">
-        <button class="btn-compact" :class="{ active: isCompact }" :title="isCompact ? '完整模式' : '简略模式'"
-          @click="emit('toggleCompact')">≡</button>
-        <button class="btn-refresh" :class="{ spinning: isRefreshing }" title="Refresh Now"
-          @click="emit('refresh')">↻</button>
+      <div class="no-drag flex items-center gap-1.5">
+        <Button variant="ghost" size="icon" class="h-6 w-6" :title="isCompact ? '完整模式' : '简略模式'"
+          @click="emit('toggleCompact')">
+          <Rows3 :class="{ 'text-[var(--fresh)]': isCompact }" />
+        </Button>
+        <Button variant="ghost" size="icon" class="h-6 w-6" title="Refresh Now"
+          @click="emit('refresh')">
+          <RefreshCw :class="{ 'animate-spin': isRefreshing }" />
+        </Button>
       </div>
     </div>
 
-    <div class="usage-list" :class="{ compact: isCompact }">
+    <div class="divide-y divide-border/60 rounded-lg border bg-muted/40 py-1">
       <!-- Kimi -->
-      <div class="usage-row" v-if="!isProviderDisabled('kimi')" :data-disabled="String(isProviderDisabled('kimi'))"
+      <div class="usage-row px-1.5 py-1" v-if="!isProviderDisabled('kimi')" :data-disabled="String(isProviderDisabled('kimi'))"
         data-provider="kimi">
-        <div class="usage-row-header">
-          <span class="usage-name">Kimi</span>
-          <div class="usage-status-wrapper">
-            <span class="usage-status" :class="usageStatusClass('kimi')"
+        <div class="mb-1.5 flex items-center gap-1.5">
+          <span class="text-[13px] font-medium text-foreground/85">Kimi</span>
+          <div class="flex h-[17px] items-center">
+            <span class="h-[7px] w-[7px] shrink-0 rounded-full" :class="usageStatusClass('kimi')"
               :title="usage.kimi?.error || usageStatusText('kimi')"></span>
           </div>
         </div>
         <template v-if="showUsageBars('kimi')">
-          <div class="usage-bar-block" data-hide-compact>
-            <div class="usage-bar-label">
-              <div class="usage-time">
+          <div class="mt-1.5" :class="{ hidden: isCompact }">
+            <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
+              <div class="flex items-center gap-0.5">
                 <span>week</span>
-                <div class="usage-bar-meta">{{ formatResetTime(kimiData('codingWeekly')?.resetTime) }}</div>
+                <span class="ml-2 text-[10px] tabular-nums text-muted-foreground/60">{{ formatResetTime(kimiData('codingWeekly')?.resetTime) }}</span>
               </div>
-              <span class="usage-bar-value">{{ kimiText('codingWeekly') }}
-                <span v-if="kimiWeeklyPace.pace" class="usage-pace" :class="paceClass(kimiWeeklyPace.pace)"
+              <span class="usage-bar-value tabular-nums text-foreground/85">{{ kimiText('codingWeekly') }}
+                <span v-if="kimiWeeklyPace.pace" class="ml-1.5 inline-flex items-center rounded-[3px] px-1 text-[9px] font-medium leading-none"
+                  :class="paceClass(kimiWeeklyPace.pace)"
                   :title="paceTooltip(kimiWeeklyPace.pace, kimiWeeklyPace.delta)">
                   {{ paceText(kimiWeeklyPace.pace) }}{{ paceArrow(kimiWeeklyPace.pace) }}
                 </span>
@@ -346,14 +354,15 @@ const allNoToken = computed<boolean>(() => {
                 :title="`平均消耗 ${kimiWeeklyPace.expectedPercent.toFixed(1)}%`"></div>
             </div>
           </div>
-          <div class="usage-bar-block">
-            <div class="usage-bar-label">
-              <div class="usage-time">
+          <div class="mt-1.5">
+            <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
+              <div class="flex items-center gap-0.5">
                 <span>5h</span>
-                <div class="usage-bar-meta">{{ formatResetTime(kimiData('codingFiveHour')?.resetTime) }}</div>
+                <span class="ml-2 text-[10px] tabular-nums text-muted-foreground/60">{{ formatResetTime(kimiData('codingFiveHour')?.resetTime) }}</span>
               </div>
-              <span class="usage-bar-value">{{ kimiText('codingFiveHour') }}
-                <span v-if="kimiFiveHourPace.pace" class="usage-pace" :class="paceClass(kimiFiveHourPace.pace)"
+              <span class="usage-bar-value tabular-nums text-foreground/85">{{ kimiText('codingFiveHour') }}
+                <span v-if="kimiFiveHourPace.pace" class="ml-1.5 inline-flex items-center rounded-[3px] px-1 text-[9px] font-medium leading-none"
+                  :class="paceClass(kimiFiveHourPace.pace)"
                   :title="paceTooltip(kimiFiveHourPace.pace, kimiFiveHourPace.delta)">
                   {{ paceText(kimiFiveHourPace.pace) }}{{ paceArrow(kimiFiveHourPace.pace) }}
                 </span>
@@ -370,27 +379,26 @@ const allNoToken = computed<boolean>(() => {
         </template>
       </div>
 
-
-
       <!-- MiniMax -->
-      <div class="usage-row" v-if="!isProviderDisabled('minimax')"
+      <div class="usage-row px-1.5 py-1" v-if="!isProviderDisabled('minimax')"
         :data-disabled="String(isProviderDisabled('minimax'))" data-provider="minimax">
-        <div class="usage-row-header">
-          <span class="usage-name">MiniMax</span>
-          <div class="usage-status-wrapper">
-            <span class="usage-status" :class="usageStatusClass('minimax')"
+        <div class="mb-1.5 flex items-center gap-1.5">
+          <span class="text-[13px] font-medium text-foreground/85">MiniMax</span>
+          <div class="flex h-[17px] items-center">
+            <span class="h-[7px] w-[7px] shrink-0 rounded-full" :class="usageStatusClass('minimax')"
               :title="usage.minimax?.error || usageStatusText('minimax')"></span>
           </div>
         </div>
         <template v-if="showUsageBars('minimax')">
-          <div class="usage-bar-block">
-            <div class="usage-bar-label">
-              <div class="usage-time">
+          <div class="mt-1.5">
+            <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
+              <div class="flex items-center gap-0.5">
                 <span>5h</span>
-                <div class="usage-bar-meta">{{ formatResetTime(minimaxData?.fiveHourResetTime, true) }}</div>
+                <span class="ml-2 text-[10px] tabular-nums text-muted-foreground/60">{{ formatResetTime(minimaxData?.fiveHourResetTime, true) }}</span>
               </div>
-              <span class="usage-bar-value">{{ minimaxFiveHourText }}
-                <span v-if="minimaxFiveHourPace.pace" class="usage-pace" :class="paceClass(minimaxFiveHourPace.pace)"
+              <span class="usage-bar-value tabular-nums text-foreground/85">{{ minimaxFiveHourText }}
+                <span v-if="minimaxFiveHourPace.pace" class="ml-1.5 inline-flex items-center rounded-[3px] px-1 text-[9px] font-medium leading-none"
+                  :class="paceClass(minimaxFiveHourPace.pace)"
                   :title="paceTooltip(minimaxFiveHourPace.pace, minimaxFiveHourPace.delta)">
                   {{ paceText(minimaxFiveHourPace.pace) }}{{ paceArrow(minimaxFiveHourPace.pace) }}
                 </span>
@@ -404,15 +412,16 @@ const allNoToken = computed<boolean>(() => {
                 :title="`平均消耗 ${minimaxFiveHourPace.expectedPercent.toFixed(1)}%`"></div>
             </div>
           </div>
-          <div class="usage-bar-block" data-hide-compact>
-            <div class="usage-bar-label">
-              <div class="usage-time">
+          <div class="mt-1.5" :class="{ hidden: isCompact }">
+            <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
+              <div class="flex items-center gap-0.5">
                 <span>week</span>
-                <div class="usage-bar-meta" v-if="minimaxData?.weeklyResetTime">{{
-                  formatResetTime(minimaxData.weeklyResetTime, true) }}</div>
+                <span class="ml-2 text-[10px] tabular-nums text-muted-foreground/60" v-if="minimaxData?.weeklyResetTime">{{
+                  formatResetTime(minimaxData.weeklyResetTime, true) }}</span>
               </div>
-              <span class="usage-bar-value">{{ minimaxWeeklyText }}
-                <span v-if="minimaxWeeklyPace.pace" class="usage-pace" :class="paceClass(minimaxWeeklyPace.pace)"
+              <span class="usage-bar-value tabular-nums text-foreground/85">{{ minimaxWeeklyText }}
+                <span v-if="minimaxWeeklyPace.pace" class="ml-1.5 inline-flex items-center rounded-[3px] px-1 text-[9px] font-medium leading-none"
+                  :class="paceClass(minimaxWeeklyPace.pace)"
                   :title="paceTooltip(minimaxWeeklyPace.pace, minimaxWeeklyPace.delta)">
                   {{ paceText(minimaxWeeklyPace.pace) }}{{ paceArrow(minimaxWeeklyPace.pace) }}
                 </span>
@@ -430,62 +439,62 @@ const allNoToken = computed<boolean>(() => {
       </div>
 
       <!-- DeepSeek -->
-      <div class="usage-row" v-if="!isProviderDisabled('deepseek')"
+      <div class="usage-row px-1.5 py-1" v-if="!isProviderDisabled('deepseek')"
         :data-disabled="String(isProviderDisabled('deepseek'))" data-provider="deepseek">
-        <div class="usage-row-header">
-          <span class="usage-name">DeepSeek</span>
-          <div class="usage-status-wrapper">
-            <span class="usage-status" :class="usageStatusClass('deepseek')"
+        <div class="mb-1.5 flex items-center gap-1.5">
+          <span class="text-[13px] font-medium text-foreground/85">DeepSeek</span>
+          <div class="flex h-[17px] items-center">
+            <span class="h-[7px] w-[7px] shrink-0 rounded-full" :class="usageStatusClass('deepseek')"
               :title="usage.deepseek?.error || usageStatusText('deepseek')"></span>
           </div>
         </div>
-        <div class="usage-bar-block" v-if="showUsageBars('deepseek')">
-          <div class="usage-bar-label">
+        <div class="mt-1.5" v-if="showUsageBars('deepseek')">
+          <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
             <span>balance</span>
-            <span class="usage-bar-value">{{ deepseekBalanceText }}</span>
+            <span class="usage-bar-value tabular-nums text-foreground/85">{{ deepseekBalanceText }}</span>
           </div>
-          <div class="usage-bar-meta" v-if="deepseekGrantedText">{{ deepseekGrantedText }}</div>
+          <div class="text-[10px] tabular-nums text-muted-foreground/60" v-if="deepseekGrantedText">{{ deepseekGrantedText }}</div>
         </div>
       </div>
 
       <!-- MiMo -->
-      <div class="usage-row" v-if="!isProviderDisabled('mimo')"
+      <div class="usage-row px-1.5 py-1" v-if="!isProviderDisabled('mimo')"
         :data-disabled="String(isProviderDisabled('mimo'))" data-provider="mimo">
-        <div class="usage-row-header">
-          <span class="usage-name">MiMo</span>
-          <div class="usage-status-wrapper">
-            <span class="usage-status" :class="usageStatusClass('mimo')"
+        <div class="mb-1.5 flex items-center gap-1.5">
+          <span class="text-[13px] font-medium text-foreground/85">MiMo</span>
+          <div class="flex h-[17px] items-center">
+            <span class="h-[7px] w-[7px] shrink-0 rounded-full" :class="usageStatusClass('mimo')"
               :title="usage.mimo?.error || usageStatusText('mimo')"></span>
           </div>
         </div>
-        <div class="usage-bar-block" v-if="showUsageBars('mimo')">
-          <div class="usage-bar-label">
+        <div class="mt-1.5" v-if="showUsageBars('mimo')">
+          <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
             <span>balance</span>
-            <span class="usage-bar-value">{{ mimoBalanceText }}</span>
+            <span class="usage-bar-value tabular-nums text-foreground/85">{{ mimoBalanceText }}</span>
           </div>
-          <div class="usage-bar-meta" v-if="mimoGrantedText">{{ mimoGrantedText }}</div>
+          <div class="text-[10px] tabular-nums text-muted-foreground/60" v-if="mimoGrantedText">{{ mimoGrantedText }}</div>
         </div>
       </div>
 
       <!-- Codex -->
-      <div class="usage-row" v-if="!isProviderDisabled('codex')"
+      <div class="usage-row px-1.5 py-1" v-if="!isProviderDisabled('codex')"
         :data-disabled="String(isProviderDisabled('codex'))" data-provider="codex">
-        <div class="usage-row-header">
-          <span class="usage-name">Codex<span v-if="codexData?.planType" class="usage-bar-meta"> {{ codexData.planType }}</span></span>
-          <div class="usage-status-wrapper">
-            <span class="usage-status" :class="usageStatusClass('codex')"
+        <div class="mb-1.5 flex items-center gap-1.5">
+          <span class="text-[13px] font-medium text-foreground/85">Codex<span v-if="codexData?.planType" class="ml-2 text-[10px] tabular-nums text-muted-foreground/60"> {{ codexData.planType }}</span></span>
+          <div class="flex h-[17px] items-center">
+            <span class="h-[7px] w-[7px] shrink-0 rounded-full" :class="usageStatusClass('codex')"
               :title="usage.codex?.error || usageStatusText('codex')"></span>
           </div>
         </div>
         <template v-if="showUsageBars('codex')">
-          <div class="usage-bar-block" v-if="codexData?.primary">
-            <div class="usage-bar-label">
-              <div class="usage-time">
+          <div class="mt-1.5" v-if="codexData?.primary">
+            <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
+              <div class="flex items-center gap-0.5">
                 <span>{{ codexWindowLabel(codexData.primary.windowSeconds) }}</span>
-                <div class="usage-bar-meta" v-if="codexData.primary.resetAt">{{ formatResetTime(codexData.primary.resetAt * 1000) }}</div>
+                <span class="ml-2 text-[10px] tabular-nums text-muted-foreground/60" v-if="codexData.primary.resetAt">{{ formatResetTime(codexData.primary.resetAt * 1000) }}</span>
               </div>
-              <span class="usage-bar-value">{{ codexWindowText(codexData.primary) }}
-                <span v-if="codexPrimaryPace.pace" class="usage-pace"
+              <span class="usage-bar-value tabular-nums text-foreground/85">{{ codexWindowText(codexData.primary) }}
+                <span v-if="codexPrimaryPace.pace" class="ml-1.5 inline-flex items-center rounded-[3px] px-1 text-[9px] font-medium leading-none"
                   :class="paceClass(codexPrimaryPace.pace)"
                   :title="paceTooltip(codexPrimaryPace.pace, codexPrimaryPace.delta)">
                   {{ paceText(codexPrimaryPace.pace) }}{{ paceArrow(codexPrimaryPace.pace) }}
@@ -500,14 +509,14 @@ const allNoToken = computed<boolean>(() => {
                 :title="`平均消耗 ${codexPrimaryPace.expectedPercent.toFixed(1)}%`"></div>
             </div>
           </div>
-          <div class="usage-bar-block" v-if="codexData?.secondary" data-hide-compact>
-            <div class="usage-bar-label">
-              <div class="usage-time">
+          <div class="mt-1.5" v-if="codexData?.secondary" :class="{ hidden: isCompact }">
+            <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
+              <div class="flex items-center gap-0.5">
                 <span>{{ codexWindowLabel(codexData.secondary.windowSeconds) }}</span>
-                <div class="usage-bar-meta" v-if="codexData.secondary.resetAt">{{ formatResetTime(codexData.secondary.resetAt * 1000) }}</div>
+                <span class="ml-2 text-[10px] tabular-nums text-muted-foreground/60" v-if="codexData.secondary.resetAt">{{ formatResetTime(codexData.secondary.resetAt * 1000) }}</span>
               </div>
-              <span class="usage-bar-value">{{ codexWindowText(codexData.secondary) }}
-                <span v-if="codexSecondaryPace.pace" class="usage-pace"
+              <span class="usage-bar-value tabular-nums text-foreground/85">{{ codexWindowText(codexData.secondary) }}
+                <span v-if="codexSecondaryPace.pace" class="ml-1.5 inline-flex items-center rounded-[3px] px-1 text-[9px] font-medium leading-none"
                   :class="paceClass(codexSecondaryPace.pace)"
                   :title="paceTooltip(codexSecondaryPace.pace, codexSecondaryPace.delta)">
                   {{ paceText(codexSecondaryPace.pace) }}{{ paceArrow(codexSecondaryPace.pace) }}
@@ -526,24 +535,23 @@ const allNoToken = computed<boolean>(() => {
       </div>
     </div>
 
-
     <!-- Copilot -->
-    <div class="usage-row" v-if="!isProviderDisabled('copilot')" :data-disabled="String(isProviderDisabled('copilot'))"
+    <div class="usage-row px-1.5 py-1" v-if="!isProviderDisabled('copilot')" :data-disabled="String(isProviderDisabled('copilot'))"
       data-provider="copilot">
-      <div class="usage-row-header">
-        <span class="usage-name">Copilot</span>
-        <div class="usage-status-wrapper">
-          <span class="usage-status" :class="usageStatusClass('copilot')"
+      <div class="mb-1.5 flex items-center gap-1.5">
+        <span class="text-[13px] font-medium text-foreground/85">Copilot</span>
+        <div class="flex h-[17px] items-center">
+          <span class="h-[7px] w-[7px] shrink-0 rounded-full" :class="usageStatusClass('copilot')"
             :title="usage.copilot?.error || usageStatusText('copilot')"></span>
         </div>
       </div>
-      <div class="usage-bar-block" v-if="showUsageBars('copilot')">
-        <div class="usage-bar-label">
-          <div class="usage-time">
+      <div class="mt-1.5" v-if="showUsageBars('copilot')">
+        <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
+          <div class="flex items-center gap-0.5">
             <span>premium</span>
-            <div class="usage-bar-meta" v-if="copilotResetDateText">Reset {{ copilotResetDateText }}</div>
+            <span class="ml-2 text-[10px] tabular-nums text-muted-foreground/60" v-if="copilotResetDateText">Reset {{ copilotResetDateText }}</span>
           </div>
-          <span class="usage-bar-value">{{ copilotPremiumText }}</span>
+          <span class="usage-bar-value tabular-nums text-foreground/85">{{ copilotPremiumText }}</span>
         </div>
         <div class="usage-bar">
           <div class="usage-bar-fill" :style="{ width: copilotPremiumPercent + '%' }"
@@ -552,25 +560,26 @@ const allNoToken = computed<boolean>(() => {
       </div>
     </div>
 
-    <!-- Volcengine -->
-    <div class="usage-row" v-if="!isProviderDisabled('volcengine')"
+    <!-- Volcengine（原结构：在列表外，且紧跟 Copilot，保留其顶部分隔线） -->
+    <div class="usage-row border-t border-border/60 px-1.5 py-1" v-if="!isProviderDisabled('volcengine')"
       :data-disabled="String(isProviderDisabled('volcengine'))" data-provider="volcengine">
-      <div class="usage-row-header">
-        <span class="usage-name">Ark Coding Plan</span>
-        <div class="usage-status-wrapper">
-          <span class="usage-status" :class="usageStatusClass('volcengine')"
+      <div class="mb-1.5 flex items-center gap-1.5">
+        <span class="text-[13px] font-medium text-foreground/85">Ark Coding Plan</span>
+        <div class="flex h-[17px] items-center">
+          <span class="h-[7px] w-[7px] shrink-0 rounded-full" :class="usageStatusClass('volcengine')"
             :title="usage.volcengine?.error || usageStatusText('volcengine')"></span>
         </div>
       </div>
       <template v-if="showUsageBars('volcengine')">
-        <div class="usage-bar-block">
-          <div class="usage-bar-label">
-            <div class="usage-time">
+        <div class="mt-1.5">
+          <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
+            <div class="flex items-center gap-0.5">
               <span>session</span>
-              <div class="usage-bar-meta">{{ formatResetTime(volcengineMetric('session')?.resetTime) }}</div>
+              <span class="ml-2 text-[10px] tabular-nums text-muted-foreground/60">{{ formatResetTime(volcengineMetric('session')?.resetTime) }}</span>
             </div>
-            <span class="usage-bar-value">{{ volcengineText('session') }}
-              <span v-if="volcengineSessionPace.pace" class="usage-pace" :class="paceClass(volcengineSessionPace.pace)"
+            <span class="usage-bar-value tabular-nums text-foreground/85">{{ volcengineText('session') }}
+              <span v-if="volcengineSessionPace.pace" class="ml-1.5 inline-flex items-center rounded-[3px] px-1 text-[9px] font-medium leading-none"
+                :class="paceClass(volcengineSessionPace.pace)"
                 :title="paceTooltip(volcengineSessionPace.pace, volcengineSessionPace.delta)">
                 {{ paceText(volcengineSessionPace.pace) }}{{ paceArrow(volcengineSessionPace.pace) }}
               </span>
@@ -584,14 +593,15 @@ const allNoToken = computed<boolean>(() => {
               :title="`平均消耗 ${volcengineSessionPace.expectedPercent.toFixed(1)}%`"></div>
           </div>
         </div>
-        <div class="usage-bar-block">
-          <div class="usage-bar-label">
-            <div class="usage-time">
+        <div class="mt-1.5">
+          <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
+            <div class="flex items-center gap-0.5">
               <span>weekly</span>
-              <div class="usage-bar-meta">{{ formatResetTime(volcengineMetric('weekly')?.resetTime) }}</div>
+              <span class="ml-2 text-[10px] tabular-nums text-muted-foreground/60">{{ formatResetTime(volcengineMetric('weekly')?.resetTime) }}</span>
             </div>
-            <span class="usage-bar-value">{{ volcengineText('weekly') }}
-              <span v-if="volcengineWeeklyPace.pace" class="usage-pace" :class="paceClass(volcengineWeeklyPace.pace)"
+            <span class="usage-bar-value tabular-nums text-foreground/85">{{ volcengineText('weekly') }}
+              <span v-if="volcengineWeeklyPace.pace" class="ml-1.5 inline-flex items-center rounded-[3px] px-1 text-[9px] font-medium leading-none"
+                :class="paceClass(volcengineWeeklyPace.pace)"
                 :title="paceTooltip(volcengineWeeklyPace.pace, volcengineWeeklyPace.delta)">
                 {{ paceText(volcengineWeeklyPace.pace) }}{{ paceArrow(volcengineWeeklyPace.pace) }}
               </span>
@@ -605,14 +615,15 @@ const allNoToken = computed<boolean>(() => {
               :title="`平均消耗 ${volcengineWeeklyPace.expectedPercent.toFixed(1)}%`"></div>
           </div>
         </div>
-        <div class="usage-bar-block">
-          <div class="usage-bar-label">
-            <div class="usage-time">
+        <div class="mt-1.5">
+          <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
+            <div class="flex items-center gap-0.5">
               <span>monthly</span>
-              <div class="usage-bar-meta">{{ formatResetTime(volcengineMetric('monthly')?.resetTime) }}</div>
+              <span class="ml-2 text-[10px] tabular-nums text-muted-foreground/60">{{ formatResetTime(volcengineMetric('monthly')?.resetTime) }}</span>
             </div>
-            <span class="usage-bar-value">{{ volcengineText('monthly') }}
-              <span v-if="volcengineMonthlyPace.pace" class="usage-pace" :class="paceClass(volcengineMonthlyPace.pace)"
+            <span class="usage-bar-value tabular-nums text-foreground/85">{{ volcengineText('monthly') }}
+              <span v-if="volcengineMonthlyPace.pace" class="ml-1.5 inline-flex items-center rounded-[3px] px-1 text-[9px] font-medium leading-none"
+                :class="paceClass(volcengineMonthlyPace.pace)"
                 :title="paceTooltip(volcengineMonthlyPace.pace, volcengineMonthlyPace.delta)">
                 {{ paceText(volcengineMonthlyPace.pace) }}{{ paceArrow(volcengineMonthlyPace.pace) }}
               </span>
@@ -629,6 +640,6 @@ const allNoToken = computed<boolean>(() => {
       </template>
     </div>
 
-    <div class="usage-empty" v-show="allNoToken">No token configured, set in tray menu</div>
+    <div class="px-2 py-2 text-center text-xs text-muted-foreground" v-show="allNoToken">No token configured, set in tray menu</div>
   </div>
 </template>

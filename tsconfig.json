@@ -19,6 +19,11 @@
     "isolatedModules": true,
     "skipLibCheck": true,
 
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/renderer/src/*"]
+    },
+
     "types": ["vite/client"]
   },
   "include": ["src/renderer/src/**/*.ts", "src/renderer/src/**/*.vue", "src/renderer/src/**/*.d.ts", "src/shared/**/*.ts"],

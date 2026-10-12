@@ -27,7 +27,8 @@ volcengine: { accessKey: '', secretKey: '', enabled: true, useProxy: false },
   floatingBall: { enabled: false, x: null, y: null, isVisible: false },
   pet: { enabled: false, activePetId: null, scale: 100, x: null, y: null, isVisible: false },
   thresholds: { ...DEFAULT_USAGE_THRESHOLDS },
-  lanMode: { enabled: false, apiKey: '' }
+  lanMode: { enabled: false, apiKey: '' },
+  appearance: { theme: 'dark' }
 };
 
 export const VALID_INTERVALS = [5, 10, 15, 30, 60] as const;
@@ -46,6 +47,13 @@ export function isValidThresholds(t: unknown): t is UsageThresholds {
 
 export const HOOK_EVENTS = ['Notification', 'Stop', 'PreToolUse'] as const;
 export type HookEvent = typeof HOOK_EVENTS[number];
+
+type ValidTheme = 'system' | 'light' | 'dark';
+
+/** 校验主题模式是否为三值之一 */
+export function isValidTheme(t: unknown): t is ValidTheme {
+  return t === 'system' || t === 'light' || t === 'dark';
+}
 
 export class ConfigStore {
   private userDataDir: string;
@@ -111,6 +119,9 @@ volcengine: {
         lanMode: {
           enabled: typeof parsed.lanMode?.enabled === 'boolean' ? parsed.lanMode.enabled : DEFAULTS.lanMode.enabled,
           apiKey: typeof parsed.lanMode?.apiKey === 'string' ? parsed.lanMode.apiKey : DEFAULTS.lanMode.apiKey
+        },
+        appearance: {
+          theme: isValidTheme(parsed.appearance?.theme) ? parsed.appearance.theme : DEFAULTS.appearance.theme
         }
       };
     } catch (e) {
@@ -206,6 +217,11 @@ volcengine: {
     if (partial.lanMode && typeof partial.lanMode === 'object') {
       if (typeof partial.lanMode.enabled === 'boolean') this.data.lanMode.enabled = partial.lanMode.enabled;
       if (typeof partial.lanMode.apiKey === 'string') this.data.lanMode.apiKey = partial.lanMode.apiKey;
+    }
+    if (partial.appearance && typeof partial.appearance === 'object') {
+      if (isValidTheme(partial.appearance.theme)) {
+        this.data.appearance.theme = partial.appearance.theme;
+      }
     }
 
     this._save();

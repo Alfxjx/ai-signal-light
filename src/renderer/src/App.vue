@@ -5,6 +5,7 @@ import ClaudeCard from './components/ClaudeCard.vue';
 import KimiCard from './components/KimiCard.vue';
 import UsageCard from './components/UsageCard.vue';
 import { useWebSocket } from './composables/useWebSocket';
+import { useTheme } from './composables/useTheme';
 import { normalizeCwd } from './utils/cwd';
 import type {
   ClaudeProject,
@@ -46,6 +47,9 @@ const pendingByCwd = reactive<Record<string, PendingHook>>({});
 
 // 时间 tick，formatAge/ageClass 响应式依赖它
 const now = ref(Date.now());
+
+// 应用主题（明/暗 class 切换，含 system 跟随）
+useTheme();
 
 const isElectron = computed(() => !!window.electronAPI);
 
@@ -256,12 +260,15 @@ const lastUpdateText = computed(() => {
 </script>
 
 <template>
-  <div ref="appEl" class="app" :class="{ 'app--docked': dockState === 'collapsed' }">
+  <!-- 根容器：玻璃拟态 + 整窗拖拽区（交互元素各自标 no-drag）；app--docked 顶部吸附由 main.css 接管 -->
+  <div ref="appEl"
+       class="app drag-region relative flex h-screen w-screen flex-col overflow-hidden rounded-2xl border bg-background/85 shadow-[0_8px_32px_rgba(0,0,0,0.4)] backdrop-blur-xl will-change-transform"
+       :class="{ 'app--docked': dockState === 'collapsed' }">
     <TitleBar :is-pinned="isPinned" :is-electron="isElectron"
               @toggle-pin="togglePin" @minimize="minimize" @open-settings="openSettings"
               @toggle-floating-ball="toggleFloatingBall" />
 
-    <div class="cards-container">
+    <div class="no-drag flex flex-1 flex-col gap-2.5 overflow-y-auto p-2">
       <UsageCard :usage="usage" :now="now" :is-compact="isCompact" :is-refreshing="isUsageRefreshing"
                  @toggle-compact="toggleCompact" @refresh="onUsageRefresh" />
       <KimiCard v-if="kimiStatus?.available" :status="kimiStatus" :now="now" :is-refreshing="isRefreshing"
@@ -270,11 +277,13 @@ const lastUpdateText = computed(() => {
                   :pending-by-cwd="pendingByCwd" @refresh="onRefresh" @clear-pending="clearPending" />
     </div>
 
-    <div class="footer">
-      <div class="connection-status" :class="{ disconnected: !isConnected }">
-        <span class="dot"></span> {{ isConnected ? 'Connected' : 'Disconnected' }}
+    <div class="flex items-center justify-between border-t px-4 py-2 text-[11px] text-muted-foreground/70">
+      <div class="flex items-center gap-1.5">
+        <span class="h-1.5 w-1.5 rounded-full"
+              :class="isConnected ? 'bg-[var(--fresh)]' : 'bg-[var(--danger)]'"></span>
+        {{ isConnected ? 'Connected' : 'Disconnected' }}
       </div>
-      <div class="last-update">{{ lastUpdateText }}</div>
+      <div>{{ lastUpdateText }}</div>
     </div>
   </div>
 </template>

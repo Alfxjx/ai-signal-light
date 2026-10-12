@@ -66,6 +66,14 @@ export interface UsageThresholds {
 
 export const DEFAULT_USAGE_THRESHOLDS: UsageThresholds = { warn: 50, danger: 80 };
 
+/** 明暗主题模式，'system' 跟随系统 */
+export type ThemeMode = 'system' | 'light' | 'dark';
+
+/** 外观设置（明暗主题） */
+export interface AppearanceConfig {
+  theme: ThemeMode;
+}
+
 export interface LanModeConfig {
   enabled: boolean;
   apiKey: string;
@@ -88,6 +96,7 @@ export interface AppConfig {
   pet: PetConfig;
   thresholds: UsageThresholds;
   lanMode: LanModeConfig;
+  appearance: AppearanceConfig;
 }
 
 /**
@@ -106,7 +115,7 @@ export interface MobileAppConfig {
   thresholds: UsageThresholds;
 }
 
-export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex' | 'volcengine' | 'mimo' | 'window' | 'proxy' | 'floatingBall' | 'pet' | 'thresholds' | 'lanMode'>> & {
+export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax' | 'copilot' | 'deepseek' | 'codex' | 'volcengine' | 'mimo' | 'window' | 'proxy' | 'floatingBall' | 'pet' | 'thresholds' | 'lanMode' | 'appearance'>> & {
   kimi?: Partial<ProviderConfig>;
   minimax?: Partial<ProviderConfig>;
   copilot?: Partial<ProviderConfig>;
@@ -124,4 +133,5 @@ export type ConfigPartial = Partial<Omit<AppConfig, 'hooks' | 'kimi' | 'minimax'
   pet?: Partial<PetConfig>;
   thresholds?: Partial<UsageThresholds>;
   lanMode?: Partial<LanModeConfig>;
+  appearance?: Partial<AppearanceConfig>;
 };

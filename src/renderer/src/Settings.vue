@@ -1,8 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import type { SettingsSavePayload, PetMeta } from './types/electron';
 import { DEFAULT_USAGE_THRESHOLDS } from './types/messages';
 import { parseInput, fetchPet } from './pet/pet-install';
+import { applyTheme, useTheme } from '@/composables/useTheme';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { ChevronDown, Eye, EyeOff, X } from 'lucide-vue-next';
 
 interface ProviderState {
   enabled: boolean;
@@ -23,6 +32,15 @@ function makeProvider(): ProviderState {
     useProxy: false,
   };
 }
+
+// ---- 外观主题 ----
+// useTheme 负责启动时应用已保存主题 + 监听主进程 theme:changed 即时切换；
+// 本地改 Select 时 themeMode 变化触发 watcher，立即预览效果。
+const { mode: themeMode } = useTheme();
+
+watch(themeMode, (value) => {
+  applyTheme(value);
+});
 
 const kimi = reactive<ProviderState>(makeProvider());
 const minimax = reactive<ProviderState>(makeProvider());
@@ -259,6 +277,8 @@ onMounted(async () => {
   const cfg = await window.electronAPI.getSettings();
   if (!cfg) return;
 
+  themeMode.value = cfg.appearance?.theme ?? 'dark';
+
   kimi.enabled = !!cfg.kimi.enabled;
   kimi.useProxy = !!cfg.kimi.useProxy;
   kimi.token = cfg.hasKimiToken ? (cfg.kimi.token || '') : '';
@@ -292,7 +312,7 @@ onMounted(async () => {
   volcengineUseProxy.value = !!cfg.volcengine?.useProxy;
   volcengineAccessKey.value = cfg.hasVolcengineAccessKey ? (cfg.volcengine?.accessKey || '') : '';
   volcengineSecretKey.value = cfg.hasVolcengineSecretKey ? (cfg.volcengine?.secretKey || '') : '';
-volcengineAccessKeyChanged.value = false;
+  volcengineAccessKeyChanged.value = false;
   volcengineSecretKeyChanged.value = false;
   volcengineHasAccessKey.value = !!cfg.hasVolcengineAccessKey;
   volcengineHasSecretKey.value = !!cfg.hasVolcengineSecretKey;
@@ -373,7 +393,7 @@ async function onSave() {
         accessKeyChanged: volcengineAccessKeyChanged.value,
         secretKey: volcengineSecretKey.value.trim(),
         secretKeyChanged: volcengineSecretKeyChanged.value,
-enabled: volcengineEnabled.value,
+        enabled: volcengineEnabled.value,
         useProxy: volcengineUseProxy.value,
       },
       proxy: {
@@ -389,6 +409,7 @@ enabled: volcengineEnabled.value,
         danger: dangerThreshold.value,
       },
       lanMode: { enabled: lanModeEnabled.value },
+      appearance: { theme: themeMode.value },
     };
     await window.electronAPI.saveSettings(payload);
     onCancel();
@@ -415,485 +436,467 @@ async function openQrCode() {
 </script>
 
 <template>
-  <div class="settings">
-    <div class="settings-header">
-      <span class="settings-title">用量监控设置</span>
-      <button class="btn-close" title="关闭" @click="onCancel">×</button>
-    </div>
+  <div class="drag-region flex h-screen w-screen select-none flex-col overflow-hidden rounded-xl border border-border bg-background/90 shadow-2xl backdrop-blur-xl">
+    <header class="flex shrink-0 items-center justify-between border-b border-border/70 px-4 py-3">
+      <span class="text-sm font-semibold text-foreground">用量监控设置</span>
+      <Button variant="ghost" size="icon" class="no-drag h-6 w-6" title="关闭" @click="onCancel">
+        <X class="h-4 w-4" />
+      </Button>
+    </header>
 
-    <div class="settings-body">
-      <!-- 全局代理 -->
-      <div class="settings-section" data-section="proxy">
-        <div class="settings-section-header">
-          <span class="settings-section-title">代理设置</span>
+    <div class="no-drag min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+      <!-- 外观 -->
+      <section class="space-y-2">
+        <h3 class="text-sm font-medium text-foreground">外观</h3>
+        <div class="space-y-1">
+          <span class="block text-xs text-muted-foreground">主题</span>
+          <Select v-model="themeMode">
+            <SelectTrigger class="no-drag h-8 w-full">
+              <SelectValue placeholder="选择主题" />
+              <ChevronDown class="h-4 w-4 opacity-50" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="system">跟随系统</SelectItem>
+              <SelectItem value="light">浅色</SelectItem>
+              <SelectItem value="dark">深色</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <div class="settings-field">
-          <label class="settings-label" for="proxyUrl">代理地址</label>
-          <input
+      </section>
+      <Separator />
+
+      <!-- 全局代理 -->
+      <section class="space-y-2">
+        <h3 class="text-sm font-medium text-foreground">代理设置</h3>
+        <div class="space-y-1">
+          <label class="block text-xs text-muted-foreground" for="proxyUrl">代理地址</label>
+          <Input
             id="proxyUrl"
-            class="settings-input"
             v-model="proxyUrl"
             :placeholder="hasProxy ? '留空保持原值' : '如 http://127.0.0.1:7890'"
+            class="no-drag h-8 font-mono"
             autocomplete="off"
             spellcheck="false"
             @input="proxyUrlChanged = true"
-          >
+          />
         </div>
-      </div>
+      </section>
+      <Separator />
 
       <!-- Kimi -->
-      <div class="settings-section" data-provider="kimi">
-        <div class="settings-section-header">
-          <span class="settings-section-title">Kimi</span>
-          <label class="settings-toggle">
-            <input type="checkbox" v-model="kimi.enabled">
-            <span class="settings-toggle-slider"></span>
-          </label>
+      <section class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-medium text-foreground">Kimi</h3>
+          <Switch v-model="kimi.enabled" class="no-drag" />
         </div>
-        <div class="settings-field">
-          <label class="settings-toggle-label">
-            <input type="checkbox" v-model="kimi.useProxy">
-            <span>使用代理</span>
-          </label>
-        </div>
-        <div class="settings-field">
-          <label class="settings-label" for="kimiToken">API Key</label>
-          <div class="settings-input-wrap">
-            <input
+        <label class="no-drag flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+          <input type="checkbox" v-model="kimi.useProxy" class="h-3.5 w-3.5 accent-primary">
+          <span>使用代理</span>
+        </label>
+        <div class="space-y-1">
+          <label class="block text-xs text-muted-foreground" for="kimiToken">API Key</label>
+          <div class="relative">
+            <Input
               :type="kimi.showToken ? 'text' : 'password'"
               id="kimiToken"
-              class="settings-input"
               v-model="kimi.token"
               :placeholder="kimi.hasToken ? '留空保持原值' : '粘贴 Kimi 开放平台 API Key'"
+              class="no-drag h-8 pr-9 font-mono"
               autocomplete="off"
               spellcheck="false"
               @input="kimi.tokenChanged = true"
-            >
-            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="kimi.showToken = !kimi.showToken">
-              {{ kimi.showToken ? '🔒' : '👁' }}
-            </button>
+            />
+            <Button type="button" variant="ghost" size="icon" class="no-drag absolute right-0 top-0 h-8 w-8 text-muted-foreground" title="显示/隐藏" @click="kimi.showToken = !kimi.showToken">
+              <EyeOff v-if="kimi.showToken" class="h-4 w-4" />
+              <Eye v-else class="h-4 w-4" />
+            </Button>
           </div>
-          <div class="settings-hint">
-            在开放平台（platform.kimi.com）创建 API Key，粘贴到上方，用于查询 Coding 套餐用量。
-          </div>
+          <p class="text-xs text-muted-foreground">在开放平台（platform.kimi.com）创建 API Key，粘贴到上方，用于查询 Coding 套餐用量。</p>
         </div>
-      </div>
+      </section>
+      <Separator />
 
       <!-- MiniMax -->
-      <div class="settings-section" data-provider="minimax">
-        <div class="settings-section-header">
-          <span class="settings-section-title">MiniMax</span>
-          <label class="settings-toggle">
-            <input type="checkbox" v-model="minimax.enabled">
-            <span class="settings-toggle-slider"></span>
-          </label>
+      <section class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-medium text-foreground">MiniMax</h3>
+          <Switch v-model="minimax.enabled" class="no-drag" />
         </div>
-        <div class="settings-field">
-          <label class="settings-toggle-label">
-            <input type="checkbox" v-model="minimax.useProxy">
-            <span>使用代理</span>
-          </label>
-        </div>
-        <div class="settings-field">
-          <label class="settings-label" for="minimaxToken">Bearer Token</label>
-          <div class="settings-input-wrap">
-            <input
+        <label class="no-drag flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+          <input type="checkbox" v-model="minimax.useProxy" class="h-3.5 w-3.5 accent-primary">
+          <span>使用代理</span>
+        </label>
+        <div class="space-y-1">
+          <label class="block text-xs text-muted-foreground" for="minimaxToken">Bearer Token</label>
+          <div class="relative">
+            <Input
               :type="minimax.showToken ? 'text' : 'password'"
               id="minimaxToken"
-              class="settings-input"
               v-model="minimax.token"
               :placeholder="minimax.hasToken ? '留空保持原值' : '粘贴 Bearer Token'"
+              class="no-drag h-8 pr-9 font-mono"
               autocomplete="off"
               spellcheck="false"
               @input="minimax.tokenChanged = true"
-            >
-            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="minimax.showToken = !minimax.showToken">
-              {{ minimax.showToken ? '🔒' : '👁' }}
-            </button>
+            />
+            <Button type="button" variant="ghost" size="icon" class="no-drag absolute right-0 top-0 h-8 w-8 text-muted-foreground" title="显示/隐藏" @click="minimax.showToken = !minimax.showToken">
+              <EyeOff v-if="minimax.showToken" class="h-4 w-4" />
+              <Eye v-else class="h-4 w-4" />
+            </Button>
           </div>
         </div>
-      </div>
+      </section>
+      <Separator />
 
       <!-- Copilot -->
-      <div class="settings-section" data-provider="copilot">
-        <div class="settings-section-header">
-          <span class="settings-section-title">Copilot</span>
-          <label class="settings-toggle">
-            <input type="checkbox" v-model="copilot.enabled">
-            <span class="settings-toggle-slider"></span>
-          </label>
+      <section class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-medium text-foreground">Copilot</h3>
+          <Switch v-model="copilot.enabled" class="no-drag" />
         </div>
-        <div class="settings-field">
-          <label class="settings-toggle-label">
-            <input type="checkbox" v-model="copilot.useProxy">
-            <span>使用代理</span>
-          </label>
-        </div>
-        <div class="settings-field">
-          <label class="settings-label">GitHub 账号授权（推荐）</label>
-          <div class="settings-row">
-            <button type="button" class="btn-secondary" :disabled="deviceFlowBusy" @click="startCopilotDeviceFlow">
+        <label class="no-drag flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+          <input type="checkbox" v-model="copilot.useProxy" class="h-3.5 w-3.5 accent-primary">
+          <span>使用代理</span>
+        </label>
+        <div class="space-y-1">
+          <span class="block text-xs text-muted-foreground">GitHub 账号授权（推荐）</span>
+          <div class="flex gap-2">
+            <Button type="button" variant="secondary" size="sm" class="no-drag" :disabled="deviceFlowBusy" @click="startCopilotDeviceFlow">
               {{ deviceFlowBusy ? '等待授权中...' : (copilotOAuth ? '重新连接 GitHub' : '连接 GitHub') }}
-            </button>
-            <button type="button" class="btn-secondary" v-if="deviceFlowBusy" @click="cancelCopilotDeviceFlow">取消</button>
+            </Button>
+            <Button type="button" variant="secondary" size="sm" class="no-drag" v-if="deviceFlowBusy" @click="cancelCopilotDeviceFlow">取消</Button>
           </div>
-          <div class="settings-hint" v-if="deviceUserCode" style="font-size: 16px; letter-spacing: 2px;">
-            验证码：<strong>{{ deviceUserCode }}</strong>
-          </div>
-          <div class="settings-hint" v-if="deviceStatus">{{ deviceStatus }}</div>
-          <div class="settings-hint" v-else-if="copilotOAuth">已通过 GitHub OAuth 连接（保存后覆盖旧 Cookie）。</div>
+          <p v-if="deviceUserCode" class="text-base tracking-widest text-foreground">验证码：<strong>{{ deviceUserCode }}</strong></p>
+          <p v-if="deviceStatus" class="text-xs text-muted-foreground">{{ deviceStatus }}</p>
+          <p v-else-if="copilotOAuth" class="text-xs text-muted-foreground">已通过 GitHub OAuth 连接（保存后覆盖旧 Cookie）。</p>
         </div>
-        <div class="settings-field">
-          <label class="settings-label" for="copilotToken">Cookie（备选，优先使用上方授权）</label>
-          <div class="settings-input-wrap">
-            <input
+        <div class="space-y-1">
+          <label class="block text-xs text-muted-foreground" for="copilotToken">Cookie（备选，优先使用上方授权）</label>
+          <div class="relative">
+            <Input
               :type="copilot.showToken ? 'text' : 'password'"
               id="copilotToken"
-              class="settings-input"
               v-model="copilot.token"
               :placeholder="copilot.hasToken ? '留空保持原值' : '粘贴整段浏览器 Cookie'"
+              class="no-drag h-8 pr-9 font-mono"
               autocomplete="off"
               spellcheck="false"
               @input="copilot.tokenChanged = true"
-            >
-            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="copilot.showToken = !copilot.showToken">
-              {{ copilot.showToken ? '🔒' : '👁' }}
-            </button>
+            />
+            <Button type="button" variant="ghost" size="icon" class="no-drag absolute right-0 top-0 h-8 w-8 text-muted-foreground" title="显示/隐藏" @click="copilot.showToken = !copilot.showToken">
+              <EyeOff v-if="copilot.showToken" class="h-4 w-4" />
+              <Eye v-else class="h-4 w-4" />
+            </Button>
           </div>
         </div>
-      </div>
+      </section>
+      <Separator />
 
       <!-- DeepSeek -->
-      <div class="settings-section" data-provider="deepseek">
-        <div class="settings-section-header">
-          <span class="settings-section-title">DeepSeek</span>
-          <label class="settings-toggle">
-            <input type="checkbox" v-model="deepseek.enabled">
-            <span class="settings-toggle-slider"></span>
-          </label>
+      <section class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-medium text-foreground">DeepSeek</h3>
+          <Switch v-model="deepseek.enabled" class="no-drag" />
         </div>
-        <div class="settings-field">
-          <label class="settings-toggle-label">
-            <input type="checkbox" v-model="deepseek.useProxy">
-            <span>使用代理</span>
-          </label>
-        </div>
-        <div class="settings-field">
-          <label class="settings-label" for="deepseekToken">API Key</label>
-          <div class="settings-input-wrap">
-            <input
+        <label class="no-drag flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+          <input type="checkbox" v-model="deepseek.useProxy" class="h-3.5 w-3.5 accent-primary">
+          <span>使用代理</span>
+        </label>
+        <div class="space-y-1">
+          <label class="block text-xs text-muted-foreground" for="deepseekToken">API Key</label>
+          <div class="relative">
+            <Input
               :type="deepseek.showToken ? 'text' : 'password'"
               id="deepseekToken"
-              class="settings-input"
               v-model="deepseek.token"
               :placeholder="deepseek.hasToken ? '留空保持原值' : '粘贴 platform.deepseek.com 的 API Key'"
+              class="no-drag h-8 pr-9 font-mono"
               autocomplete="off"
               spellcheck="false"
               @input="deepseek.tokenChanged = true"
-            >
-            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="deepseek.showToken = !deepseek.showToken">
-              {{ deepseek.showToken ? '🔒' : '👁' }}
-            </button>
+            />
+            <Button type="button" variant="ghost" size="icon" class="no-drag absolute right-0 top-0 h-8 w-8 text-muted-foreground" title="显示/隐藏" @click="deepseek.showToken = !deepseek.showToken">
+              <EyeOff v-if="deepseek.showToken" class="h-4 w-4" />
+              <Eye v-else class="h-4 w-4" />
+            </Button>
           </div>
         </div>
-      </div>
+      </section>
+      <Separator />
 
       <!-- Codex -->
-      <div class="settings-section" data-provider="codex">
-        <div class="settings-section-header">
-          <span class="settings-section-title">Codex</span>
-          <label class="settings-toggle">
-            <input type="checkbox" v-model="codexEnabled">
-            <span class="settings-toggle-slider"></span>
-          </label>
+      <section class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-medium text-foreground">Codex</h3>
+          <Switch v-model="codexEnabled" class="no-drag" />
         </div>
-        <div class="settings-field">
-          <label class="settings-toggle-label">
-            <input type="checkbox" v-model="codexUseProxy">
-            <span>使用代理</span>
-          </label>
-        </div>
-        <div class="settings-field">
-          <div class="settings-hint" v-if="codexAutoAvailable">已检测到本机 Codex CLI 登录（~/.codex/auth.json），自动读取，无需配置。</div>
-          <div class="settings-hint" v-else>未检测到本机 Codex CLI 登录。请先安装并登录 Codex CLI（~/.codex/auth.json）。</div>
-        </div>
-      </div>
+        <label class="no-drag flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+          <input type="checkbox" v-model="codexUseProxy" class="h-3.5 w-3.5 accent-primary">
+          <span>使用代理</span>
+        </label>
+        <p v-if="codexAutoAvailable" class="text-xs text-muted-foreground">已检测到本机 Codex CLI 登录（~/.codex/auth.json），自动读取，无需配置。</p>
+        <p v-else class="text-xs text-muted-foreground">未检测到本机 Codex CLI 登录。请先安装并登录 Codex CLI（~/.codex/auth.json）。</p>
+      </section>
+      <Separator />
 
       <!-- 火山引擎 Ark Coding Plan -->
-      <div class="settings-section" data-provider="volcengine">
-        <div class="settings-section-header">
-          <span class="settings-section-title">火山引擎 (Ark Coding Plan)</span>
-          <label class="settings-toggle">
-            <input type="checkbox" v-model="volcengineEnabled">
-            <span class="settings-toggle-slider"></span>
-          </label>
+      <section class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-medium text-foreground">火山引擎 (Ark Coding Plan)</h3>
+          <Switch v-model="volcengineEnabled" class="no-drag" />
         </div>
-        <div class="settings-field">
-          <label class="settings-toggle-label">
-            <input type="checkbox" v-model="volcengineUseProxy">
-            <span>使用代理</span>
-          </label>
-        </div>
-        <div class="settings-field">
-          <label class="settings-label" for="volcengineAccessKey">Access Key ID</label>
-          <div class="settings-input-wrap">
-            <input
+        <label class="no-drag flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+          <input type="checkbox" v-model="volcengineUseProxy" class="h-3.5 w-3.5 accent-primary">
+          <span>使用代理</span>
+        </label>
+        <div class="space-y-1">
+          <label class="block text-xs text-muted-foreground" for="volcengineAccessKey">Access Key ID</label>
+          <div class="relative">
+            <Input
               :type="volcengineShowAccessKey ? 'text' : 'password'"
               id="volcengineAccessKey"
-              class="settings-input"
               v-model="volcengineAccessKey"
               :placeholder="volcengineHasAccessKey ? '留空保持原值' : 'AKLT...'"
+              class="no-drag h-8 pr-9 font-mono"
               autocomplete="off" spellcheck="false"
               @input="volcengineAccessKeyChanged = true"
-            >
-            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="volcengineShowAccessKey = !volcengineShowAccessKey">
-              {{ volcengineShowAccessKey ? '🔒' : '👁' }}
-            </button>
+            />
+            <Button type="button" variant="ghost" size="icon" class="no-drag absolute right-0 top-0 h-8 w-8 text-muted-foreground" title="显示/隐藏" @click="volcengineShowAccessKey = !volcengineShowAccessKey">
+              <EyeOff v-if="volcengineShowAccessKey" class="h-4 w-4" />
+              <Eye v-else class="h-4 w-4" />
+            </Button>
           </div>
         </div>
-        <div class="settings-field">
-          <label class="settings-label" for="volcengineSecretKey">Secret Access Key</label>
-          <div class="settings-input-wrap">
-            <input
+        <div class="space-y-1">
+          <label class="block text-xs text-muted-foreground" for="volcengineSecretKey">Secret Access Key</label>
+          <div class="relative">
+            <Input
               :type="volcengineShowSecretKey ? 'text' : 'password'"
               id="volcengineSecretKey"
-              class="settings-input"
               v-model="volcengineSecretKey"
               :placeholder="volcengineHasSecretKey ? '留空保持原值' : '粘贴 Secret Access Key'"
+              class="no-drag h-8 pr-9 font-mono"
               autocomplete="off" spellcheck="false"
               @input="volcengineSecretKeyChanged = true"
-            >
-            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="volcengineShowSecretKey = !volcengineShowSecretKey">
-              {{ volcengineShowSecretKey ? '🔒' : '👁' }}
-            </button>
+            />
+            <Button type="button" variant="ghost" size="icon" class="no-drag absolute right-0 top-0 h-8 w-8 text-muted-foreground" title="显示/隐藏" @click="volcengineShowSecretKey = !volcengineShowSecretKey">
+              <EyeOff v-if="volcengineShowSecretKey" class="h-4 w-4" />
+              <Eye v-else class="h-4 w-4" />
+            </Button>
           </div>
-          <div class="settings-hint">
-在 console.volcengine.com/iam/keymanage/ 创建访问密钥（区域 cn-beijing）。AK/SK 长期有效，无需再维护 Cookie。
-          </div>
+          <p class="text-xs text-muted-foreground">在 console.volcengine.com/iam/keymanage/ 创建访问密钥（区域 cn-beijing）。AK/SK 长期有效，无需再维护 Cookie。</p>
         </div>
-      </div>
+      </section>
+      <Separator />
 
       <!-- 小米 MiMo -->
-      <div class="settings-section" data-provider="mimo">
-        <div class="settings-section-header">
-          <span class="settings-section-title">小米 MiMo</span>
-          <label class="settings-toggle">
-            <input type="checkbox" v-model="mimo.enabled">
-            <span class="settings-toggle-slider"></span>
-          </label>
+      <section class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-medium text-foreground">小米 MiMo</h3>
+          <Switch v-model="mimo.enabled" class="no-drag" />
         </div>
-        <div class="settings-field">
-          <label class="settings-toggle-label">
-            <input type="checkbox" v-model="mimo.useProxy">
-            <span>使用代理</span>
-          </label>
-        </div>
-        <div class="settings-field">
-          <label class="settings-label" for="mimoCookie">控制台 Cookie</label>
-          <div class="settings-input-wrap">
-            <input
+        <label class="no-drag flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+          <input type="checkbox" v-model="mimo.useProxy" class="h-3.5 w-3.5 accent-primary">
+          <span>使用代理</span>
+        </label>
+        <div class="space-y-1">
+          <label class="block text-xs text-muted-foreground" for="mimoCookie">控制台 Cookie</label>
+          <div class="relative">
+            <Input
               :type="mimo.showToken ? 'text' : 'password'"
               id="mimoCookie"
-              class="settings-input"
               v-model="mimo.token"
               :placeholder="mimo.hasToken ? '留空保持原值' : '粘贴整段 Cookie'"
+              class="no-drag h-8 pr-9 font-mono"
               autocomplete="off"
               spellcheck="false"
               @input="mimo.tokenChanged = true"
-            >
-            <button type="button" class="btn-toggle-visibility" title="显示/隐藏" @click="mimo.showToken = !mimo.showToken">
-              {{ mimo.showToken ? '🔒' : '👁' }}
-            </button>
+            />
+            <Button type="button" variant="ghost" size="icon" class="no-drag absolute right-0 top-0 h-8 w-8 text-muted-foreground" title="显示/隐藏" @click="mimo.showToken = !mimo.showToken">
+              <EyeOff v-if="mimo.showToken" class="h-4 w-4" />
+              <Eye v-else class="h-4 w-4" />
+            </Button>
           </div>
-          <div class="settings-hint">
-            MiMo 余额只由网页控制台接口暴露，调模型的 <code>sk-</code> API Key 查不到。
-            打开 <code>platform.xiaomimimo.com/#/console/balance</code> → F12 → Network → 刷新 →
-            找到 <code>api/v1/balance</code> 请求 → 复制整段 <code>Cookie</code> 请求头
-            （需含 <code>api-platform_serviceToken</code> 与 <code>userId</code>）。会话过期后需重新粘贴。
-          </div>
+          <p class="text-xs leading-relaxed text-muted-foreground">
+            MiMo 余额只由网页控制台接口暴露，调模型的 <code class="rounded bg-muted px-1 font-mono text-[11px]">sk-</code> API Key 查不到。
+            打开 <code class="rounded bg-muted px-1 font-mono text-[11px]">platform.xiaomimimo.com/#/console/balance</code> → F12 → Network → 刷新 →
+            找到 <code class="rounded bg-muted px-1 font-mono text-[11px]">api/v1/balance</code> 请求 → 复制整段 <code class="rounded bg-muted px-1 font-mono text-[11px]">Cookie</code> 请求头
+            （需含 <code class="rounded bg-muted px-1 font-mono text-[11px]">api-platform_serviceToken</code> 与 <code class="rounded bg-muted px-1 font-mono text-[11px]">userId</code>）。会话过期后需重新粘贴。
+          </p>
         </div>
-      </div>
+      </section>
+      <Separator />
 
       <!-- 刷新周期 -->
-      <div class="settings-field">
-        <label class="settings-label" for="interval">刷新周期</label>
-        <select id="interval" class="settings-select" v-model.number="intervalMinutes">
-          <option :value="5">5 分钟</option>
-          <option :value="10">10 分钟</option>
-          <option :value="15">15 分钟</option>
-          <option :value="30">30 分钟</option>
-          <option :value="60">60 分钟</option>
-        </select>
-      </div>
+      <section class="space-y-2">
+        <h3 class="text-sm font-medium text-foreground">刷新周期</h3>
+        <Select v-model="intervalMinutes">
+          <SelectTrigger class="no-drag h-8 w-full">
+            <SelectValue placeholder="选择刷新周期" />
+            <ChevronDown class="h-4 w-4 opacity-50" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem :value="5">5 分钟</SelectItem>
+            <SelectItem :value="10">10 分钟</SelectItem>
+            <SelectItem :value="15">15 分钟</SelectItem>
+            <SelectItem :value="30">30 分钟</SelectItem>
+            <SelectItem :value="60">60 分钟</SelectItem>
+          </SelectContent>
+        </Select>
+      </section>
+      <Separator />
 
       <!-- 用量阈值 -->
-      <div class="settings-section" data-section="thresholds">
-        <div class="settings-section-header">
-          <span class="settings-section-title">用量阈值</span>
-        </div>
-        <div class="settings-field">
-          <label class="settings-label">进度条颜色切换点（已用 %）</label>
-          <div class="settings-row">
-            <label class="settings-label-inline" for="warnThreshold">warn</label>
-            <input
+      <section class="space-y-2">
+        <h3 class="text-sm font-medium text-foreground">用量阈值</h3>
+        <div class="space-y-1">
+          <span class="block text-xs text-muted-foreground">进度条颜色切换点（已用 %）</span>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-muted-foreground" for="warnThreshold">warn</label>
+            <Input
               id="warnThreshold"
               type="number"
-              class="settings-input settings-input--narrow"
               min="0" max="99" step="1"
               v-model.number="warnThreshold"
+              class="no-drag h-8 w-16"
               @input="validateThresholds"
-            >
-            <label class="settings-label-inline" for="dangerThreshold">danger</label>
-            <input
+            />
+            <label class="text-xs text-muted-foreground" for="dangerThreshold">danger</label>
+            <Input
               id="dangerThreshold"
               type="number"
-              class="settings-input settings-input--narrow"
               min="1" max="100" step="1"
               v-model.number="dangerThreshold"
+              class="no-drag h-8 w-16"
               @input="validateThresholds"
-            >
+            />
           </div>
-          <div class="settings-hint" v-if="thresholdError">{{ thresholdError }}</div>
-          <div class="settings-hint" v-else>已用 % 超过 danger 变红，超过 warn 变黄，否则绿。warn 必须小于 danger。</div>
+          <p v-if="thresholdError" class="text-xs text-[color:var(--danger)]">{{ thresholdError }}</p>
+          <p v-else class="text-xs text-muted-foreground">已用 % 超过 danger 变红，超过 warn 变黄，否则绿。warn 必须小于 danger。</p>
         </div>
-      </div>
+      </section>
+      <Separator />
 
       <!-- 悬浮球 -->
-      <div class="settings-section" data-section="floating-ball">
-        <div class="settings-section-header">
-          <span class="settings-section-title">悬浮球</span>
-          <label class="settings-toggle">
-            <input type="checkbox" v-model="floatingBallEnabled">
-            <span class="settings-toggle-slider"></span>
-          </label>
+      <section class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-medium text-foreground">悬浮球</h3>
+          <Switch v-model="floatingBallEnabled" class="no-drag" />
         </div>
-        <div class="settings-field">
-          <div class="settings-hint">桌面右下角常驻 80×80 状态指示器：中心 5h 剩余百分比、底部多模型 mini bar、有通知时顶部亮红点。单击切到主窗口，可拖动改位置。</div>
-        </div>
-      </div>
+        <p class="text-xs text-muted-foreground">桌面右下角常驻 80×80 状态指示器：中心 5h 剩余百分比、底部多模型 mini bar、有通知时顶部亮红点。单击切到主窗口，可拖动改位置。</p>
+      </section>
+      <Separator />
 
       <!-- 桌面宠物 -->
-      <div class="settings-section" data-section="pet">
-        <div class="settings-section-header">
-          <span class="settings-section-title">桌面宠物</span>
-          <label class="settings-toggle">
-            <input type="checkbox" v-model="petEnabled">
-            <span class="settings-toggle-slider"></span>
-          </label>
+      <section class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-medium text-foreground">桌面宠物</h3>
+          <Switch v-model="petEnabled" class="no-drag" />
         </div>
-        <div class="settings-field">
-          <div class="settings-hint">养一只像素宠物，跟随 Kimi 工作状态变换动作。单击打开 Kimi Web，长按看用量，右键菜单，可拖动。</div>
-        </div>
+        <p class="text-xs text-muted-foreground">养一只像素宠物，跟随 Kimi 工作状态变换动作。单击打开 Kimi Web，长按看用量，右键菜单，可拖动。</p>
 
-        <div class="settings-field">
-          <div class="settings-label">我的宠物</div>
-          <div v-if="petLibrary.length === 0" class="settings-hint">尚未安装宠物</div>
-          <div v-for="p in petLibrary" :key="p.id" class="settings-row pet-row">
-            <span class="settings-label-inline pet-name" :title="p.author ? `${p.name} by ${p.author}` : p.name">
+        <div class="space-y-1">
+          <span class="block text-xs text-muted-foreground">我的宠物</span>
+          <p v-if="petLibrary.length === 0" class="text-xs text-muted-foreground">尚未安装宠物</p>
+          <div v-for="p in petLibrary" :key="p.id" class="flex items-center gap-2">
+            <span class="max-w-[150px] truncate text-xs text-muted-foreground" :title="p.author ? `${p.name} by ${p.author}` : p.name">
               {{ p.name }}<template v-if="p.author"> · {{ p.author }}</template>
             </span>
-            <span class="settings-spacer"></span>
-            <span v-if="p.id === petActiveId" class="pet-badge">当前</span>
-            <button v-else type="button" class="btn-secondary btn-tiny" @click="onPetSwitch(p.id)">切换</button>
-            <button type="button" class="btn-secondary btn-tiny" @click="onPetRemove(p.id)">移除</button>
+            <span class="flex-1"></span>
+            <Badge v-if="p.id === petActiveId" variant="outline" class="no-drag border-[color:var(--fresh)] text-[color:var(--fresh)]">当前</Badge>
+            <Button v-else type="button" variant="secondary" size="sm" class="no-drag h-7 px-2" @click="onPetSwitch(p.id)">切换</Button>
+            <Button type="button" variant="secondary" size="sm" class="no-drag h-7 px-2" @click="onPetRemove(p.id)">移除</Button>
           </div>
         </div>
 
-        <div class="settings-field">
+        <div class="space-y-1">
           <div v-if="!petShowInstall">
-            <button type="button" class="btn-secondary" @click="petShowInstall = true">＋ 安装新宠物</button>
+            <Button type="button" variant="secondary" size="sm" class="no-drag" @click="petShowInstall = true">＋ 安装新宠物</Button>
           </div>
-          <div v-else>
-            <input
+          <div v-else class="space-y-2">
+            <Input
               id="petInstallInput"
-              class="settings-input"
               v-model="petInstallInput"
               placeholder="粘贴画廊安装命令或宠物 slug"
+              class="no-drag h-8"
               spellcheck="false"
               autocomplete="off"
               @keyup.enter="onPetInstall"
-            >
-            <div class="settings-row">
-              <button type="button" class="btn-secondary" :disabled="petInstallBusy" @click="onPetInstall">
+            />
+            <div class="flex gap-2">
+              <Button type="button" variant="secondary" size="sm" class="no-drag" :disabled="petInstallBusy" @click="onPetInstall">
                 {{ petInstallBusy ? '下载中…' : '安装' }}
-              </button>
-              <button type="button" class="btn-secondary" @click="petShowInstall = false">取消</button>
+              </Button>
+              <Button type="button" variant="secondary" size="sm" class="no-drag" @click="petShowInstall = false">取消</Button>
             </div>
           </div>
-          <div class="settings-hint" v-if="petInstallStatus">{{ petInstallStatus }}</div>
-          <div class="settings-hint">从宠物画廊（<code>codexpet.top</code> / <code>petdex.dev</code> 等）复制安装命令粘贴到上方，只下载素材、不执行脚本。</div>
+          <p v-if="petInstallStatus" class="text-xs text-muted-foreground">{{ petInstallStatus }}</p>
+          <p class="text-xs text-muted-foreground">从宠物画廊（<code class="rounded bg-muted px-1 font-mono text-[11px]">codexpet.top</code> / <code class="rounded bg-muted px-1 font-mono text-[11px]">petdex.dev</code> 等）复制安装命令粘贴到上方，只下载素材、不执行脚本。</p>
         </div>
 
-        <div class="settings-field">
-          <div class="settings-row">
-            <span class="settings-label-inline">大小</span>
-            <button type="button" class="btn-secondary btn-tiny" @click="applyPetScale(petScale - PET_SCALE_STEP)">−</button>
-            <button type="button" class="btn-secondary btn-tiny" @click="applyPetScale(100)">重置</button>
-            <button type="button" class="btn-secondary btn-tiny" @click="applyPetScale(petScale + PET_SCALE_STEP)">＋</button>
-            <span class="settings-label-inline">{{ petScale }}%</span>
-          </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-muted-foreground">大小</span>
+          <Button type="button" variant="secondary" size="sm" class="no-drag h-7 px-2" @click="applyPetScale(petScale - PET_SCALE_STEP)">−</Button>
+          <Button type="button" variant="secondary" size="sm" class="no-drag h-7 px-2" @click="applyPetScale(100)">重置</Button>
+          <Button type="button" variant="secondary" size="sm" class="no-drag h-7 px-2" @click="applyPetScale(petScale + PET_SCALE_STEP)">＋</Button>
+          <span class="text-xs text-muted-foreground">{{ petScale }}%</span>
         </div>
-      </div>
+      </section>
+      <Separator />
 
       <!-- 手机配对（LAN 模式） -->
-      <div class="settings-section" data-section="lan-mode">
-        <div class="settings-section-header">
-          <span class="settings-section-title">手机配对（LAN 同步）</span>
-          <label class="settings-toggle">
-            <input type="checkbox" v-model="lanModeEnabled">
-            <span class="settings-toggle-slider"></span>
-          </label>
+      <section class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-medium text-foreground">手机配对（LAN 同步）</h3>
+          <Switch v-model="lanModeEnabled" class="no-drag" />
         </div>
-        <div class="settings-field">
-          <div class="settings-hint">开启后桌面服务会监听局域网，手机 App 可通过同一 Wi-Fi 同步项目状态。</div>
-          <div class="settings-row">
-            <button type="button" class="btn-secondary" @click="openQrCode">显示配对二维码</button>
-          </div>
-          <div class="settings-hint" style="color: rgba(211, 47, 47, 0.9);">⚠ 二维码包含明文 Token，请勿截图分享或让他人拍照。</div>
+        <p class="text-xs text-muted-foreground">开启后桌面服务会监听局域网，手机 App 可通过同一 Wi-Fi 同步项目状态。</p>
+        <div class="flex">
+          <Button type="button" variant="secondary" size="sm" class="no-drag" @click="openQrCode">显示配对二维码</Button>
         </div>
-      </div>
+        <p class="text-xs font-medium text-[color:var(--danger)]">⚠ 二维码包含明文 Token，请勿截图分享或让他人拍照。</p>
+      </section>
+      <Separator />
 
       <!-- Claude Code Hooks -->
-      <div class="settings-section" data-section="hooks">
-        <div class="settings-section-header">
-          <span class="settings-section-title">Claude Code Hooks</span>
-        </div>
-        <div class="settings-field">
-          <label class="settings-toggle-label">
-            <input type="checkbox" v-model="hookEnabled.Notification">
+      <section class="space-y-2">
+        <h3 class="text-sm font-medium text-foreground">Claude Code Hooks</h3>
+        <div class="space-y-1">
+          <label class="no-drag flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+            <input type="checkbox" v-model="hookEnabled.Notification" class="h-3.5 w-3.5 accent-primary">
             <span>Notification（Claude 需要输入时）</span>
           </label>
-          <label class="settings-toggle-label">
-            <input type="checkbox" v-model="hookEnabled.Stop">
+          <label class="no-drag flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+            <input type="checkbox" v-model="hookEnabled.Stop" class="h-3.5 w-3.5 accent-primary">
             <span>Stop（响应结束）</span>
           </label>
-          <label class="settings-toggle-label">
-            <input type="checkbox" v-model="hookEnabled.PreToolUse">
+          <label class="no-drag flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+            <input type="checkbox" v-model="hookEnabled.PreToolUse" class="h-3.5 w-3.5 accent-primary">
             <span>PreToolUse（工具调用前）</span>
           </label>
         </div>
-        <div class="settings-field">
-          <label class="settings-label" for="hookSnippet">手动配置（粘贴到 ~/.claude/settings.json）</label>
-          <textarea id="hookSnippet" class="settings-textarea" readonly :value="hookSnippet" rows="8"></textarea>
-          <div class="settings-row">
-            <button type="button" class="btn-secondary" @click="copySnippet">复制 JSON</button>
-            <span v-if="copyStatus" class="settings-hint">{{ copyStatus }}</span>
+        <div class="space-y-1">
+          <label class="block text-xs text-muted-foreground" for="hookSnippet">手动配置（粘贴到 ~/.claude/settings.json）</label>
+          <Textarea id="hookSnippet" :model-value="hookSnippet" readonly rows="8" class="no-drag select-text font-mono text-xs" />
+          <div class="flex items-center gap-2">
+            <Button type="button" variant="secondary" size="sm" class="no-drag" @click="copySnippet">复制 JSON</Button>
+            <span v-if="copyStatus" class="text-xs text-muted-foreground">{{ copyStatus }}</span>
           </div>
-          <div class="settings-hint">勾选事件后片段实时更新；只含已勾选项。</div>
+          <p class="text-xs text-muted-foreground">勾选事件后片段实时更新；只含已勾选项。</p>
         </div>
-        <div class="settings-field">
-          <label class="settings-toggle-label">
-            <input type="checkbox" :checked="hookAutoInstalled" disabled @change="onAutoInstallToggle">
+        <div class="space-y-1">
+          <label class="no-drag flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+            <input type="checkbox" :checked="hookAutoInstalled" disabled @change="onAutoInstallToggle" class="h-3.5 w-3.5 accent-primary">
             <span>自动写入 ~/.claude/settings.json（已禁用）</span>
           </label>
-          <span class="settings-hint">请手动复制上方 JSON 粘贴到 ~/.claude/settings.json</span>
+          <p class="text-xs text-muted-foreground">请手动复制上方 JSON 粘贴到 ~/.claude/settings.json</p>
         </div>
-      </div>
+      </section>
     </div>
 
-    <div class="settings-footer">
-      <button class="btn-cancel" @click="onCancel">取消</button>
-      <button class="btn-save" :disabled="saving || !thresholdsValid" @click="onSave">{{ saving ? '保存中...' : '保存' }}</button>
-    </div>
+    <footer class="no-drag flex shrink-0 items-center justify-end gap-2 border-t border-border/70 px-4 py-3">
+      <Button variant="secondary" class="no-drag" @click="onCancel">取消</Button>
+      <Button class="no-drag" :disabled="saving || !thresholdsValid" @click="onSave">{{ saving ? '保存中...' : '保存' }}</Button>
+    </footer>
   </div>
 </template>

@@ -11,6 +11,11 @@ export default defineConfig({
   plugins: [vue()],
   root: RENDERER_SRC,
   base: './',
+  resolve: {
+    alias: {
+      '@': RENDERER_SRC,
+    },
+  },
   build: {
     outDir: RENDERER_DIST,
     emptyOutDir: true,

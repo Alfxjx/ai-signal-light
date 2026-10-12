@@ -66,9 +66,12 @@ src/
 │   ├── pet/pet-install.ts (+ .test.ts)     # 画廊命令解析 + 安全 unzip + 图集尺寸校验（仅下载素材）
 │   ├── pet/pet-sprites.ts                  # 官方 Codex 图集逐帧播放器（9 行动作表，CSS background-position）
 │   ├── components/            # TitleBar, ClaudeCard (project list), KimiCard (web 状态), UsageCard (quota bars)
-│   ├── composables/           # useWebSocket (reconnect), useUsageState
+│   ├── components/ui/         # shadcn-vue 基础组件（源码拷贝）：button/input/textarea/select/switch/label/card/badge/separator
+│   ├── composables/           # useWebSocket (reconnect), useUsageState, useTheme (明暗主题切换)
+│   ├── lib/utils.ts           # cn()（clsx + tailwind-merge）
 │   ├── utils/                 # time.ts, cwd.ts, kimiFilter.ts (+ colocated *.test.ts)
-│   └── styles/
+│   └── styles/                # globals.css = Tailwind + shadcn 双主题 CSS 变量（各入口必先 import 它）；
+│                              # main/settings/dropdown/tray-hover.css 只剩窗口级残留（dock 动画、原生 select option、尺寸约束）
 ├── shared/                    # Imported by both main and renderer
 │   ├── constants.ts           # WS_PORT = 3456 (single source of truth)
 │   ├── types/                 # websocket / config / ipc / usage / detector / kimi types
@@ -138,6 +141,8 @@ opencode-usage-plugin-helper-cli/   # 插件配置助手 CLI（own package.json 
 - Tests are Vitest, colocated with sources as `*.test.ts` (`src/main/`, `src/renderer/src/utils/`). Run with `npm test`.
 - The floating ball window is intentionally `focusable: false` so it does not steal focus from the IDE when clicked. It renders a single pixel-art skeuomorphic LED reflecting the **Kimi Code aggregate state** (`approval`=红闪 / `editing`=黄常亮 / `thinking`=黄呼吸 / `idle`=绿微光 / `offline`=灰灭); short-press toggles a sibling **dropdown** window anchored below it (focusable, hidden on blur/Esc), which lists recent active projects (`kimiFilter.filterRecentProjects`: keep busy or active within 3 days) plus the Kimi 5h usage bar.
 - The deprecated `Status` enum (IDLE/EXECUTING/WAITING) still exists in some type casts for historical compatibility; new code should not rely on it.
+- **UI 风格（shadcn-vue + Tailwind v3.4）**: 主面板/设置/悬浮球下拉/托盘弹窗 4 个窗口已迁移到 shadcn 风格（悬浮球 LED 与桌面宠物除外，保持原样）。样式一律用 Tailwind 原子类 + `cn()`（`@/lib/utils`）+ `components/ui/` 里的 shadcn-vue 组件，**不再写手写全局 class**；窗口 `.vue` 文件保持无 `<style>` 块。颜色只用语义 token（`bg-background`/`text-foreground`/`text-muted-foreground`/`border-border` 等）或状态色 CSS 变量 `var(--fresh/--warn/--danger/--muted-fg)`，禁止硬编码色值。主题双模式定义在 `styles/globals.css`（`:root` 亮色 / `.dark` 暗色，hsl 变量），`darkMode: 'class'`。
+- **主题系统**: `config.appearance.theme`（`'system'|'light'|'dark'`，默认 `'dark'`）持久化主题；设置页「外观」区块修改后随保存广播 `theme:changed`（`configStore.onChange` → 所有 BrowserWindow），渲染层 `useTheme()` 应用并跟随系统。每个窗口 HTML 的 `<html class="dark">` 是防闪白默认值，不要删。窗口拖动靠 `.drag-region`/`.no-drag` 工具类（globals.css 定义，**必须以静态字符串出现在模板里** Tailwind 才会生成）；`@` 别名指向 `src/renderer/src`（vite.config.ts + tsconfig.json paths 双配置）。
 
 ## Harness Conventions
 

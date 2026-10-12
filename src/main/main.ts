@@ -14,6 +14,7 @@ import { PetStore } from './pet-store';
 import { WS_PORT } from '../shared/constants';
 import { IPC_CHANNELS } from '../shared/types/ipc';
 import type { HooksInstallResult, HooksUninstallResult, PetInstallInput } from '../shared/types/ipc';
+import type { ThemeMode } from '../shared/types/config';
 import { buildQrPayload, encodeQrPayload, generateApiKey, getLanIp } from './pairing';
 
 // 统一 dev 与打包后的 userData 目录名，并刻意区分二者。
@@ -1040,11 +1041,22 @@ app.whenReady().then(() => {
   server.start();
 
   // 监听 LAN 模式变化，自动重启服务器以切换绑定地址
+  // 同时监听主题变化：向所有窗口广播 theme:changed，渲染层据此切 <html> 的 dark class
+  let lastTheme: ThemeMode | undefined;
   configStore.onChange((cfg) => {
     const currentLan = server?.isLanEnabled();
     if (currentLan !== cfg.lanMode?.enabled) {
       console.log('[main] LAN mode changed, restarting server...');
       server?.restart();
+    }
+    const theme = cfg.appearance?.theme;
+    if (theme && theme !== lastTheme) {
+      lastTheme = theme;
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) {
+          win.webContents.send(IPC_CHANNELS.THEME_CHANGED, theme);
+        }
+      }
     }
   });
 
@@ -1132,7 +1144,8 @@ hasVolcengineAccessKey: !!cfg.volcengine.accessKey,
     floatingBall: { enabled: !!cfg.floatingBall.enabled },
     pet: { enabled: !!cfg.pet?.enabled },
     thresholds: { ...cfg.thresholds },
-    lanMode: { enabled: !!cfg.lanMode?.enabled, apiKey: cfg.lanMode?.apiKey || '' }
+    lanMode: { enabled: !!cfg.lanMode?.enabled, apiKey: cfg.lanMode?.apiKey || '' },
+    appearance: { theme: cfg.appearance.theme }
   };
 });
 

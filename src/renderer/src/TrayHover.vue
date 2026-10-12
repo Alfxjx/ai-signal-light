@@ -1,8 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { useUsageState } from './composables/useUsageState';
+import { useTheme } from './composables/useTheme';
 import type { DeepseekUsageData, MimoUsageData, CodexUsageData, CodexWindowData } from './types/messages';
 import { formatAge } from './utils/time';
+
+// 应用明暗主题（跟随设置，监听主进程 theme:changed 即时切换）
+useTheme();
+
+// 百分比三档着色：level → 状态色 CSS 变量（fresh/warn/danger/muted）
+const LEVEL_COLOR: Record<'fresh' | 'warn' | 'danger' | 'muted', string> = {
+  fresh: 'var(--fresh)',
+  warn: 'var(--warn)',
+  danger: 'var(--danger)',
+  muted: 'var(--muted-fg)',
+};
 
 // 复用悬浮球的 useUsageState → 同样接 WS 拿 init/usageUpdate
 const {
@@ -134,105 +146,110 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="th" ref="root">
-    <div class="th-header">
-      <div class="th-header-left">
-        <span class="th-title">用量速览</span>
-        <button class="th-refresh" :class="{ spinning: isRefreshing }" title="刷新" @click="onRefresh">↻</button>
+  <div ref="root" class="flex w-[200px] flex-col gap-2.5 rounded-lg border bg-popover/90 px-3.5 pb-3 pt-2.5 shadow-[0_6px_24px_rgba(0,0,0,0.5)] backdrop-blur-xl no-drag">
+    <div class="flex items-baseline justify-between gap-2 border-b pb-1.5">
+      <div class="flex items-center gap-1.5">
+        <span class="text-[11px] font-semibold tracking-wide text-foreground/85">用量速览</span>
+        <button
+          class="flex h-[15px] w-[15px] cursor-pointer items-center justify-center rounded bg-muted/80 p-0 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          :class="{ 'animate-spin': isRefreshing }"
+          title="刷新"
+          @click="onRefresh"
+        >↻</button>
       </div>
-      <span class="th-updated" :data-ts="lastUpdatedTs">{{ formatAge(lastUpdatedTs, now) }}</span>
+      <span class="text-[10px] tabular-nums text-muted-foreground/70" :data-ts="lastUpdatedTs">{{ formatAge(lastUpdatedTs, now) }}</span>
     </div>
 
-    <div class="th-list">
+    <div class="flex flex-col gap-2">
       <!-- Kimi: 5h + week -->
-      <div class="th-section" v-if="kimiVisible">
-        <div class="th-section-name">Kimi</div>
-        <div class="th-row">
-          <span class="th-tag">5h</span>
-          <span class="th-pct" :class="`th-pct--${kimiFiveHour.level}`">{{ kimiFiveHour.percent }}%</span>
-          <span class="th-reset" v-if="kimiFiveHour.resetText">({{ kimiFiveHour.resetText }})</span>
+      <div class="flex flex-col gap-0.5" v-if="kimiVisible">
+        <div class="mb-0.5 text-xs font-semibold tracking-wide text-foreground/90">Kimi</div>
+        <div class="no-drag flex items-baseline gap-1.5 pl-3 text-[11px] leading-normal">
+          <span class="min-w-[36px] shrink-0 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">5h</span>
+          <span class="shrink-0 font-semibold tabular-nums" :style="{ color: LEVEL_COLOR[kimiFiveHour.level] }">{{ kimiFiveHour.percent }}%</span>
+          <span class="ml-auto whitespace-nowrap text-[10px] tabular-nums text-muted-foreground/70" v-if="kimiFiveHour.resetText">({{ kimiFiveHour.resetText }})</span>
         </div>
-        <div class="th-row">
-          <span class="th-tag">week</span>
-          <span class="th-pct" :class="`th-pct--${kimiWeekly.level}`">{{ kimiWeekly.percent }}%</span>
-          <span class="th-reset" v-if="kimiWeekly.resetText">({{ kimiWeekly.resetText }})</span>
+        <div class="no-drag flex items-baseline gap-1.5 pl-3 text-[11px] leading-normal">
+          <span class="min-w-[36px] shrink-0 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">week</span>
+          <span class="shrink-0 font-semibold tabular-nums" :style="{ color: LEVEL_COLOR[kimiWeekly.level] }">{{ kimiWeekly.percent }}%</span>
+          <span class="ml-auto whitespace-nowrap text-[10px] tabular-nums text-muted-foreground/70" v-if="kimiWeekly.resetText">({{ kimiWeekly.resetText }})</span>
         </div>
       </div>
 
       <!-- MiniMax: 5h + week -->
-      <div class="th-section" v-if="minimaxVisible">
-        <div class="th-section-name">MiniMax</div>
-        <div class="th-row">
-          <span class="th-tag">5h</span>
-          <span class="th-pct" :class="`th-pct--${minimaxFiveHour.level}`">{{ minimaxFiveHour.percent }}%</span>
-          <span class="th-reset" v-if="minimaxFiveHour.resetText">({{ minimaxFiveHour.resetText }})</span>
+      <div class="flex flex-col gap-0.5" v-if="minimaxVisible">
+        <div class="mb-0.5 text-xs font-semibold tracking-wide text-foreground/90">MiniMax</div>
+        <div class="no-drag flex items-baseline gap-1.5 pl-3 text-[11px] leading-normal">
+          <span class="min-w-[36px] shrink-0 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">5h</span>
+          <span class="shrink-0 font-semibold tabular-nums" :style="{ color: LEVEL_COLOR[minimaxFiveHour.level] }">{{ minimaxFiveHour.percent }}%</span>
+          <span class="ml-auto whitespace-nowrap text-[10px] tabular-nums text-muted-foreground/70" v-if="minimaxFiveHour.resetText">({{ minimaxFiveHour.resetText }})</span>
         </div>
-        <div class="th-row">
-          <span class="th-tag">week</span>
-          <span class="th-pct" :class="`th-pct--${minimaxWeekly.level}`">{{ minimaxWeekly.percent }}%</span>
-          <span class="th-reset" v-if="minimaxWeekly.resetText">({{ minimaxWeekly.resetText }})</span>
+        <div class="no-drag flex items-baseline gap-1.5 pl-3 text-[11px] leading-normal">
+          <span class="min-w-[36px] shrink-0 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">week</span>
+          <span class="shrink-0 font-semibold tabular-nums" :style="{ color: LEVEL_COLOR[minimaxWeekly.level] }">{{ minimaxWeekly.percent }}%</span>
+          <span class="ml-auto whitespace-nowrap text-[10px] tabular-nums text-muted-foreground/70" v-if="minimaxWeekly.resetText">({{ minimaxWeekly.resetText }})</span>
         </div>
       </div>
 
       <!-- Copilot: premium -->
-      <div class="th-section" v-if="copilotVisible">
-        <div class="th-section-name">Copilot</div>
-        <div class="th-row">
-          <span class="th-tag">premium</span>
-          <span class="th-pct" :class="`th-pct--${copilotSlot.level}`">{{ copilotSlot.percent }}%</span>
-          <span class="th-reset" v-if="copilotSlot.resetText">({{ copilotSlot.resetText }})</span>
+      <div class="flex flex-col gap-0.5" v-if="copilotVisible">
+        <div class="mb-0.5 text-xs font-semibold tracking-wide text-foreground/90">Copilot</div>
+        <div class="no-drag flex items-baseline gap-1.5 pl-3 text-[11px] leading-normal">
+          <span class="min-w-[36px] shrink-0 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">premium</span>
+          <span class="shrink-0 font-semibold tabular-nums" :style="{ color: LEVEL_COLOR[copilotSlot.level] }">{{ copilotSlot.percent }}%</span>
+          <span class="ml-auto whitespace-nowrap text-[10px] tabular-nums text-muted-foreground/70" v-if="copilotSlot.resetText">({{ copilotSlot.resetText }})</span>
         </div>
       </div>
 
       <!-- Codex: primary window -->
-      <div class="th-section" v-if="codexVisible">
-        <div class="th-section-name">Codex</div>
-        <div class="th-row">
-          <span class="th-tag">{{ codexWindowTag || '—' }}</span>
-          <span class="th-pct" :class="`th-pct--${codexSlot.level}`">{{ codexSlot.percent }}%</span>
-          <span class="th-reset" v-if="codexSlot.resetText">({{ codexSlot.resetText }})</span>
+      <div class="flex flex-col gap-0.5" v-if="codexVisible">
+        <div class="mb-0.5 text-xs font-semibold tracking-wide text-foreground/90">Codex</div>
+        <div class="no-drag flex items-baseline gap-1.5 pl-3 text-[11px] leading-normal">
+          <span class="min-w-[36px] shrink-0 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">{{ codexWindowTag || '—' }}</span>
+          <span class="shrink-0 font-semibold tabular-nums" :style="{ color: LEVEL_COLOR[codexSlot.level] }">{{ codexSlot.percent }}%</span>
+          <span class="ml-auto whitespace-nowrap text-[10px] tabular-nums text-muted-foreground/70" v-if="codexSlot.resetText">({{ codexSlot.resetText }})</span>
         </div>
       </div>
 
       <!-- DeepSeek: 余额 -->
-      <div class="th-section" v-if="deepseekVisible">
-        <div class="th-section-name">DeepSeek</div>
-        <div class="th-row">
-          <span class="th-tag">余额</span>
-          <span class="th-balance">{{ deepseekBalanceText }}</span>
+      <div class="flex flex-col gap-0.5" v-if="deepseekVisible">
+        <div class="mb-0.5 text-xs font-semibold tracking-wide text-foreground/90">DeepSeek</div>
+        <div class="no-drag flex items-baseline gap-1.5 pl-3 text-[11px] leading-normal">
+          <span class="min-w-[36px] shrink-0 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">余额</span>
+          <span class="font-medium tabular-nums text-foreground/75">{{ deepseekBalanceText }}</span>
         </div>
       </div>
 
       <!-- MiMo: 余额 -->
-      <div class="th-section" v-if="mimoVisible">
-        <div class="th-section-name">MiMo</div>
-        <div class="th-row">
-          <span class="th-tag">余额</span>
-          <span class="th-balance">{{ mimoBalanceText }}</span>
+      <div class="flex flex-col gap-0.5" v-if="mimoVisible">
+        <div class="mb-0.5 text-xs font-semibold tracking-wide text-foreground/90">MiMo</div>
+        <div class="no-drag flex items-baseline gap-1.5 pl-3 text-[11px] leading-normal">
+          <span class="min-w-[36px] shrink-0 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">余额</span>
+          <span class="font-medium tabular-nums text-foreground/75">{{ mimoBalanceText }}</span>
         </div>
       </div>
 
       <!-- 火山 Ark Coding Plan: session(5h) + weekly + monthly -->
-      <div class="th-section" v-if="volcengineVisible">
-        <div class="th-section-name">Ark Coding Plan</div>
-        <div class="th-row">
-          <span class="th-tag">session</span>
-          <span class="th-pct" :class="`th-pct--${volcengineSlots.session.level}`">{{ volcengineSlots.session.percent }}%</span>
-          <span class="th-reset" v-if="volcengineSlots.session.resetText">({{ volcengineSlots.session.resetText }})</span>
+      <div class="flex flex-col gap-0.5" v-if="volcengineVisible">
+        <div class="mb-0.5 text-xs font-semibold tracking-wide text-foreground/90">Ark Coding Plan</div>
+        <div class="no-drag flex items-baseline gap-1.5 pl-3 text-[11px] leading-normal">
+          <span class="min-w-[36px] shrink-0 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">session</span>
+          <span class="shrink-0 font-semibold tabular-nums" :style="{ color: LEVEL_COLOR[volcengineSlots.session.level] }">{{ volcengineSlots.session.percent }}%</span>
+          <span class="ml-auto whitespace-nowrap text-[10px] tabular-nums text-muted-foreground/70" v-if="volcengineSlots.session.resetText">({{ volcengineSlots.session.resetText }})</span>
         </div>
-        <div class="th-row">
-          <span class="th-tag">weekly</span>
-          <span class="th-pct" :class="`th-pct--${volcengineSlots.weekly.level}`">{{ volcengineSlots.weekly.percent }}%</span>
-          <span class="th-reset" v-if="volcengineSlots.weekly.resetText">({{ volcengineSlots.weekly.resetText }})</span>
+        <div class="no-drag flex items-baseline gap-1.5 pl-3 text-[11px] leading-normal">
+          <span class="min-w-[36px] shrink-0 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">weekly</span>
+          <span class="shrink-0 font-semibold tabular-nums" :style="{ color: LEVEL_COLOR[volcengineSlots.weekly.level] }">{{ volcengineSlots.weekly.percent }}%</span>
+          <span class="ml-auto whitespace-nowrap text-[10px] tabular-nums text-muted-foreground/70" v-if="volcengineSlots.weekly.resetText">({{ volcengineSlots.weekly.resetText }})</span>
         </div>
-        <div class="th-row">
-          <span class="th-tag">monthly</span>
-          <span class="th-pct" :class="`th-pct--${volcengineSlots.monthly.level}`">{{ volcengineSlots.monthly.percent }}%</span>
-          <span class="th-reset" v-if="volcengineSlots.monthly.resetText">({{ volcengineSlots.monthly.resetText }})</span>
+        <div class="no-drag flex items-baseline gap-1.5 pl-3 text-[11px] leading-normal">
+          <span class="min-w-[36px] shrink-0 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70">monthly</span>
+          <span class="shrink-0 font-semibold tabular-nums" :style="{ color: LEVEL_COLOR[volcengineSlots.monthly.level] }">{{ volcengineSlots.monthly.percent }}%</span>
+          <span class="ml-auto whitespace-nowrap text-[10px] tabular-nums text-muted-foreground/70" v-if="volcengineSlots.monthly.resetText">({{ volcengineSlots.monthly.resetText }})</span>
         </div>
       </div>
 
-      <div class="th-empty" v-if="!anyVisible">无用量数据</div>
+      <div class="py-2 text-center text-[11px] text-muted-foreground" v-if="!anyVisible">无用量数据</div>
     </div>
   </div>
 </template>

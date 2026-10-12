@@ -1,32 +1,8 @@
-/* ===== 基础样式 ===== */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  background: transparent;
-  overflow: hidden;
-  user-select: none;
-  -webkit-app-region: drag; /* 允许拖拽窗口 */
-}
-
-.app {
-  width: 100vw;
-  height: 100vh;
-  background: rgba(20, 20, 30, 0.92);
-  backdrop-filter: blur(20px);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  position: relative;
-  will-change: transform; /* 顶部吸附动画用 transform 走 GPU 合成 */
-}
+/* ===== 主面板窗口级样式 =====
+   只保留 Tailwind 表达不了或不该表达的内容：
+   - 顶部吸附 dock 动画 / 收起态把手
+   - ageClass/barClass 返回的状态色分级类
+   - 用量条自定义实现（track / fill / marker） */
 
 /* 顶部吸附动画进行中：关掉 backdrop-filter，避免模糊层在 transform 滑动时错位/闪烁 */
 .app--dock-animating {
@@ -44,535 +20,47 @@ body {
   width: 40px;
   height: 3px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.55);
+  background: color-mix(in srgb, var(--foreground) 55%, transparent);
   pointer-events: none;
 }
 
-/* ===== 标题栏 ===== */
-.title-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  -webkit-app-region: drag;
-}
-
-.title {
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
-  letter-spacing: 0.5px;
-}
-
-.window-controls {
-  display: flex;
-  gap: 6px;
-  -webkit-app-region: no-drag;
-}
-
-.window-controls button {
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.window-controls button:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.9);
-}
-
-/* ===== 卡片容器 ===== */
-.cards-container {
-  flex: 1;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  overflow-y: auto;
-  -webkit-app-region: no-drag;
-}
-
-/* ===== 状态卡片 ===== */
-.status-card {
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 12px;
-  padding: 14px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  transition: all 0.3s ease;
-}
-
-.status-card:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-/* Claude Code 卡去掉外壳背景/边框，避免卡片嵌套 */
-.status-card[data-assistant="claude"] {
-  background: transparent;
-  border: none;
-  padding: 8px 0;
-}
-
-.status-card[data-assistant="claude"]:hover {
-  background: transparent;
-  border: none;
-}
-
-/* ===== Claude Code 项目列表 ===== */
-.claude-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  padding: 0 4px;
-}
-
-.claude-header .header-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.btn-refresh {
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 13px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  -webkit-app-region: no-drag;
-}
-
-.btn-refresh:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.btn-refresh.spinning {
-  animation: spin 0.6s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.claude-title {
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.claude-range {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.9);
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 12px;
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-}
-
-.claude-range:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.claude-range option {
-  background: #14141e;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.project-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  max-height: 360px;
-  overflow-y: auto;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  padding: 6px 0;
-}
-
-.project-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: background 0.2s;
-}
-
-.project-row:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.project-name {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 60%;
-}
-
-/* Claude Code hook 红点：紧贴 name，把 time 推到右边 */
-.hook-badge {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ef4444;
-  flex-shrink: 0;
-  margin-left: 6px;
-  margin-right: auto;
-  cursor: pointer;
-  box-shadow: 0 0 4px rgba(239, 68, 68, 0.6);
-  animation: hook-pulse 1.6s ease-in-out infinite;
-}
-
+/* 项目红点呼吸动画（模板里用 arbitrary animation 引用） */
 @keyframes hook-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
 }
 
-.project-time {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-  margin-left: 8px;
+/* ageClass() 返回的三档着色（引用 CSS 变量，随主题切换） */
+.age-fresh { color: var(--fresh); }
+.age-warn  { color: var(--warn); }
+.age-stale { color: var(--muted-fg); }
+
+/* 时间范围下拉的原生 option：跟随窗口底色，避免暗色主题下弹层是白底（Tailwind 无法样式化 option） */
+select.claude-range option {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
 
-.age-fresh { color: #4ade80; }
-.age-warn  { color: #facc15; }
-.age-stale { color: #94a3b8; }
-
-.project-empty {
-  padding: 8px;
-  text-align: center;
-  color: #94a3b8;
-  font-size: 12px;
-  list-style: none;
-}
-
-/* ===== 底部 ===== */
-.footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.35);
-}
-
-.connection-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.connection-status .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #4ade80;
-}
-
-.connection-status.disconnected .dot {
-  background: #ef4444;
-}
-
-.cards-container::-webkit-scrollbar,
-.project-list::-webkit-scrollbar {
-  width: 4px;
-}
-
-.cards-container::-webkit-scrollbar-track,
-.project-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.cards-container::-webkit-scrollbar-thumb,
-.project-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-}
-
-/* ===== 用量监控卡片 ===== */
-.usage-card {
-  background: transparent;
-  border: none;
-  padding: 8px 0;
-}
-
-.usage-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  padding: 0 4px;
-}
-
-.usage-header .header-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.usage-header .header-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  -webkit-app-region: no-drag;
-}
-
-.btn-compact {
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 13px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  -webkit-app-region: no-drag;
-}
-
-.btn-compact:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.btn-compact.active {
-  background: rgba(74, 222, 128, 0.2);
-  color: #4ade80;
-}
-
-/* ===== 简略模式 ===== */
-.compact .usage-bar-block[data-hide-compact] {
-  display: none;
-}
-
-.compact [data-assistant="claude"] .project-list .project-row:nth-child(n+5) {
-  display: none;
-}
-
-/* ===== Kimi Code (web) 卡 ===== */
-/* 与 Claude 卡共享 .claude-header/.project-list/... 样式；同样去掉外壳背景/边框 */
-.status-card[data-assistant="kimi"] {
-  background: transparent;
-  border: none;
-  padding: 8px 0;
-}
-
-.status-card[data-assistant="kimi"]:hover {
-  background: transparent;
-  border: none;
-}
-
-.kimi-header-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.kimi-state-badge {
-  font-size: 11px;
-  font-weight: 500;
-  padding: 1px 7px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.kimi-state-badge[data-state="thinking"] { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
-.kimi-state-badge[data-state="editing"]  { background: rgba(250, 204, 21, 0.15);  color: #facc15; }
-.kimi-state-badge[data-state="approval"] { background: rgba(239, 68, 68, 0.15);   color: #ef4444; }
-.kimi-state-badge[data-state="idle"]     { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
-.kimi-state-badge[data-state="offline"]  { background: rgba(100, 116, 139, 0.2);  color: #64748b; }
-
-/* 目录行左侧实时忙态圆点：红=待审核 / 黄=编辑 / 绿=思考 / 灰=空闲 */
-.kimi-state-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-right: 6px;
-}
-
-.kimi-state-dot.dot-approval { background: #ef4444; }
-.kimi-state-dot.dot-editing  { background: #facc15; }
-.kimi-state-dot.dot-thinking { background: #4ade80; }
-.kimi-state-dot.dot-idle     { background: #94a3b8; }
-
-.compact [data-assistant="kimi"] .project-list .project-row:nth-child(n+5) {
-  display: none;
-}
-
-.usage-title {
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.usage-updated {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
-  font-variant-numeric: tabular-nums;
-}
-
-.usage-list {
-  display: flex;
-  flex-direction: column;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  padding: 4px 0;
-}
-
-.usage-row {
-  padding: 4px 6px;
-}
-
-.usage-row + .usage-row {
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  margin-top: 2px;
-}
-
-.usage-row-header {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-
-.usage-name {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
-  font-weight: 500;
-}
-
-.usage-status-wrapper {
-  display: flex;
-  align-items: center;
-  height: 17px;
-}
-
-.usage-status {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #22c55e;
-  flex-shrink: 0;
-}
-
-.usage-status.disabled {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.usage-status.error {
-  background: #ef4444;
-}
-
-.usage-status.no_token {
-  background: #facc15;
-}
-
-.usage-bar-block {
-  margin-top: 6px;
-}
-
-.usage-bar-block:first-of-type {
-  margin-top: 0;
-}
-
-.usage-bar-label {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
-  margin-bottom: 3px;
-}
-
-.usage-time {
-  display: flex;
-  flex-direction: row;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 2px;
-}
-
-.usage-bar-meta {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.35);
-  margin-left: 8px;
-  font-variant-numeric: tabular-nums;
-}
-
-.usage-bar-value {
-  font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.usage-pace {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 6px;
-  padding: 0 4px;
-  border-radius: 3px;
-  font-size: 9px;
-  font-weight: 500;
-  line-height: 1;
-  color: rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.usage-pace.pace-fast {
-  color: #fca5a5;
-  background: rgba(239, 68, 68, 0.15);
-}
-
-.usage-pace.pace-slow {
-  color: #86efac;
-  background: rgba(34, 197, 94, 0.15);
-}
-
-.usage-pace.pace-average {
-  color: rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.06);
-}
-
+/* ===== 用量条（保留自定义实现，颜色走 CSS 变量） ===== */
 .usage-bar {
   position: relative;
   height: 4px;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
   border-radius: 2px;
   overflow: visible;
 }
+
+.usage-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--fresh);
+  border-radius: 2px;
+  transition: width 0.6s ease, background 0.3s ease;
+}
+
+/* warn/danger：CSS 变量柔和版（混入背景色），不再是死硬的高亮色块 */
+.usage-bar-fill.warn   { background: color-mix(in srgb, var(--warn) 55%, hsl(var(--background))); }
+.usage-bar-fill.danger { background: color-mix(in srgb, var(--danger) 45%, hsl(var(--background))); }
 
 .usage-bar-marker {
   position: absolute;
@@ -580,35 +68,15 @@ body {
   left: 0;
   width: 2px;
   height: 8px;
-  background: rgba(255, 255, 255, 0.7);
+  background: color-mix(in srgb, var(--foreground) 65%, transparent);
   border-radius: 1px;
   transform: translateX(-50%);
   pointer-events: none;
   box-shadow: 0 0 2px rgba(0, 0, 0, 0.4);
 }
 
-.usage-bar-fill {
-  height: 100%;
-  width: 0%;
-  background: #4ade80;
-  border-radius: 2px;
-  transition: width 0.6s ease, background 0.3s ease;
-}
-
-.usage-bar-fill.warn { background: #a78d25; }
-.usage-bar-fill.danger { background: #610c0c; }
-
-.usage-empty {
-  padding: 8px;
-  text-align: center;
-  color: #94a3b8;
-  font-size: 12px;
-}
-
-.usage-row[data-disabled="true"] .usage-bar-fill {
-  opacity: 0.3;
-}
-
+/* 禁用 provider：用量条与数值淡化 */
+.usage-row[data-disabled="true"] .usage-bar-fill { opacity: 0.3; }
 .usage-row[data-disabled="true"] .usage-bar-value {
-  color: rgba(255, 255, 255, 0.3);
+  color: color-mix(in srgb, var(--foreground) 30%, transparent);
 }

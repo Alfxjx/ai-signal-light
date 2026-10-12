@@ -1,4 +1,4 @@
-import type { AppConfig, UsageThresholds } from './config';
+import type { AppConfig, ThemeMode, UsageThresholds } from './config';
 
 export interface SettingsPayload extends AppConfig {
   hasKimiToken: boolean;
@@ -33,6 +33,7 @@ export interface SettingsSavePayload {
   pet?: { enabled: boolean };
   thresholds?: UsageThresholds;
   lanMode?: { enabled: boolean; apiKey?: string };
+  appearance?: { theme: ThemeMode };
 }
 
 export interface HooksSnippetInfo {
@@ -122,6 +123,8 @@ export interface ElectronAPI {
   saveSettings: (partial: SettingsSavePayload) => Promise<{ success: boolean }>;
   closeSettings: () => Promise<void>;
   openSettings: () => Promise<void>;
+  /** 主题变化由主进程广播（settings 里改了外观后全窗口同步），渲染层据此切 <html> 的 dark class */
+  onThemeChanged: (cb: (theme: ThemeMode) => void) => void;
   resizeWindow: (opts: { height: number }) => Promise<void>;
   getWindowState: () => Promise<WindowState | null>;
   setCompact: (isCompact: boolean) => Promise<void>;
@@ -220,4 +223,5 @@ export const IPC_CHANNELS = {
   WINDOW_DOCK_ANIM: 'window:dock-anim',
   TRAY_HOVER_POINTER: 'tray-hover:pointer',
   TRAY_HOVER_RESIZE: 'tray-hover:resize',
+  THEME_CHANGED: 'theme:changed',
 } as const;
