@@ -120,7 +120,8 @@ export interface ElectronAPI {
   toggleAlwaysOnTop: (enabled: boolean) => Promise<void>;
   platform: string;
   getSettings: () => Promise<SettingsPayload | null>;
-  saveSettings: (partial: SettingsSavePayload) => Promise<{ success: boolean }>;
+  /** 主进程按 key 逐项浅合并，未出现的键保持原值，所以允许只传部分字段（如主面板单独切主题） */
+  saveSettings: (partial: Partial<SettingsSavePayload>) => Promise<{ success: boolean }>;
   closeSettings: () => Promise<void>;
   openSettings: () => Promise<void>;
   /** 主题变化由主进程广播（settings 里改了外观后全窗口同步），渲染层据此切 <html> 的 dark class */

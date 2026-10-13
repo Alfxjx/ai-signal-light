@@ -40,6 +40,7 @@
 - 实机目检（明/暗/跟随系统 × 4 窗口、reka-ui Select popper 定位、拖拽区回归、亮色玻璃对比度）需 dev 跑起来确认
 
 ## 遗留/坑
+- **主面板标题栏有主题切换按钮**（在「悬浮窗」按钮左侧，Sun/Moon 图标）：点击在浅色/深色间切换，走 `saveSettings({ appearance })`；`ElectronAPI.saveSettings` 类型已放宽为 `Partial<SettingsSavePayload>`（主进程按 key 逐项浅合并，可只传部分字段）。
 - **全局文字色必须显式给 foreground**：`globals.css` 的 base 层原本只有 `background: transparent`，缺 `color: hsl(var(--foreground))`，导致未指定颜色的元素（含 lucide 图标的 `currentColor`）继承浏览器默认黑色、暗色主题下看不见。已修。
 - **不要用半透明玻璃底**：首版四个窗口用了 `bg-*/90 + backdrop-blur-xl`，用户反馈要去掉，现全部改为实色（`bg-popover` / `bg-background`）。
 - `.drag-region`/`.no-drag` 必须以**静态字符串**出现在模板里，Tailwind 才生成（动态拼接会静默丢拖动）

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { Pin, PinOff, Settings, Minus, Activity } from 'lucide-vue-next';
+import { Pin, PinOff, Settings, Minus, Activity, Sun, Moon } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 
 defineProps<{
   isPinned: boolean;
   isElectron: boolean;
+  isDark: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -12,6 +13,7 @@ const emit = defineEmits<{
   minimize: [];
   openSettings: [];
   toggleFloatingBall: [];
+  toggleTheme: [];
 }>();
 </script>
 
@@ -20,6 +22,11 @@ const emit = defineEmits<{
   <div class="flex items-center justify-between border-b px-4 py-3">
     <div class="text-sm font-semibold tracking-wide text-foreground/90">USAiGE</div>
     <div class="no-drag flex items-center gap-1.5">
+      <Button variant="ghost" size="icon" class="h-6 w-6" :title="isDark ? '切换到浅色主题' : '切换到深色主题'"
+        @click="emit('toggleTheme')">
+        <Moon v-if="isDark" />
+        <Sun v-else />
+      </Button>
       <Button variant="ghost" size="icon" class="h-6 w-6" title="悬浮窗" @click="emit('toggleFloatingBall')">
         <Activity />
       </Button>

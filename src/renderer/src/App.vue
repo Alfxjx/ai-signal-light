@@ -5,8 +5,9 @@ import ClaudeCard from './components/ClaudeCard.vue';
 import KimiCard from './components/KimiCard.vue';
 import UsageCard from './components/UsageCard.vue';
 import { useWebSocket } from './composables/useWebSocket';
-import { useTheme } from './composables/useTheme';
+import { useTheme, applyTheme } from './composables/useTheme';
 import { normalizeCwd } from './utils/cwd';
+import type { ThemeMode } from '../../shared/types/config';
 import type {
   ClaudeProject,
   KimiStatus,
@@ -49,7 +50,7 @@ const pendingByCwd = reactive<Record<string, PendingHook>>({});
 const now = ref(Date.now());
 
 // 应用主题（明/暗 class 切换，含 system 跟随）
-useTheme();
+const { mode: themeMode } = useTheme();
 
 const isElectron = computed(() => !!window.electronAPI);
 
@@ -222,6 +223,16 @@ function toggleFloatingBall() {
   }
 }
 
+const isDarkTheme = computed(() => document.documentElement.classList.contains('dark'));
+
+// 主题按钮只在浅色/深色之间切换；当前是「跟随系统」时按实际外观取反
+function toggleTheme() {
+  const next: ThemeMode = isDarkTheme.value ? 'light' : 'dark';
+  applyTheme(next);
+  themeMode.value = next;
+  void window.electronAPI?.saveSettings?.({ appearance: { theme: next } });
+}
+
 // ====== Age timer ======
 let ageTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -260,13 +271,13 @@ const lastUpdateText = computed(() => {
 </script>
 
 <template>
-  <!-- 根容器：玻璃拟态 + 整窗拖拽区（交互元素各自标 no-drag）；app--docked 顶部吸附由 main.css 接管 -->
+  <!-- 根容器：实色底 + 整窗拖拽区（交互元素各自标 no-drag）；app--docked 顶部吸附由 main.css 接管 -->
   <div ref="appEl"
        class="app drag-region relative flex h-screen w-screen flex-col overflow-hidden rounded-2xl border bg-background shadow-[0_8px_32px_rgba(0,0,0,0.4)] will-change-transform"
        :class="{ 'app--docked': dockState === 'collapsed' }">
-    <TitleBar :is-pinned="isPinned" :is-electron="isElectron"
+    <TitleBar :is-pinned="isPinned" :is-electron="isElectron" :is-dark="isDarkTheme"
               @toggle-pin="togglePin" @minimize="minimize" @open-settings="openSettings"
-              @toggle-floating-ball="toggleFloatingBall" />
+              @toggle-floating-ball="toggleFloatingBall" @toggle-theme="toggleTheme" />
 
     <div class="no-drag flex flex-1 flex-col gap-2.5 overflow-y-auto p-2">
       <UsageCard :usage="usage" :now="now" :is-compact="isCompact" :is-refreshing="isUsageRefreshing"
