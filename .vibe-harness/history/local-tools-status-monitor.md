@@ -92,5 +92,6 @@ opencode clash-verge-rev · Greeting（当日）  …9 月的旧会话会被过�
 - 卡片结构对齐 KimiCard：头部队名 + 忙态徽标 + detail（版本/端口/来源，无时间）+ 下面项目列表（当日裁剪）。
 - 单工具可见性：`present` = 有进程 / 有 detail / 有 projects（三者任一），否则整卡隐藏——避免装过的工具也各占一张空卡。
 - App.vue：三个 `<LocalToolCard tool-id="codex|mcode|opencode" ...>` 与 KimiCard、ClaudeCard 平铺在右栏。
-- 滚动：去掉 LocalToolCard 项目列表的 `max-h-[240px]` 卡内限高，内容自然撑高，由 App.vue 外层内容区（`overflow-y-auto`）统一整列滚动——项目多了整个右侧一起滚，而不是每张卡各自出小滚动条。
+- 滚动：去掉 LocalToolCard 项目列表的 `max-h-[240px]` 卡内限高，内容自然撑高，由 App.vue 外层内容区统一整列滚动——项目多了整个右侧一起滚，而不是每张卡各自出小滚动条。
+- 分列滚动：App.vue 内容区外层去掉 `overflow-y-auto`，左列（UsageCard）与右列（Kimi/Codex/MiniMax/opencode/Claude 卡）各自 `overflow-y-auto`，左右两列独立滚动。
 - typecheck / 179 测试 / vite build 通过。

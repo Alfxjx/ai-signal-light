@@ -290,12 +290,12 @@ const lastUpdateText = computed(() => {
               @toggle-floating-ball="toggleFloatingBall" @toggle-theme="toggleTheme"
               @close="closePanel" />
 
-    <div class="no-drag flex flex-1 gap-2.5 overflow-y-auto p-2">
-      <div class="flex min-w-0 flex-1 flex-col">
+    <div class="no-drag flex flex-1 gap-2.5 p-2">
+      <div class="flex min-w-0 flex-1 flex-col overflow-y-auto">
         <UsageCard :usage="usage" :now="now" :is-compact="isCompact" :is-refreshing="isUsageRefreshing"
           @toggle-compact="toggleCompact" @refresh="onUsageRefresh" />
       </div>
-      <div class="flex min-w-0 flex-1 flex-col gap-2.5">
+      <div class="flex min-w-0 flex-1 flex-col gap-2.5 overflow-y-auto">
         <KimiCard v-if="kimiStatus?.available" :status="kimiStatus" :now="now" :is-refreshing="isRefreshing"
           @refresh="onRefresh" />
         <LocalToolCard tool-id="codex" :status="localToolsStatus" :now="now" />
