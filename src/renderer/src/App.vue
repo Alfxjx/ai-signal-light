@@ -284,7 +284,7 @@ const lastUpdateText = computed(() => {
               @close="closePanel" />
 
     <div class="no-drag flex flex-1 gap-2.5 overflow-y-auto p-2">
-      <div class="w-[248px] shrink-0">
+      <div class="flex min-w-0 flex-1 flex-col">
         <UsageCard :usage="usage" :now="now" :is-compact="isCompact" :is-refreshing="isUsageRefreshing"
           @toggle-compact="toggleCompact" @refresh="onUsageRefresh" />
       </div>
