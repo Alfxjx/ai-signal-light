@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Pin, PinOff, Settings, Minus, Activity, Sun, Moon } from 'lucide-vue-next';
+import { Pin, PinOff, Settings, Minus, X, Activity, Sun, Moon } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 
 defineProps<{
@@ -14,6 +14,7 @@ const emit = defineEmits<{
   openSettings: [];
   toggleFloatingBall: [];
   toggleTheme: [];
+  close: [];
 }>();
 </script>
 
@@ -40,6 +41,9 @@ const emit = defineEmits<{
       </Button>
       <Button variant="ghost" size="icon" class="h-6 w-6" title="Minimize" @click="emit('minimize')">
         <Minus />
+      </Button>
+      <Button variant="ghost" size="icon" class="h-6 w-6" title="Close" @click="emit('close')">
+        <X />
       </Button>
     </div>
   </div>

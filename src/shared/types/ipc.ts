@@ -127,6 +127,7 @@ export interface ElectronAPI {
   /** 主题变化由主进程广播（settings 里改了外观后全窗口同步），渲染层据此切 <html> 的 dark class */
   onThemeChanged: (cb: (theme: ThemeMode) => void) => void;
   resizeWindow: (opts: { height: number }) => Promise<void>;
+  minimizeWindow: () => Promise<void>;
   getWindowState: () => Promise<WindowState | null>;
   setCompact: (isCompact: boolean) => Promise<void>;
   onDockStateChange: (cb: (state: DockStateName) => void) => void;
@@ -192,6 +193,7 @@ export const IPC_CHANNELS = {
   SETTINGS_CLOSE: 'settings:close',
   SETTINGS_OPEN: 'settings:open',
   WINDOW_RESIZE: 'window:resize',
+  WINDOW_MINIMIZE: 'window:minimize',
   WINDOW_GET_STATE: 'window:get-state',
   WINDOW_SET_COMPACT: 'window:set-compact',
   HOOKS_GET_SNIPPET: 'hooks:get-snippet',

@@ -187,8 +187,13 @@ function togglePin() {
 
 function minimize() {
   if (isElectron.value) {
-    window.close();
+    void window.electronAPI?.minimizeWindow?.();
   }
+}
+
+// 关闭：主窗口 close 事件里会被拦下 hide 到托盘，程序继续在后台跑
+function closePanel() {
+  window.close();
 }
 
 function openSettings() {
@@ -277,7 +282,8 @@ const lastUpdateText = computed(() => {
        :class="{ 'app--docked': dockState === 'collapsed' }">
     <TitleBar :is-pinned="isPinned" :is-electron="isElectron" :is-dark="isDarkTheme"
               @toggle-pin="togglePin" @minimize="minimize" @open-settings="openSettings"
-              @toggle-floating-ball="toggleFloatingBall" @toggle-theme="toggleTheme" />
+              @toggle-floating-ball="toggleFloatingBall" @toggle-theme="toggleTheme"
+              @close="closePanel" />
 
     <div class="no-drag flex flex-1 gap-2.5 overflow-y-auto p-2">
       <div class="w-[248px] shrink-0">

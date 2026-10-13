@@ -13,6 +13,7 @@ const IPC_CHANNELS = {
   SETTINGS_CLOSE: 'settings:close',
   SETTINGS_OPEN: 'settings:open',
   WINDOW_RESIZE: 'window:resize',
+  WINDOW_MINIMIZE: 'window:minimize',
   WINDOW_GET_STATE: 'window:get-state',
   WINDOW_SET_COMPACT: 'window:set-compact',
   HOOKS_GET_SNIPPET: 'hooks:get-snippet',
@@ -65,6 +66,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 窗口控制
   resizeWindow: (opts: { height: number }) => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_RESIZE, opts),
+  minimizeWindow: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_MINIMIZE),
   getWindowState: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_GET_STATE),
   setCompact: (isCompact: boolean) => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_SET_COMPACT, isCompact),
   // 顶部吸附状态：'free' | 'collapsed' | 'expanded'，渲染层据此画顶部把手

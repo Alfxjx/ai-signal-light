@@ -645,6 +645,8 @@ function toggleWindow(): void {
   if (mainWindow.isVisible()) {
     mainWindow.hide();
   } else {
+    // 最小化状态下 show() 不会还原窗口，必须先 restore
+    if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
   }
 }
@@ -1448,6 +1450,12 @@ ipcMain.handle(IPC_CHANNELS.WINDOW_RESIZE, async (_event, { height }: { height: 
     // 吸附态下高度变了要重新摆位，否则收起态的 y 会错位
     dock?.reapply();
   }
+});
+
+// 主面板最小化（真正收到任务栏；关闭按钮走 window.close → 主窗口 close 事件里 hide 到托盘）
+ipcMain.handle(IPC_CHANNELS.WINDOW_MINIMIZE, async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed()) win.minimize();
 });
 
 // 渲染层启动时读窗口状态（主要为了同步 isCompact）
