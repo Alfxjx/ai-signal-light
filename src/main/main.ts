@@ -4,7 +4,8 @@ import fs from 'fs';
 import os from 'os';
 import QRCode from 'qrcode';
 import { StatusServer } from './server';
-import { ConfigStore, VALID_INTERVALS, HOOK_EVENTS, MIN_PANEL_WIDTH } from './config';
+import { ConfigStore, VALID_INTERVALS, HOOK_EVENTS } from './config';
+import { PANEL_WIDTH_DEFAULT, PANEL_WIDTH_MIN, PANEL_HEIGHT_COMPACT } from '../shared/constants';
 import { UsageMonitor, parseProxyUrl } from './usage-monitor';
 import { KimiMonitor } from './kimi-monitor';
 import { startDeviceFlow, pollDeviceFlow, isCopilotOAuthToken } from './copilot-auth';
@@ -71,9 +72,9 @@ const CLAUDE_SETTINGS = path.join(os.homedir(), '.claude', 'settings.json');
 const CLAUDE_SETTINGS_BAK = CLAUDE_SETTINGS + '.bak';
 
 function createWindow(): void {
-  const cfgWin = (configStore && configStore.get().window) || { width: 520, height: 550, x: null, y: null, isCompact: true, dockedTop: false };
-  const persistedW = Number.isFinite(cfgWin.width) ? cfgWin.width : 520;
-  const persistedH = Number.isFinite(cfgWin.height) ? cfgWin.height : 550;
+  const cfgWin = (configStore && configStore.get().window) || { width: PANEL_WIDTH_DEFAULT, height: PANEL_HEIGHT_COMPACT, x: null, y: null, isCompact: true, dockedTop: false };
+  const persistedW = Number.isFinite(cfgWin.width) ? cfgWin.width : PANEL_WIDTH_DEFAULT;
+  const persistedH = Number.isFinite(cfgWin.height) ? cfgWin.height : PANEL_HEIGHT_COMPACT;
   // 持久化的 x/y 必须落在当前某个显示器内才有效（防止断开副屏后窗口飞到屏外）
   const hasSavedPos = Number.isFinite(cfgWin.x) && Number.isFinite(cfgWin.y)
     && isRectVisible(cfgWin.x as number, cfgWin.y as number, persistedW, persistedH);
@@ -81,7 +82,7 @@ function createWindow(): void {
   const winOpts: Electron.BrowserWindowConstructorOptions = {
     width: persistedW,
     height: persistedH,
-    minWidth: MIN_PANEL_WIDTH,
+    minWidth: PANEL_WIDTH_MIN,
     minHeight: 352,
     resizable: true,
     maximizable: false,

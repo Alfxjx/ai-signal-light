@@ -8,6 +8,7 @@ import { useWebSocket } from './composables/useWebSocket';
 import { useTheme, applyTheme } from './composables/useTheme';
 import { normalizeCwd } from './utils/cwd';
 import type { ThemeMode } from '../../shared/types/config';
+import { PANEL_HEIGHT_COMPACT, PANEL_HEIGHT_FULL } from '../../shared/constants';
 import type {
   ClaudeProject,
   KimiStatus,
@@ -216,7 +217,7 @@ function onUsageRefresh() {
 function toggleCompact() {
   isCompact.value = !isCompact.value;
   if (isElectron.value) {
-    const newHeight = isCompact.value ? 380 : 550;
+    const newHeight = isCompact.value ? PANEL_HEIGHT_COMPACT : PANEL_HEIGHT_FULL;
     window.electronAPI?.resizeWindow({ height: newHeight });
     window.electronAPI?.setCompact(isCompact.value);
   }
