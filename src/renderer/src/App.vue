@@ -50,7 +50,7 @@ const pendingByCwd = reactive<Record<string, PendingHook>>({});
 const now = ref(Date.now());
 
 // 应用主题（明/暗 class 切换，含 system 跟随）
-const { mode: themeMode } = useTheme();
+const { mode: themeMode, isDark: isDarkTheme } = useTheme();
 
 const isElectron = computed(() => !!window.electronAPI);
 
@@ -227,8 +227,6 @@ function toggleFloatingBall() {
     window.electronAPI?.floatingBall?.toggle();
   }
 }
-
-const isDarkTheme = computed(() => document.documentElement.classList.contains('dark'));
 
 // 主题按钮只在浅色/深色之间切换；当前是「跟随系统」时按实际外观取反
 function toggleTheme() {

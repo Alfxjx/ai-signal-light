@@ -12,16 +12,20 @@ function attachSystemListener(): () => void {
   return () => mq?.removeEventListener?.('change', apply);
 }
 
+/** 实际生效的深浅色：DOM class 不是响应式数据，由 applyTheme 写入，供 UI（主题按钮图标）读取 */
+const isDark = ref(document.documentElement.classList.contains('dark'));
+
 export function applyTheme(mode: ThemeMode): void {
   const dark = mode === 'dark' || (mode === 'system' && !!window.matchMedia?.('(prefers-color-scheme: dark)')?.matches);
   document.documentElement.classList.toggle('dark', dark);
+  isDark.value = dark;
 }
 
 /**
  * 启动时从主进程读主题设置并应用，同时监听主进程广播的 theme:changed 即时切换。
  * window.electronAPI 可能不存在（如纯浏览器调试），做防御处理。
  */
-export function useTheme(): { mode: Ref<ThemeMode> } {
+export function useTheme(): { mode: Ref<ThemeMode>; isDark: Ref<boolean> } {
   const mode = ref<ThemeMode>('dark');
   let detachSystem: (() => void) | null = null;
 
@@ -51,5 +55,5 @@ export function useTheme(): { mode: Ref<ThemeMode> } {
     detachSystem?.();
   });
 
-  return { mode };
+  return { mode, isDark };
 }
