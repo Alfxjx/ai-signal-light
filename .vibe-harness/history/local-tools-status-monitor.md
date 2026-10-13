@@ -49,3 +49,20 @@
 
 - 纯增量，不动 detector / kimi / usage 逻辑；只读用户数据，不写任何文件（opencode 密码仅主进程内读取，不下发渲染层）
 - 轮询开销：每 10s 一次 tasklist + 数次 stat / 小文件读取，可忽略
+
+## 第二轮增强：忙态细分 + 工作目录 + 标题（2026-10-13）
+
+用户反馈第一版只有「进程存活 + 最后活跃」，拿不到像 Kimi 那样的当前忙态和工作目录。探索后三家数据源全部打通并落地：
+
+- **codex**：从 `~/.codex/sessions/**/*.jsonl` 尾部事件推断忙态——`response_item.reasoning`→思考中、`function_call`/`custom_tool_call`/`message.assistant`→编辑中、`event_msg.*`→空闲；工作目录已有。
+- **mcode**：权威状态在 `runtime-state.sqlite`（status/title/workspace_dir/updated_at_ms）。Electron 28=Node 18 无 `node:sqlite`，**spawn 外部 node（v22.5+）** 查询（`{readOnly:true}`），失败降级会话文件 mtime。坑：node 冷启动 + 读 3.6MB db 需数秒，超时 3s 太短会失败 → 提至 8s。
+- **opencode**：破解 HTTP API 认证——`service.json` 的 password + **HTTP Basic auth（用户名固定 `opencode`）**；`GET /api/session` 拿当前会话的 `location.directory`（工作目录）、`title`（XML 状态标签 `<thinking>` 等）、`time.updated/idle`。坑①：响应包在 `{data:[...],cursor}`，解析需兼容裸数组/`{sessions}`。坑②：状态标记是 **XML 标签不是前缀**（实测 `<thinking>Greeting</thinking>`），且 JSON.stringify 输出看不出尖括号（曾误判为前缀），须按字符码排查；title 清洗用 `<[^>]*>` 正则。
+
+类型扩展：`LocalToolStatus` 加 `phase`（thinking/editing/idle/offline）+ `title`；`state` 由 phase 派生（thinking/editing→working）。UI 每行两行式：主行（状态点 + 名字 + 忙态文字 + detail + 时间）+ 副行（工作目录 basename · 会话标题）。单测 18→32 个。
+
+真实采集验证（本机）：
+```
+codex     phase=idle    cwd=D:\codes\moco\gch\Web\kj95x  | Codex CLI
+mcode     phase=offline cwd=D:\me\clash-verge-rev  title=打招呼  | v0.6.8
+opencode  phase=idle    cwd=D:\me\clash-verge-rev  title=Greeting | 127.0.0.1:49374 · v2.0.14
+```
