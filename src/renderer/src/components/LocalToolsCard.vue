@@ -51,7 +51,7 @@ function tool(id: LocalToolId): LocalToolStatus | null {
   <div data-assistant="local-tools" class="py-2">
     <div class="mb-2 flex items-center justify-between px-1">
       <div class="flex min-w-0 items-center gap-2">
-        <span class="text-[13px] font-medium text-foreground/85">本地 Agent</span>
+        <span class="text-[13px] font-medium text-foreground/85">Agent</span>
         <Badge variant="outline"
           class="rounded-full border-transparent px-1.5 py-px text-[11px] font-medium"
           :class="STATE_BADGE_CLASS[status?.state ?? 'offline']">{{ stateText }}</Badge>
