@@ -533,7 +533,6 @@ const allNoToken = computed<boolean>(() => {
           </div>
         </template>
       </div>
-    </div>
 
     <!-- Copilot -->
     <div class="usage-row px-1.5 py-1" v-if="!isProviderDisabled('copilot')" :data-disabled="String(isProviderDisabled('copilot'))"
@@ -560,8 +559,8 @@ const allNoToken = computed<boolean>(() => {
       </div>
     </div>
 
-    <!-- Volcengine（原结构：在列表外，且紧跟 Copilot，保留其顶部分隔线） -->
-    <div class="usage-row border-t border-border/60 px-1.5 py-1" v-if="!isProviderDisabled('volcengine')"
+    <!-- Volcengine -->
+    <div class="usage-row px-1.5 py-1" v-if="!isProviderDisabled('volcengine')"
       :data-disabled="String(isProviderDisabled('volcengine'))" data-provider="volcengine">
       <div class="mb-1.5 flex items-center gap-1.5">
         <span class="text-[13px] font-medium text-foreground/85">Ark Coding Plan</span>
@@ -638,6 +637,7 @@ const allNoToken = computed<boolean>(() => {
           </div>
         </div>
       </template>
+    </div>
     </div>
 
     <div class="px-2 py-2 text-center text-xs text-muted-foreground" v-show="allNoToken">No token configured, set in tray menu</div>
