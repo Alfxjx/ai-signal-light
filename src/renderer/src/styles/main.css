@@ -68,11 +68,12 @@ select.claude-range option {
   left: 0;
   width: 2px;
   height: 8px;
-  background: color-mix(in srgb, var(--foreground) 65%, transparent);
+  /* 用 foreground 全不透明：浅色主题下为近黑、深色下为近白，两边都清晰 */
+  background: hsl(var(--foreground));
   border-radius: 1px;
   transform: translateX(-50%);
   pointer-events: none;
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.35);
 }
 
 /* 禁用 provider：用量条与数值淡化 */
