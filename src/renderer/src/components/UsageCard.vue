@@ -592,7 +592,7 @@ const allNoToken = computed<boolean>(() => {
               :title="`平均消耗 ${volcengineSessionPace.expectedPercent.toFixed(1)}%`"></div>
           </div>
         </div>
-        <div class="mt-1.5">
+        <div class="mt-1.5" :class="{ hidden: isCompact }">
           <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
             <div class="flex items-center gap-0.5">
               <span>weekly</span>
@@ -614,7 +614,7 @@ const allNoToken = computed<boolean>(() => {
               :title="`平均消耗 ${volcengineWeeklyPace.expectedPercent.toFixed(1)}%`"></div>
           </div>
         </div>
-        <div class="mt-1.5">
+        <div class="mt-1.5" :class="{ hidden: isCompact }">
           <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
             <div class="flex items-center gap-0.5">
               <span>monthly</span>
