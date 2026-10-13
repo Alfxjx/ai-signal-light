@@ -36,7 +36,7 @@ const usage = reactive<UsageState>({
   thresholds: { ...DEFAULT_USAGE_THRESHOLDS },
 });
 
-const isPinned = ref(true);
+const isPinned = ref(false);
 const isCompact = ref(true);
 const lastUpdate = ref<number | null>(null);
 const isRefreshing = ref(false);

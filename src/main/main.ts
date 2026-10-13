@@ -86,7 +86,7 @@ function createWindow(): void {
     resizable: true,
     maximizable: false,
     minimizable: true,
-    alwaysOnTop: true,        // 置顶显示
+    alwaysOnTop: false,       // 默认不置顶，标题栏 Pin 按钮可切换
     skipTaskbar: false,
     frame: false,             // 无边框
     transparent: true,        // 透明背景
