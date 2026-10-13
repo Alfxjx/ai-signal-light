@@ -332,28 +332,6 @@ const allNoToken = computed<boolean>(() => {
           </div>
         </div>
         <template v-if="showUsageBars('kimi')">
-          <div class="mt-1.5" :class="{ hidden: isCompact }">
-            <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
-              <div class="flex items-center gap-0.5">
-                <span>week</span>
-                <span class="ml-2 text-[10px] tabular-nums text-muted-foreground/60">{{ formatResetTime(kimiData('codingWeekly')?.resetTime) }}</span>
-              </div>
-              <span class="usage-bar-value tabular-nums text-foreground/85">{{ kimiText('codingWeekly') }}
-                <span v-if="kimiWeeklyPace.pace" class="ml-1.5 inline-flex items-center rounded-[3px] px-1 text-[9px] font-medium leading-none"
-                  :class="paceClass(kimiWeeklyPace.pace)"
-                  :title="paceTooltip(kimiWeeklyPace.pace, kimiWeeklyPace.delta)">
-                  {{ paceText(kimiWeeklyPace.pace) }}{{ paceArrow(kimiWeeklyPace.pace) }}
-                </span>
-              </span>
-            </div>
-            <div class="usage-bar">
-              <div class="usage-bar-fill" :style="{ width: kimiPercent('codingWeekly') + '%' }"
-                :class="barClass(kimiPercent('codingWeekly'), usage.thresholds)"></div>
-              <div v-if="kimiWeeklyPace.expectedPercent != null" class="usage-bar-marker"
-                :style="{ left: kimiWeeklyPace.expectedPercent + '%' }"
-                :title="`平均消耗 ${kimiWeeklyPace.expectedPercent.toFixed(1)}%`"></div>
-            </div>
-          </div>
           <div class="mt-1.5">
             <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
               <div class="flex items-center gap-0.5">
@@ -374,6 +352,28 @@ const allNoToken = computed<boolean>(() => {
               <div v-if="kimiFiveHourPace.expectedPercent != null" class="usage-bar-marker"
                 :style="{ left: kimiFiveHourPace.expectedPercent + '%' }"
                 :title="`平均消耗 ${kimiFiveHourPace.expectedPercent.toFixed(1)}%`"></div>
+            </div>
+          </div>
+          <div class="mt-1.5" :class="{ hidden: isCompact }">
+            <div class="mb-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
+              <div class="flex items-center gap-0.5">
+                <span>week</span>
+                <span class="ml-2 text-[10px] tabular-nums text-muted-foreground/60">{{ formatResetTime(kimiData('codingWeekly')?.resetTime) }}</span>
+              </div>
+              <span class="usage-bar-value tabular-nums text-foreground/85">{{ kimiText('codingWeekly') }}
+                <span v-if="kimiWeeklyPace.pace" class="ml-1.5 inline-flex items-center rounded-[3px] px-1 text-[9px] font-medium leading-none"
+                  :class="paceClass(kimiWeeklyPace.pace)"
+                  :title="paceTooltip(kimiWeeklyPace.pace, kimiWeeklyPace.delta)">
+                  {{ paceText(kimiWeeklyPace.pace) }}{{ paceArrow(kimiWeeklyPace.pace) }}
+                </span>
+              </span>
+            </div>
+            <div class="usage-bar">
+              <div class="usage-bar-fill" :style="{ width: kimiPercent('codingWeekly') + '%' }"
+                :class="barClass(kimiPercent('codingWeekly'), usage.thresholds)"></div>
+              <div v-if="kimiWeeklyPace.expectedPercent != null" class="usage-bar-marker"
+                :style="{ left: kimiWeeklyPace.expectedPercent + '%' }"
+                :title="`平均消耗 ${kimiWeeklyPace.expectedPercent.toFixed(1)}%`"></div>
             </div>
           </div>
         </template>
