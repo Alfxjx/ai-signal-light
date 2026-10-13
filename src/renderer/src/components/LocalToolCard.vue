@@ -68,7 +68,8 @@ const projects = computed<LocalToolProject[]>(() =>
           :title="tool.detail">{{ tool.detail }}</span>
       </div>
     </div>
-    <ul class="max-h-[240px] overflow-y-auto rounded-xl border bg-muted/40 py-1.5">
+    <!-- 项目列表不设内部限高：内容自然撑高，由 App.vue 外层内容区统一整列滚动 -->
+    <ul class="rounded-xl border bg-muted/40 py-1.5">
       <li v-if="projects.length === 0"
         class="px-2 py-2 text-center text-xs text-muted-foreground">今日无活动</li>
       <li v-for="p in projects" :key="p.id"
