@@ -83,3 +83,13 @@ codex   kj95x / ni / 看板研究（今日）   …更早的 cari.product.licens
 mcode   clash-verge-rev · 打招呼
 opencode clash-verge-rev · Greeting（当日）  …9 月的旧会话会被过滤
 ```
+
+## 第四轮：拆成三张独立卡片，与 Claude/Kimi 同级（2026-10-13）
+
+用户要求：去掉标题行的时间、去掉「Agent」总标题，Codex / MiniMax Code / opencode 各成一张卡片与 ClaudeCard/KimiCard 同级。
+
+- `LocalToolsCard.vue`（三工具合一）→ 删除；新建 `LocalToolCard.vue`（单个工具，`tool-id` prop 复用三份）。
+- 卡片结构对齐 KimiCard：头部队名 + 忙态徽标 + detail（版本/端口/来源，无时间）+ 下面项目列表（当日裁剪）。
+- 单工具可见性：`present` = 有进程 / 有 detail / 有 projects（三者任一），否则整卡隐藏——避免装过的工具也各占一张空卡。
+- App.vue：三个 `<LocalToolCard tool-id="codex|mcode|opencode" ...>` 与 KimiCard、ClaudeCard 平铺在右栏。
+- typecheck / 179 测试 / vite build 通过。

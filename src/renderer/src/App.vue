@@ -3,7 +3,7 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
 import TitleBar from './components/TitleBar.vue';
 import ClaudeCard from './components/ClaudeCard.vue';
 import KimiCard from './components/KimiCard.vue';
-import LocalToolsCard from './components/LocalToolsCard.vue';
+import LocalToolCard from './components/LocalToolCard.vue';
 import UsageCard from './components/UsageCard.vue';
 import { useWebSocket } from './composables/useWebSocket';
 import { useTheme, applyTheme } from './composables/useTheme';
@@ -298,7 +298,9 @@ const lastUpdateText = computed(() => {
       <div class="flex min-w-0 flex-1 flex-col gap-2.5">
         <KimiCard v-if="kimiStatus?.available" :status="kimiStatus" :now="now" :is-refreshing="isRefreshing"
           @refresh="onRefresh" />
-        <LocalToolsCard v-if="localToolsStatus?.available" :status="localToolsStatus" :now="now" />
+        <LocalToolCard tool-id="codex" :status="localToolsStatus" :now="now" />
+        <LocalToolCard tool-id="mcode" :status="localToolsStatus" :now="now" />
+        <LocalToolCard tool-id="opencode" :status="localToolsStatus" :now="now" />
         <ClaudeCard :projects="projects" :now="now" :is-refreshing="isRefreshing"
           :pending-by-cwd="pendingByCwd" @refresh="onRefresh" @clear-pending="clearPending" />
       </div>
