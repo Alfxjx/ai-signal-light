@@ -19,7 +19,7 @@ volcengine: { accessKey: '', secretKey: '', enabled: true, useProxy: false },
   mimo:      { token: '', enabled: true, useProxy: false },
   proxy: { url: '' },
   intervalMinutes: 10,
-  window: { width: 240, height: 550, x: null, y: null, isCompact: true, dockedTop: false },
+  window: { width: 520, height: 550, x: null, y: null, isCompact: true, dockedTop: false },
   hooks: {
     enabled: { Notification: true, Stop: true, PreToolUse: true },
     endpoint: { autoInstalled: false }
@@ -33,6 +33,9 @@ volcengine: { accessKey: '', secretKey: '', enabled: true, useProxy: false },
 
 export const VALID_INTERVALS = [5, 10, 15, 30, 60] as const;
 export type ValidInterval = typeof VALID_INTERVALS[number];
+
+/** 主面板双列布局的最小宽度：左列 Usage 248 + 间距，低于此值视为旧版单列配置 */
+export const MIN_PANEL_WIDTH = 460;
 
 /** 校验 warn/danger 阈值对。0≤warn<danger≤100，两个都必须是整数。 */
 export function isValidThresholds(t: unknown): t is UsageThresholds {
@@ -94,7 +97,12 @@ volcengine: {
         },
         mimo:    { ...DEFAULTS.mimo,    ...(parsed.mimo    || {}) },
         proxy:   { ...DEFAULTS.proxy,   ...(parsed.proxy   || {}) },
-        window:  { ...DEFAULTS.window,  ...(parsed.window  || {}) },
+        window:  {
+          ...DEFAULTS.window,
+          ...(parsed.window  || {}),
+          // 旧版本是单列窄面板（240 宽），双列布局需要更宽：存量配置自动升级
+          width: MIN_PANEL_WIDTH <= (Number(parsed.window?.width) || 0) ? Number(parsed.window?.width) : DEFAULTS.window.width,
+        },
         hooks: {
           enabled:  { ...DEFAULTS.hooks.enabled,  ...((parsed.hooks && parsed.hooks.enabled)  || {}) },
           endpoint: { ...DEFAULTS.hooks.endpoint, ...((parsed.hooks && parsed.hooks.endpoint) || {}) }

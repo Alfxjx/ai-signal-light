@@ -279,13 +279,17 @@ const lastUpdateText = computed(() => {
               @toggle-pin="togglePin" @minimize="minimize" @open-settings="openSettings"
               @toggle-floating-ball="toggleFloatingBall" @toggle-theme="toggleTheme" />
 
-    <div class="no-drag flex flex-1 flex-col gap-2.5 overflow-y-auto p-2">
-      <UsageCard :usage="usage" :now="now" :is-compact="isCompact" :is-refreshing="isUsageRefreshing"
-                 @toggle-compact="toggleCompact" @refresh="onUsageRefresh" />
-      <KimiCard v-if="kimiStatus?.available" :status="kimiStatus" :now="now" :is-refreshing="isRefreshing"
-                @refresh="onRefresh" />
-      <ClaudeCard :projects="projects" :now="now" :is-refreshing="isRefreshing"
-                  :pending-by-cwd="pendingByCwd" @refresh="onRefresh" @clear-pending="clearPending" />
+    <div class="no-drag flex flex-1 gap-2.5 overflow-y-auto p-2">
+      <div class="w-[248px] shrink-0">
+        <UsageCard :usage="usage" :now="now" :is-compact="isCompact" :is-refreshing="isUsageRefreshing"
+          @toggle-compact="toggleCompact" @refresh="onUsageRefresh" />
+      </div>
+      <div class="flex min-w-0 flex-1 flex-col gap-2.5">
+        <KimiCard v-if="kimiStatus?.available" :status="kimiStatus" :now="now" :is-refreshing="isRefreshing"
+          @refresh="onRefresh" />
+        <ClaudeCard :projects="projects" :now="now" :is-refreshing="isRefreshing"
+          :pending-by-cwd="pendingByCwd" @refresh="onRefresh" @clear-pending="clearPending" />
+      </div>
     </div>
 
     <div class="flex items-center justify-between border-t px-4 py-2 text-[11px] text-muted-foreground/70">
