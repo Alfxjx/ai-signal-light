@@ -146,7 +146,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="root" class="flex w-[200px] flex-col gap-2.5 rounded-lg border bg-popover/90 px-3.5 pb-3 pt-2.5 shadow-[0_6px_24px_rgba(0,0,0,0.5)] backdrop-blur-xl no-drag">
+  <div ref="root" class="flex w-[200px] flex-col gap-2.5 rounded-lg border bg-popover px-3.5 pb-3 pt-2.5 shadow-[0_6px_24px_rgba(0,0,0,0.5)] no-drag">
     <div class="flex items-baseline justify-between gap-2 border-b pb-1.5">
       <div class="flex items-center gap-1.5">
         <span class="text-[11px] font-semibold tracking-wide text-foreground/85">用量速览</span>

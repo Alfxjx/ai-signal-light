@@ -66,10 +66,13 @@
     border-color: hsl(var(--border));
   }
 
-  /* Electron 透明窗口必须：html/body 透明，玻璃底由窗口容器自己画 */
+  /* Electron 透明窗口必须：html/body 背景透明，窗口底色由容器自己画；
+     但文字色必须显式给 foreground —— 缺失会让未指定颜色的元素（含 lucide 图标的
+     currentColor）继承浏览器默认黑色，暗色主题下看不见 */
   html,
   body {
     background: transparent;
+    color: hsl(var(--foreground));
   }
 
   body {

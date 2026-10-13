@@ -40,6 +40,8 @@
 - 实机目检（明/暗/跟随系统 × 4 窗口、reka-ui Select popper 定位、拖拽区回归、亮色玻璃对比度）需 dev 跑起来确认
 
 ## 遗留/坑
+- **全局文字色必须显式给 foreground**：`globals.css` 的 base 层原本只有 `background: transparent`，缺 `color: hsl(var(--foreground))`，导致未指定颜色的元素（含 lucide 图标的 `currentColor`）继承浏览器默认黑色、暗色主题下看不见。已修。
+- **不要用半透明玻璃底**：首版四个窗口用了 `bg-*/90 + backdrop-blur-xl`，用户反馈要去掉，现全部改为实色（`bg-popover` / `bg-background`）。
 - `.drag-region`/`.no-drag` 必须以**静态字符串**出现在模板里，Tailwind 才生成（动态拼接会静默丢拖动）
 - reka-ui Select 弹层 portal 挂 body；240px 窄窗口贴边时 popper 定位要实机看
 - warn/danger 用量条用 `color-mix(var, hsl(var(--background)))` 柔和版，亮度微调改 main.css 两处百分比

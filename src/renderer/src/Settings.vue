@@ -436,7 +436,7 @@ async function openQrCode() {
 </script>
 
 <template>
-  <div class="drag-region flex h-screen w-screen select-none flex-col overflow-hidden rounded-xl border border-border bg-background/90 shadow-2xl backdrop-blur-xl">
+  <div class="drag-region flex h-screen w-screen select-none flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl">
     <header class="flex shrink-0 items-center justify-between border-b border-border/70 px-4 py-3">
       <span class="text-sm font-semibold text-foreground">用量监控设置</span>
       <Button variant="ghost" size="icon" class="no-drag h-6 w-6" title="关闭" @click="onCancel">

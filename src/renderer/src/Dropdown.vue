@@ -74,7 +74,7 @@ const stateText = computed(() => STATE_TEXT[kimiStatus?.value?.state ?? 'offline
 </script>
 
 <template>
-  <div class="no-drag flex max-h-[420px] w-[260px] flex-col overflow-hidden rounded-xl border border-border/70 bg-popover/90 shadow-lg backdrop-blur-xl">
+  <div class="no-drag flex max-h-[420px] w-[260px] flex-col overflow-hidden rounded-xl border border-border/70 bg-popover shadow-lg">
     <!-- 顶部：整体状态 + 用量 -->
     <header class="flex items-start justify-between border-b border-border/50 px-3.5 pb-2.5 pt-3">
       <div class="flex min-w-0 flex-col gap-1">

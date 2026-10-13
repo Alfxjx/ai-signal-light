@@ -262,7 +262,7 @@ const lastUpdateText = computed(() => {
 <template>
   <!-- 根容器：玻璃拟态 + 整窗拖拽区（交互元素各自标 no-drag）；app--docked 顶部吸附由 main.css 接管 -->
   <div ref="appEl"
-       class="app drag-region relative flex h-screen w-screen flex-col overflow-hidden rounded-2xl border bg-background/85 shadow-[0_8px_32px_rgba(0,0,0,0.4)] backdrop-blur-xl will-change-transform"
+       class="app drag-region relative flex h-screen w-screen flex-col overflow-hidden rounded-2xl border bg-background shadow-[0_8px_32px_rgba(0,0,0,0.4)] will-change-transform"
        :class="{ 'app--docked': dockState === 'collapsed' }">
     <TitleBar :is-pinned="isPinned" :is-electron="isElectron"
               @toggle-pin="togglePin" @minimize="minimize" @open-settings="openSettings"
