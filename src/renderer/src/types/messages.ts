@@ -42,6 +42,7 @@ export type {
   LocalToolId,
   LocalToolState,
   LocalToolPhase,
+  LocalToolProject,
   LocalToolStatus,
   LocalToolsStatus,
 } from '../../../shared/types/local-tools';

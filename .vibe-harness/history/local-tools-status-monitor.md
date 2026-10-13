@@ -66,3 +66,20 @@ codex     phase=idle    cwd=D:\codes\moco\gch\Web\kj95x  | Codex CLI
 mcode     phase=offline cwd=D:\me\clash-verge-rev  title=打招呼  | v0.6.8
 opencode  phase=idle    cwd=D:\me\clash-verge-rev  title=Greeting | 127.0.0.1:49374 · v2.0.14
 ```
+
+## 第三轮：多项目列表（像 Kimi 那样，每工具多个项目行，2026-10-13）
+
+用户要"像 kimi code web 那样多个的"——每工具不再只显示最新一个会话，而是列出多个活跃项目（按工作目录归并）。
+
+- 类型：`LocalToolStatus` 改为含 `projects: LocalToolProject[]`（仿 `KimiProject`：id/name/cwd/title/phase/lastActive）；工具级 `phase`/`lastActive` 由 projects 聚合派生。
+- 数据：codex 扫最近 20 个 jsonl（新 `findRecentFiles`）；mcode sqlite 去掉 LIMIT 返回全部 `archived=0` 会话；opencode `/api/session?limit=30` 拿会话列表。
+- 归并：`mergeProjects` 按 cwd 归并（同 cwd 忙态取更忙、时间取最新、标题取非空；无 cwd 以 title 归并），`aggregateProjectPhase` 聚合工具级忙态（thinking > editing > idle）。
+- UI：`LocalToolsCard` 改两层级——每工具标题行（点 + 名 + 忙态 + detail + 时间）+ 下面项目列表（缩进、忙态点 + 目录 basename + 标题 + 时间）；新增 `renderer/src/utils/localToolsFilter.ts` 的 `filterTodayLocalProjects`（对齐 Kimi `filterTodayProjects`：非 idle 强留 + 当日活动保留），单测 4 个。
+- 测试：monitor 33 个（新增 mergeProjects/aggregateProjectPhase/findRecentFiles），渲染层 4 个，全量 179 绿。
+
+真实采集（本机，UI 按当日裁剪后展示）：
+```
+codex   kj95x / ni / 看板研究（今日）   …更早的 cari.product.license.management 等会被当日过滤隐藏
+mcode   clash-verge-rev · 打招呼
+opencode clash-verge-rev · Greeting（当日）  …9 月的旧会话会被过滤
+```

@@ -3,28 +3,29 @@
  *
  * 数据源（全部只读本机，已实测验证）：
  * - codex：~/.codex/sessions/<yyyy>/<mm>/<dd>/rollout-*.jsonl（CLI 与 ChatGPT 桌面版共用），
- *   首行 session_meta.payload.cwd 为工作目录，末条事件推断当前忙态（reasoning=思考 /
- *   function_call·message.assistant=编辑 / task_complete·token_count=空闲）；
- *   进程匹配 codex.exe / ChatGPT.exe。
+ *   每个会话首行 session_meta.payload.cwd 为工作目录，末条事件推断忙态（reasoning=思考 /
+ *   function_call·message.assistant=编辑 / task_complete·token_count=空闲）；进程匹配 codex.exe / ChatGPT.exe。
  * - mcode (MiniMax Code)：~/.minimax-code/.mcode-active/<pid>.json 为 mcode 自写的运行标记
  *   （有残留风险，须配 pid 存活检测）；权威状态在 ~/.minimax/v2/sqlite/runtime-state.sqlite
  *   （status/title/workspace_dir/updated_at_ms）——Electron 28 内置 Node 18 无 node:sqlite，
  *   故 spawn 外部 node（v22.5+ 才有 node:sqlite）查询，失败降级会话文件 mtime。
  * - opencode：~/.local/state/opencode/service.json 提供 { pid, version, url, password }；
- *   HTTP API（Basic auth，用户名 opencode，密码即 password）GET /api/session 拿当前会话的
- *   location.directory（工作目录）、title（含状态前缀 thinking/idle）、time.updated/idle。
+ *   HTTP API（Basic auth，用户名 opencode，密码即 password）GET /api/session 拿会话列表的
+ *   location.directory（工作目录）、title（XML 状态标签 <thinking> 等）、time.updated/idle。
  *
- * 状态判定：running 且 phase=thinking/editing → working；idle → idle；否则 offline。
- * 聚合优先级：任一 working > 任一 idle > 全 offline。
+ * 每工具按工作目录归并成多个"项目"行（仿 KimiProject），工具级聚合忙态：任一 thinking > 任一
+ * editing > 全 idle；未运行 → offline。聚合优先级：任一 working > 任一 idle > 全 offline。
  */
 
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import { execFile } from 'child_process';
+import { normalizeCwd } from '../shared/utils/cwd';
 import type {
   LocalToolId,
   LocalToolPhase,
+  LocalToolProject,
   LocalToolStatus,
   LocalToolsStatus,
   LocalToolState,
@@ -36,10 +37,14 @@ const ACTIVE_WINDOW_MS = 60_000;
 const POLL_INTERVAL_MS = 10_000;
 /** 读 codex jsonl 头/尾的字节数（session_meta 首行含 base_instructions 大字段，8KB 会截断） */
 const JSONL_SNIP = 256 * 1024;
+/** 每工具最多采集的会话/文件数（归并前） */
+const MAX_PROJECT_INPUTS = 20;
 /** opencode HTTP API 超时 */
 const API_TIMEOUT_MS = 2_000;
 /** spawn 外部 node 读 mcode sqlite 超时（node 冷启动 + 读 3.6MB db 需数秒） */
 const SQLITE_TIMEOUT_MS = 8_000;
+
+const PHASE_RANK: Record<LocalToolPhase, number> = { offline: 0, idle: 1, editing: 2, thinking: 3 };
 
 // ==================== 纯函数（便于单测） ====================
 
@@ -286,7 +291,7 @@ export function parseOpenCodeSession(
   };
 }
 
-/** mcode sqlite 查询结果（来自外部 node 输出 JSON 的首行） */
+/** mcode sqlite 查询结果（来自外部 node 输出 JSON，多行） */
 export interface McodeSessionInfo {
   status: string | null;
   title: string | null;
@@ -294,20 +299,21 @@ export interface McodeSessionInfo {
   updatedAtMs: number | null;
 }
 
-/** 解析外部 node 查询 mcode runtime-state.sqlite 的 stdout */
-export function parseMcodeSqliteOutput(stdout: string): McodeSessionInfo | null {
+/** 解析外部 node 查询 mcode runtime-state.sqlite 的 stdout（返回全部会话行） */
+export function parseMcodeSqliteOutput(stdout: string): McodeSessionInfo[] {
   try {
     const rows = JSON.parse(stdout) as Array<Record<string, unknown>>;
-    if (!Array.isArray(rows) || rows.length === 0) return null;
-    const r = rows[0];
-    return {
-      status: typeof r.status === 'string' ? r.status : null,
-      title: typeof r.title === 'string' ? r.title : null,
-      workspaceDir: typeof r.workspace_dir === 'string' ? r.workspace_dir : null,
-      updatedAtMs: typeof r.updated_at_ms === 'number' ? r.updated_at_ms : null,
-    };
+    if (!Array.isArray(rows)) return [];
+    return rows
+      .map((r) => ({
+        status: typeof r.status === 'string' ? r.status : null,
+        title: typeof r.title === 'string' ? r.title : null,
+        workspaceDir: typeof r.workspace_dir === 'string' ? r.workspace_dir : null,
+        updatedAtMs: typeof r.updated_at_ms === 'number' ? r.updated_at_ms : null,
+      }))
+      .filter((r) => r.workspaceDir != null || r.title != null || r.updatedAtMs != null);
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -317,16 +323,66 @@ export function mcodeStatusToPhase(status: string | null): LocalToolPhase {
   return 'editing';
 }
 
+/** 归并输入：一个会话/文件贡献的一条项目线索 */
+export interface LocalProjectInput {
+  cwd: string | null;
+  title: string | null;
+  phase: LocalToolPhase;
+  lastActive: number | null;
+}
+
 /**
- * 递归找目录下最新的文件（可按扩展名过滤，带深度/数量防御）。
+ * 按工作目录把多个会话归并成项目行（同 cwd 合并：忙态取更忙、时间取最新、标题取非空）。
+ * 无 cwd 时以 title 归并。返回按 lastActive 倒序。
  */
-export async function findLatestFile(
+export function mergeProjects(inputs: LocalProjectInput[]): LocalToolProject[] {
+  const map = new Map<string, LocalToolProject>();
+  for (const inp of inputs) {
+    const cwd = inp.cwd;
+    const key = cwd
+      ? `cwd:${(normalizeCwd(cwd, process.platform === 'win32') ?? cwd).toLowerCase()}`
+      : `id:${inp.title ?? inp.lastActive ?? 'unknown'}`;
+    let p = map.get(key);
+    if (!p) {
+      p = {
+        id: key,
+        name: cwd ? path.basename(cwd.replace(/[\\/]+$/, '')) || cwd : inp.title ?? key,
+        cwd,
+        title: inp.title,
+        phase: 'idle',
+        lastActive: null,
+      };
+      map.set(key, p);
+    }
+    if (inp.phase && PHASE_RANK[inp.phase] > PHASE_RANK[p.phase]) p.phase = inp.phase;
+    if (inp.lastActive != null && (p.lastActive == null || inp.lastActive > p.lastActive)) {
+      p.lastActive = inp.lastActive;
+    }
+    if (inp.title && !p.title) p.title = inp.title;
+  }
+  return [...map.values()].sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
+}
+
+/** 工具级聚合忙态：任一 thinking > 任一 editing > 全 idle（无项目 → idle） */
+export function aggregateProjectPhase(projects: LocalToolProject[]): LocalToolPhase {
+  let best: LocalToolPhase = 'idle';
+  for (const p of projects) {
+    if (PHASE_RANK[p.phase] > PHASE_RANK[best]) best = p.phase;
+  }
+  return best;
+}
+
+/**
+ * 递归找目录下按 mtime 最新的一批文件（按扩展名过滤，带深度/数量防御）。
+ */
+export async function findRecentFiles(
   root: string,
-  opts: { ext?: string[]; maxDepth?: number; maxFiles?: number } = {},
-): Promise<{ path: string; mtimeMs: number } | null> {
+  opts: { ext?: string[]; limit?: number; maxDepth?: number; maxFiles?: number } = {},
+): Promise<Array<{ path: string; mtimeMs: number }>> {
   const maxDepth = opts.maxDepth ?? 6;
   const maxFiles = opts.maxFiles ?? 2000;
-  let best: { path: string; mtimeMs: number } | null = null;
+  const limit = opts.limit ?? MAX_PROJECT_INPUTS;
+  const found: Array<{ path: string; mtimeMs: number }> = [];
   let count = 0;
 
   async function walk(dir: string, depth: number): Promise<void> {
@@ -344,19 +400,28 @@ export async function findLatestFile(
         await walk(full, depth + 1);
       } else if (e.isFile()) {
         if (opts.ext && !opts.ext.includes(path.extname(e.name).toLowerCase())) continue;
-        let st: fs.Stats;
         try {
-          st = await fs.promises.stat(full);
+          const st = await fs.promises.stat(full);
+          found.push({ path: full, mtimeMs: st.mtimeMs });
         } catch {
-          continue;
+          // 忽略坏文件
         }
-        if (!best || st.mtimeMs > best.mtimeMs) best = { path: full, mtimeMs: st.mtimeMs };
       }
     }
   }
 
   await walk(root, 0);
-  return best;
+  found.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return found.slice(0, limit);
+}
+
+/** 递归找目录下最新的一个文件（等价 findRecentFiles[0]） */
+export async function findLatestFile(
+  root: string,
+  opts: { ext?: string[]; maxDepth?: number; maxFiles?: number } = {},
+): Promise<{ path: string; mtimeMs: number } | null> {
+  const list = await findRecentFiles(root, { ext: opts.ext, maxDepth: opts.maxDepth, maxFiles: opts.maxFiles, limit: 1 });
+  return list[0] ?? null;
 }
 
 /** 判断进程名列表是否命中任一目标名（大小写不敏感，子串匹配） */
@@ -384,30 +449,20 @@ export function aggregateToolState(tools: Record<LocalToolId, LocalToolStatus>):
   return result;
 }
 
-/** 组装单个工具状态：phase 决定 state；未运行强制 offline；无 phase 时按活跃度推断 */
+/** 组装单个工具状态：由 projects 派生 phase/state/lastActive；未运行强制 offline */
 export function buildToolStatus(
   running: boolean,
-  phase: LocalToolPhase | null,
-  lastActive: number | null,
-  now: number,
-  activeWindowMs: number,
-  extra: { cwd?: string | null; title?: string | null; detail?: string | null } = {},
+  projects: LocalToolProject[],
+  extra: { detail?: string | null } = {},
 ): LocalToolStatus {
-  let finalPhase: LocalToolPhase = 'offline';
-  if (running) {
-    finalPhase = phase ?? (lastActive != null && now - lastActive <= activeWindowMs ? 'editing' : 'idle');
-  }
+  const phase: LocalToolPhase = running ? aggregateProjectPhase(projects) : 'offline';
   const state: LocalToolState =
-    finalPhase === 'thinking' || finalPhase === 'editing' ? 'working' : finalPhase === 'idle' ? 'idle' : 'offline';
-  return {
-    running,
-    state,
-    phase: finalPhase,
-    cwd: extra.cwd ?? null,
-    title: extra.title ?? null,
-    lastActive,
-    detail: extra.detail ?? null,
-  };
+    phase === 'thinking' || phase === 'editing' ? 'working' : phase === 'idle' ? 'idle' : 'offline';
+  let lastActive: number | null = null;
+  for (const p of projects) {
+    if (p.lastActive != null && (lastActive == null || p.lastActive > lastActive)) lastActive = p.lastActive;
+  }
+  return { running, state, phase, projects, lastActive, detail: extra.detail ?? null };
 }
 
 // ==================== 平台层 ====================
@@ -456,47 +511,46 @@ async function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs: numbe
   }
 }
 
-/** 通过 opencode HTTP API 拿当前会话（Basic auth: opencode:<password>） */
-async function fetchOpenCodeSession(
+/** 通过 opencode HTTP API 拿会话列表（Basic auth: opencode:<password>），失败返回空 */
+async function fetchOpenCodeSessions(
   url: string,
   password: string,
   now: number,
   activeWindowMs: number,
-): Promise<OpenCodeSessionInfo | null> {
+  limit = 30,
+): Promise<OpenCodeSessionInfo[]> {
   try {
     const r = await fetchWithTimeout(
-      `${url}/api/session?limit=1`,
+      `${url}/api/session?limit=${limit}`,
       { headers: { Authorization: openCodeBasicAuth(password) } },
       API_TIMEOUT_MS,
     );
-    if (!r || !r.ok) return null;
+    if (!r || !r.ok) return [];
     const data = (await r.json().catch(() => null)) as unknown;
-    const list = extractOpenCodeSessions(data);
-    if (list.length === 0) return null;
-    return parseOpenCodeSession(list[0], now, activeWindowMs);
+    return extractOpenCodeSessions(data)
+      .map((s) => parseOpenCodeSession(s, now, activeWindowMs))
+      .filter((s): s is OpenCodeSessionInfo => s !== null);
   } catch {
-    return null;
+    return [];
   }
 }
 
-/** 用外部 node（v22.5+ 才有 node:sqlite）查 mcode runtime-state.sqlite，失败返回 null */
-async function queryMcodeSqlite(dbPath: string): Promise<McodeSessionInfo | null> {
-  let exists = false;
+/** 用外部 node（v22.5+ 才有 node:sqlite）查 mcode runtime-state.sqlite 全部会话，失败返回 [] */
+async function queryMcodeSqlite(dbPath: string): Promise<McodeSessionInfo[]> {
   try {
-    exists = fs.existsSync(dbPath);
+    if (!fs.existsSync(dbPath)) return [];
   } catch {
-    exists = false;
+    return [];
   }
-  if (!exists) return null;
   const script =
     "const{DatabaseSync}=require('node:sqlite');const db=new DatabaseSync(process.argv[1],{readOnly:true});" +
-    "try{const rows=db.prepare(\"SELECT session_id,status,title,workspace_dir,updated_at_ms FROM local_runtime_sessions WHERE archived=0 ORDER BY updated_at_ms DESC LIMIT 3\").all();" +
+    "try{const rows=db.prepare(\"SELECT session_id,status,title,workspace_dir,updated_at_ms FROM local_runtime_sessions WHERE archived=0 ORDER BY updated_at_ms DESC\").all();" +
     "process.stdout.write(JSON.stringify(rows));}finally{db.close();}";
   try {
     const stdout = await execFileAsync('node', ['-e', script, dbPath], SQLITE_TIMEOUT_MS);
     return parseMcodeSqliteOutput(stdout);
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -604,18 +658,30 @@ export class LocalToolsMonitor {
     now: number,
     activeWindowMs: number,
   ): Promise<LocalToolStatus> {
-    const latest = await findLatestFile(path.join(home, '.codex', 'sessions'), { ext: ['.jsonl'] });
-    let cwd: string | null = null;
-    let lastActive: number | null = null;
-    let phase: LocalToolPhase | null = null;
-    if (latest) {
-      const info = await parseCodexSession(latest.path);
-      cwd = info?.cwd ?? null;
-      lastActive = info?.lastTsMs ?? latest.mtimeMs;
-      if (info?.lastEvent) phase = codexEventToPhase(info.lastEvent);
+    const files = await findRecentFiles(path.join(home, '.codex', 'sessions'), {
+      ext: ['.jsonl'],
+      limit: MAX_PROJECT_INPUTS,
+    });
+    const inputs: LocalProjectInput[] = [];
+    for (const f of files) {
+      const info = await parseCodexSession(f.path);
+      if (!info) continue;
+      inputs.push({
+        cwd: info.cwd,
+        title: null,
+        phase: codexEventToPhase(info.lastEvent),
+        lastActive: info.lastTsMs ?? f.mtimeMs,
+      });
     }
-    const detail = classifyCodexCwd(cwd) === 'desktop' ? 'ChatGPT 桌面客户端' : cwd ? 'Codex CLI' : null;
-    return buildToolStatus(running, phase, lastActive, now, activeWindowMs, { cwd, detail });
+    const projects = mergeProjects(inputs);
+    const top = projects[0];
+    const detail =
+      top?.cwd != null
+        ? classifyCodexCwd(top.cwd) === 'desktop'
+          ? 'ChatGPT 桌面客户端'
+          : 'Codex CLI'
+        : null;
+    return buildToolStatus(running, projects, { detail });
   }
 
   private async collectMcode(
@@ -625,33 +691,29 @@ export class LocalToolsMonitor {
   ): Promise<LocalToolStatus> {
     const active = readActiveMarker(path.join(home, '.minimax-code', '.mcode-active'));
     const running = active ? isPidAlive(active.pid) : false;
+    const version = readTextFile(path.join(home, '.minimax-code', 'current'))?.trim() ?? null;
 
-    // 权威状态优先：sqlite（status/title/workspace_dir）；失败降级会话文件 mtime
-    let phase: LocalToolPhase | null = null;
-    let title: string | null = null;
-    let cwd: string | null = null;
-    let lastActive: number | null = null;
-    const info = await queryMcodeSqlite(path.join(home, '.minimax', 'v2', 'sqlite', 'runtime-state.sqlite'));
-    if (info) {
-      phase = mcodeStatusToPhase(info.status);
-      title = info.title;
-      cwd = info.workspaceDir;
-      lastActive = info.updatedAtMs;
-    }
-    if (lastActive == null) {
+    // 权威状态优先：sqlite 全量会话；失败降级会话文件 mtime
+    const rows = await queryMcodeSqlite(path.join(home, '.minimax', 'v2', 'sqlite', 'runtime-state.sqlite'));
+    let inputs: LocalProjectInput[];
+    if (rows.length > 0) {
+      inputs = rows.map((r) => ({
+        cwd: r.workspaceDir,
+        title: r.title,
+        phase: mcodeStatusToPhase(r.status),
+        lastActive: r.updatedAtMs,
+      }));
+    } else {
       const latest = await findLatestFile(path.join(home, '.minimax', 'v2', 'sessions'), {
         ext: ['.jsonl', '.json'],
       });
-      lastActive = latest?.mtimeMs ?? null;
-      if (active && (lastActive == null || active.startedAtMs > lastActive)) lastActive = active.startedAtMs;
+      let fallbackTs = latest?.mtimeMs ?? null;
+      if (active && (fallbackTs == null || active.startedAtMs > fallbackTs)) fallbackTs = active.startedAtMs;
+      inputs = fallbackTs != null ? [{ cwd: null, title: null, phase: 'idle', lastActive: fallbackTs }] : [];
     }
 
-    const version = readTextFile(path.join(home, '.minimax-code', 'current'))?.trim() ?? null;
-    return buildToolStatus(running, phase, lastActive, now, activeWindowMs, {
-      cwd,
-      title,
-      detail: version ? `v${version}` : null,
-    });
+    const projects = mergeProjects(inputs);
+    return buildToolStatus(running, projects, { detail: version ? `v${version}` : null });
   }
 
   private async collectOpenCode(
@@ -662,30 +724,30 @@ export class LocalToolsMonitor {
     const service = readOpenCodeService(path.join(home, '.local', 'state', 'opencode', 'service.json'));
     const running = service ? isPidAlive(service.pid) : false;
 
-    let phase: LocalToolPhase | null = null;
-    let title: string | null = null;
-    let cwd: string | null = null;
-    let lastActive: number | null = null;
+    let inputs: LocalProjectInput[];
     if (running && service?.url && service.password) {
-      const sess = await fetchOpenCodeSession(service.url, service.password, now, activeWindowMs);
-      if (sess) {
-        cwd = sess.cwd;
-        title = sess.title;
-        phase = sess.phase;
-        lastActive = sess.updatedMs;
-      }
+      const sessions = await fetchOpenCodeSessions(service.url, service.password, now, activeWindowMs);
+      inputs = sessions.map((s) => ({
+        cwd: s.cwd,
+        title: s.title,
+        phase: s.phase,
+        lastActive: s.updatedMs,
+      }));
+    } else {
+      inputs = [];
     }
-    if (lastActive == null) {
+    if (inputs.length === 0) {
       const latest = await findLatestFile(path.join(home, '.local', 'share', 'opencode'), {
         ext: ['.db', '.json', '.jsonl'],
       });
-      lastActive = latest?.mtimeMs ?? null;
+      if (latest) inputs = [{ cwd: null, title: null, phase: 'idle', lastActive: latest.mtimeMs }];
     }
 
+    const projects = mergeProjects(inputs);
     const url = service?.url?.replace(/^https?:\/\//, '') ?? null;
     const detail = service
       ? [url, service.version ? `v${service.version}` : null].filter(Boolean).join(' · ')
       : null;
-    return buildToolStatus(running, phase, lastActive, now, activeWindowMs, { cwd, title, detail });
+    return buildToolStatus(running, projects, { detail });
   }
 }

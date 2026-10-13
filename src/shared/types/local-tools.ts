@@ -7,25 +7,37 @@
 /** 工具标识 */
 export type LocalToolId = 'codex' | 'mcode' | 'opencode';
 
-/** 聚合状态：工作中 > 空闲 > 离线（用于整卡徽标） */
+/** 聚合状态：工作中 > 空闲 > 离线（用于整卡/工具徽标） */
 export type LocalToolState = 'working' | 'idle' | 'offline';
 
-/** 忙态细分（UI 显示思考中/编辑中/空闲/离线） */
+/** 忙态细分：思考中 / 编辑中 / 空闲 / 离线（工具级离线；项目级只会是前三者） */
 export type LocalToolPhase = 'thinking' | 'editing' | 'idle' | 'offline';
+
+/** 一个工具下的"项目"行：按工作目录归并（仿 KimiProject） */
+export interface LocalToolProject {
+  /** 归并 key：normalized cwd，无 cwd 时退化为 title/id */
+  id: string;
+  /** 显示名：目录 basename，无 cwd 时用会话标题 */
+  name: string;
+  cwd: string | null;
+  title: string | null;
+  /** 该项目聚合忙态（thinking > editing > idle） */
+  phase: LocalToolPhase;
+  /** 最近活动时间，毫秒 */
+  lastActive: number | null;
+}
 
 /** 单个工具的运行状态 */
 export interface LocalToolStatus {
   /** 进程是否在跑（可靠信号；mcode/opencode 由 pid 存活判定，codex 由进程名匹配） */
   running: boolean;
-  /** 聚合状态：phase ∈ thinking/editing → working；idle → idle；offline → offline */
+  /** 工具级聚合状态（由 projects 最忙 phase 派生） */
   state: LocalToolState;
-  /** 忙态细分：思考中 / 编辑中 / 空闲 / 离线 */
+  /** 工具级聚合忙态：thinking > editing > idle；未运行 → offline */
   phase: LocalToolPhase;
-  /** 最近活跃会话的工作目录 */
-  cwd: string | null;
-  /** 最近活跃会话标题 */
-  title: string | null;
-  /** 最后活跃时间，毫秒时间戳 */
+  /** 该工具的活跃项目列表（按工作目录归并） */
+  projects: LocalToolProject[];
+  /** 工具级最后活跃时间（projects 里最新），毫秒 */
   lastActive: number | null;
   /** 附加信息：来源标注（桌面/CLI）、版本、服务地址等 */
   detail: string | null;
