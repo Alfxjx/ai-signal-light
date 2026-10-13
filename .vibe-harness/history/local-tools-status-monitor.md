@@ -94,4 +94,5 @@ opencode clash-verge-rev · Greeting（当日）  …9 月的旧会话会被过�
 - App.vue：三个 `<LocalToolCard tool-id="codex|mcode|opencode" ...>` 与 KimiCard、ClaudeCard 平铺在右栏。
 - 滚动：去掉 LocalToolCard 项目列表的 `max-h-[240px]` 卡内限高，内容自然撑高，由 App.vue 外层内容区统一整列滚动——项目多了整个右侧一起滚，而不是每张卡各自出小滚动条。
 - 分列滚动：App.vue 内容区外层去掉 `overflow-y-auto`，左列（UsageCard）与右列（Kimi/Codex/MiniMax/opencode/Claude 卡）各自 `overflow-y-auto`，左右两列独立滚动。
+- **分列滚动修复**：只把 overflow 挪到两列、中间行没加 `min-h-0`，导致中间行 `min-height: auto`=内容高度，拒绝收缩到窗口剩余高度，两列被撑爆、各自 `overflow-y-auto` 永不触发（左右一起失效）。修复：中间行加 `min-h-0`（`App.vue` 的 `div.no-drag.flex.min-h-0.flex-1.gap-2.5.p-2`）。用 Electron 临时脚本实测验证：加前两列 clientH=557 不可滚，加后 clientH=329 左右均可滚。
 - typecheck / 179 测试 / vite build 通过。

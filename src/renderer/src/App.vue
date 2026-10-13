@@ -290,7 +290,7 @@ const lastUpdateText = computed(() => {
               @toggle-floating-ball="toggleFloatingBall" @toggle-theme="toggleTheme"
               @close="closePanel" />
 
-    <div class="no-drag flex flex-1 gap-2.5 p-2">
+    <div class="no-drag flex min-h-0 flex-1 gap-2.5 p-2">
       <div class="flex min-w-0 flex-1 flex-col overflow-y-auto">
         <UsageCard :usage="usage" :now="now" :is-compact="isCompact" :is-refreshing="isUsageRefreshing"
           @toggle-compact="toggleCompact" @refresh="onUsageRefresh" />
