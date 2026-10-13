@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [2.9.0](https://github.com/Alfxjx/ai-signal-light/compare/v2.8.1...v2.9.0) (2026-10-13)
+
+
+### ✨ 新功能
+
+* 主面板新增「本地 Agent」卡片，监控 Codex/ChatGPT 客户端、MiniMax Code、opencode 运行状态 ([a3b02a3](https://github.com/Alfxjx/ai-signal-light/commit/a3b02a312ef4cfa9d4ef76a8dc8f189c84c0923a))
+* Agent 卡片改多项目列表，每工具按工作目录归并展示多个活跃项目（仿 Kimi） ([eedcaab](https://github.com/Alfxjx/ai-signal-light/commit/eedcaab3cda220c085de03ebb8648e0c1e3c0a39))
+* Agent 卡片支持忙态细分/工作目录/会话标题，打通 opencode HTTP API 与 mcode sqlite ([c341de2](https://github.com/Alfxjx/ai-signal-light/commit/c341de20661e5ed0c7b1f69b58de27926eab1ff0))
+* **opencode-plugin:** 用量侧边栏新增 Codex provider ([a434967](https://github.com/Alfxjx/ai-signal-light/commit/a434967cee97d259efd0d3d77897787c5d60fc49))
+* **renderer:** 标题栏最小化改为真最小化，新增关闭按钮 ([cc18f58](https://github.com/Alfxjx/ai-signal-light/commit/cc18f584b66722da47421f03a7351ad5e1588a5e))
+* **renderer:** 主面板标题栏新增主题切换按钮 ([880cc09](https://github.com/Alfxjx/ai-signal-light/commit/880cc091d6383b5578137f5652b37838dca84a49))
+* **renderer:** 主面板改双列布局（Usage 一列，Kimi/Claude 另一列）并调整窗口尺寸 ([01a75f8](https://github.com/Alfxjx/ai-signal-light/commit/01a75f8ffe2be264b8925a4b4aa6900cc5b3b8c4))
+* **renderer:** 主面板默认不置顶 ([0d8200d](https://github.com/Alfxjx/ai-signal-light/commit/0d8200dde47837fd4882db0775d3ae97b620be53))
+* **renderer:** 桌面端四窗口迁移 shadcn-vue 风格，新增明暗双主题 ([611f249](https://github.com/Alfxjx/ai-signal-light/commit/611f249b7d11ad76984cc39908d4dd04dc108930))
+
+
+### 🐛 修复
+
+* 修复主面板分列滚动失效（中间行缺 min-h-0 导致两列被撑爆） ([db8aaa8](https://github.com/Alfxjx/ai-signal-light/commit/db8aaa8d367b69f78430d21b8d441cdfa5527bbd))
+* **renderer:** 补全局前景色并去掉窗口半透明玻璃底 ([497bd26](https://github.com/Alfxjx/ai-signal-light/commit/497bd2664230fa40396cb6e959d729d2b70d61dd))
+* **renderer:** 双列布局下抬高主面板简略/完整模式高度 ([ef01a29](https://github.com/Alfxjx/ai-signal-light/commit/ef01a2922e8f5bc87bacac79f58572231b8b40a5))
+* **renderer:** 修复主题按钮只能切一次的问题 ([64033a9](https://github.com/Alfxjx/ai-signal-light/commit/64033a91f1b4652526dd2cb81a1c942abde88dd3))
+* **renderer:** 用量条时间进度标记改为纯 foreground 色，浅色主题下呈黑色更清晰 ([74579f0](https://github.com/Alfxjx/ai-signal-light/commit/74579f06951bcc7a74bdfef168d40d4035946265))
+* **renderer:** Ark Coding Plan 简略模式只显示 session ([09711e4](https://github.com/Alfxjx/ai-signal-light/commit/09711e40d70e953fca2de2eb95b770f89fd1fe57))
+* **renderer:** Copilot 与 Ark Coding Plan 行移回用量列表容器内 ([c513cf0](https://github.com/Alfxjx/ai-signal-light/commit/c513cf08b377eb7176168b5b6dfa2fd7ee96b260))
+
+
+### 📝 文档
+
+* **opencode-plugin:** README 去除本机个人路径，改用占位符以便公开分发 ([cd37bed](https://github.com/Alfxjx/ai-signal-light/commit/cd37bed2b07edf6d00679d77c26ba3f2a90527dd))
+
+
+### 💄 样式
+
+* 「本地 Agent」卡片标题去掉「本地」二字 ([5139f78](https://github.com/Alfxjx/ai-signal-light/commit/5139f78a17347646e6d0b23b9c2d76b333939fa8))
+* 去掉本地工具卡项目列表的卡内限高，改由外层内容区整列滚动 ([8ee1eb4](https://github.com/Alfxjx/ai-signal-light/commit/8ee1eb485c5fe0b89a046ddb517bebd4ad688af0))
+* 主面板左右两列分开滚动（左列用量/右列 Agent 卡片各自独立滚动） ([011e4e0](https://github.com/Alfxjx/ai-signal-light/commit/011e4e0389306e5b636ffb8525382911675fd7a8))
+* **renderer:** 主面板两列改为各占一半宽度 ([1ffc2d2](https://github.com/Alfxjx/ai-signal-light/commit/1ffc2d295af6163563fa735e785d6481f717fb1e))
+* **renderer:** Kimi 用量条改为 5h 在上、week 在下 ([a48a6a2](https://github.com/Alfxjx/ai-signal-light/commit/a48a6a20232d990061479dda3d59cdd9de56c995))
+
+
+### ♻️ 重构
+
+* Agent 卡片拆为三张独立卡片与 Claude/Kimi 同级，去掉总标题与标题行时间 ([4096b81](https://github.com/Alfxjx/ai-signal-light/commit/4096b81677bb11392336296db063cff2d1eee4c3))
+
 ## [2.8.1](https://github.com/Alfxjx/ai-signal-light/compare/v2.8.0...v2.8.1) (2026-10-12)
 
 
