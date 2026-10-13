@@ -3,6 +3,7 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
 import TitleBar from './components/TitleBar.vue';
 import ClaudeCard from './components/ClaudeCard.vue';
 import KimiCard from './components/KimiCard.vue';
+import LocalToolsCard from './components/LocalToolsCard.vue';
 import UsageCard from './components/UsageCard.vue';
 import { useWebSocket } from './composables/useWebSocket';
 import { useTheme, applyTheme } from './composables/useTheme';
@@ -12,6 +13,7 @@ import { PANEL_HEIGHT_COMPACT, PANEL_HEIGHT_FULL } from '../../shared/constants'
 import type {
   ClaudeProject,
   KimiStatus,
+  LocalToolsStatus,
   UsageState,
   WsMessage,
   AssistantStatus,
@@ -25,6 +27,7 @@ import { DEFAULT_USAGE_THRESHOLDS } from './types/messages';
 // ====== State ======
 const projects = ref<ClaudeProject[]>([]);
 const kimiStatus = ref<KimiStatus | null>(null);
+const localToolsStatus = ref<LocalToolsStatus | null>(null);
 const usage = reactive<UsageState>({
   kimi: null,
   minimax: null,
@@ -86,11 +89,14 @@ function handleMessage(msg: WsMessage) {
   if (msg.type === 'init') {
     if (msg.data.claude) handleClaudeData(msg.data.claude);
     if (msg.data.kimi) kimiStatus.value = msg.data.kimi;
+    if (msg.data.localTools) localToolsStatus.value = msg.data.localTools;
     if (msg.data.usage) handleUsageInit(msg.data.usage);
   } else if (msg.type === 'statusChange' && msg.assistantId === 'claude') {
     handleClaudeData(msg.data as AssistantStatus);
   } else if (msg.type === 'kimiStatus') {
     kimiStatus.value = msg.data;
+  } else if (msg.type === 'localToolsStatus') {
+    localToolsStatus.value = msg.data;
   } else if (msg.type === 'usageInit') {
     handleUsageInit(msg.data);
   } else if (msg.type === 'usageUpdate') {
@@ -292,6 +298,7 @@ const lastUpdateText = computed(() => {
       <div class="flex min-w-0 flex-1 flex-col gap-2.5">
         <KimiCard v-if="kimiStatus?.available" :status="kimiStatus" :now="now" :is-refreshing="isRefreshing"
           @refresh="onRefresh" />
+        <LocalToolsCard v-if="localToolsStatus?.available" :status="localToolsStatus" :now="now" />
         <ClaudeCard :projects="projects" :now="now" :is-refreshing="isRefreshing"
           :pending-by-cwd="pendingByCwd" @refresh="onRefresh" @clear-pending="clearPending" />
       </div>

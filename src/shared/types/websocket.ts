@@ -2,6 +2,7 @@ import type { DetectorAllStatus } from './detector';
 import type { UsageSnapshot, UsageUpdatePayload } from './usage';
 import type { MobileAppConfig, UsageThresholds } from './config';
 import type { KimiStatus } from './kimi';
+import type { LocalToolsStatus } from './local-tools';
 
 export interface ClaudeHookPayload {
   event: 'Notification' | 'Stop' | 'PreToolUse';
@@ -20,9 +21,10 @@ export interface PendingHook {
 }
 
 export type WsMessage =
-  | { type: 'init'; data: DetectorAllStatus & { kimi?: KimiStatus; usage?: UsageSnapshot & { enabled?: Record<string, boolean>; intervalMinutes?: number; thresholds?: UsageThresholds }; pending?: Record<string, PendingHook> } }
+  | { type: 'init'; data: DetectorAllStatus & { kimi?: KimiStatus; usage?: UsageSnapshot & { enabled?: Record<string, boolean>; intervalMinutes?: number; thresholds?: UsageThresholds }; pending?: Record<string, PendingHook>; localTools?: LocalToolsStatus } }
   | { type: 'statusChange'; assistantId: string; data: { status?: string; details: { projects: unknown[] } } }
   | { type: 'kimiStatus'; data: KimiStatus }
+  | { type: 'localToolsStatus'; data: LocalToolsStatus }
   | { type: 'usageInit'; data: UsageSnapshot & { enabled?: Record<string, boolean>; intervalMinutes?: number; thresholds?: UsageThresholds } }
   | (UsageUpdatePayload & { type: 'usageUpdate' })
   | (ClaudeHookPayload & { type: 'claudeHook' })

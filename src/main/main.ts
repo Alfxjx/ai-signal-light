@@ -8,6 +8,7 @@ import { ConfigStore, VALID_INTERVALS, HOOK_EVENTS } from './config';
 import { PANEL_WIDTH_DEFAULT, PANEL_WIDTH_MIN, PANEL_HEIGHT_COMPACT } from '../shared/constants';
 import { UsageMonitor, parseProxyUrl } from './usage-monitor';
 import { KimiMonitor } from './kimi-monitor';
+import { LocalToolsMonitor } from './local-tools-monitor';
 import { startDeviceFlow, pollDeviceFlow, isCopilotOAuthToken } from './copilot-auth';
 import { codexAuthAvailable } from './codex-credentials';
 import { TopEdgeDock, type DockState } from './edge-dock';
@@ -39,6 +40,7 @@ let server: StatusServer | null = null;
 let configStore: ConfigStore | null = null;
 let usageMonitor: UsageMonitor | null = null;
 let kimiMonitor: KimiMonitor | null = null;
+let localToolsMonitor: LocalToolsMonitor | null = null;
 let petStore: PetStore | null = null;
 let copilotDeviceCancelled = false;
 let isQuitting = false;
@@ -1036,11 +1038,14 @@ app.whenReady().then(() => {
   // 2.1 创建 Kimi Code (web) 状态监控（注入到 server 中以便广播 + 走 refresh）
   kimiMonitor = new KimiMonitor();
 
+  // 2.1.1 创建本地 Agent 工具状态监控（Codex/ChatGPT、MiniMax Code、opencode；注入到 server 中以便广播）
+  localToolsMonitor = new LocalToolsMonitor();
+
   // 2.2 创建桌面宠物素材库（磁盘存储）
   petStore = new PetStore(path.join(app.getPath('userData'), 'pets'));
 
   // 3. 启动状态服务器（注入 configStore + usageMonitor 让它能广播用量）
-  server = new StatusServer(WS_PORT, { configStore, usageMonitor, kimiMonitor });
+  server = new StatusServer(WS_PORT, { configStore, usageMonitor, kimiMonitor, localToolsMonitor });
   server.start();
 
   // 监听 LAN 模式变化，自动重启服务器以切换绑定地址
@@ -1100,6 +1105,7 @@ app.on('before-quit', () => {
   if (trayHoverWindow && !trayHoverWindow.isDestroyed()) trayHoverWindow.destroy();
   trayHoverWindow = null;
   if (usageMonitor) usageMonitor.stop();
+  if (localToolsMonitor) localToolsMonitor.stop();
   if (server) server.stop();
   dock?.stop();
 });

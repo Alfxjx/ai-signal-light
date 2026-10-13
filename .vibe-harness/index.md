@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [local-tools-status-monitor](plans/local-tools-status-monitor.md) | [history](history/local-tools-status-monitor.md)
+- 时间：2026-10-13
+- 范围：桌面端主面板新增「本地 Agent」卡片，实时监控 Codex CLI / ChatGPT 桌面客户端、MiniMax Code (mcode)、opencode 三家的运行状态（进程存活 + 最近活跃 + 目录/版本/端口），数据源全部本机只读，每 10s 轮询，经 WS `localToolsStatus` 推送
+- 关联：`src/shared/types/{local-tools,websocket}.ts`、`src/main/{local-tools-monitor,local-tools-monitor.test,server,main}.ts`、`src/renderer/src/components/LocalToolsCard.vue`、`src/renderer/src/{App.vue,types/messages.ts}`、`AGENTS.md`
+
 ## [desktop-shadcn-redesign](plans/desktop-shadcn-redesign.md) | [history](history/desktop-shadcn-redesign.md)
 - 时间：2026-10-12
 - 范围：桌面端主面板/设置/悬浮球下拉/托盘弹窗 4 窗口迁移 shadcn-vue + Tailwind v3.4，新增明/暗/跟随系统三档主题（config.appearance.theme + theme:changed 广播）；4 份窗口 CSS 从 1399 行删到 105 行

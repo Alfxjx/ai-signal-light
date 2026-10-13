@@ -39,6 +39,13 @@ export type {
 } from '../../../shared/types/kimi';
 
 export type {
+  LocalToolId,
+  LocalToolState,
+  LocalToolStatus,
+  LocalToolsStatus,
+} from '../../../shared/types/local-tools';
+
+export type {
   UsageThresholds,
 } from '../../../shared/types/config';
 

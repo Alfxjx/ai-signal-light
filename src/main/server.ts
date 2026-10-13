@@ -8,6 +8,7 @@ import { normalizeCwd } from '../shared/utils/cwd';
 import type { ConfigStore } from './config';
 import type { UsageMonitor } from './usage-monitor';
 import type { KimiMonitor } from './kimi-monitor';
+import type { LocalToolsMonitor } from './local-tools-monitor';
 import type { WsMessage, ClientWsMessage, PendingHook } from '../shared/types/websocket';
 import { toMobileConfig } from './pairing';
 
@@ -15,6 +16,7 @@ interface ServerOptions {
   configStore?: ConfigStore | null;
   usageMonitor?: UsageMonitor | null;
   kimiMonitor?: KimiMonitor | null;
+  localToolsMonitor?: LocalToolsMonitor | null;
 }
 
 /**
@@ -26,6 +28,7 @@ export class StatusServer {
   private configStore: ConfigStore | null;
   private usageMonitor: UsageMonitor | null;
   private kimiMonitor: KimiMonitor | null;
+  private localToolsMonitor: LocalToolsMonitor | null;
   private wss: WebSocket.Server | null = null;
   private httpServer: http.Server | null = null;
   private clients = new Set<WebSocket>();
@@ -38,6 +41,7 @@ export class StatusServer {
     this.configStore = options.configStore || null;
     this.usageMonitor = options.usageMonitor || null;
     this.kimiMonitor = options.kimiMonitor || null;
+    this.localToolsMonitor = options.localToolsMonitor || null;
   }
 
   start(): this {
@@ -72,6 +76,7 @@ export class StatusServer {
         data: {
           ...this.detector.getAllStatus(),
           kimi: this.kimiMonitor ? this.kimiMonitor.getStatus() : undefined,
+          localTools: this.localToolsMonitor ? this.localToolsMonitor.getStatus() : undefined,
           pending: this.getPendingSnapshot()
         }
       } as WsMessage));
@@ -112,6 +117,7 @@ export class StatusServer {
             this.detector.checkAll();
             if (this.usageMonitor) this.usageMonitor.checkAll();
             if (this.kimiMonitor) this.kimiMonitor.refresh();
+            if (this.localToolsMonitor) this.localToolsMonitor.refresh();
           } else if (msg.type === 'getConfig') {
             // QR 配对后手机端反向拉取配置；连接已在 verifyClient 阶段鉴权通过
             const requestId = msg.requestId;
@@ -166,6 +172,13 @@ export class StatusServer {
       });
     }
 
+    // 注册本地 Agent 工具状态回调（Codex/ChatGPT、MiniMax Code、opencode），推送给所有客户端
+    if (this.localToolsMonitor) {
+      this.localToolsMonitor.onStatusChange((status) => {
+        this.broadcast({ type: 'localToolsStatus', data: status } as WsMessage);
+      });
+    }
+
     // 注册配置变更回调：阈值变化时推送给所有客户端
     if (this.configStore) {
       this.configStore.onChange((cfg) => {
@@ -177,6 +190,8 @@ export class StatusServer {
     this.detector.start();
     // 启动 Kimi Code (web) 状态监控
     this.kimiMonitor?.start();
+    // 启动本地 Agent 工具状态监控
+    this.localToolsMonitor?.start();
 
     // 根据 lanMode 决定绑定地址：localhost-only 或 LAN
     const cfg = this.configStore?.get();
@@ -350,6 +365,7 @@ export class StatusServer {
   stop(): void {
     this.detector.stop();
     this.kimiMonitor?.stop();
+    this.localToolsMonitor?.stop();
     if (this.wss) this.wss.close();
     if (this.httpServer) this.httpServer.close();
   }
