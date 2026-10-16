@@ -1,0 +1,25 @@
+{
+  "name": "asl-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AI状态监控 CLI：6 家供应商用量配额（JSON / 终端表格 / --watch）",
+  "bin": {
+    "asl": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "providers-core": "file:../providers-core"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^3.0.0"
+  }
+}
