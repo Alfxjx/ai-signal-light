@@ -29,7 +29,7 @@
 1. **file: 依赖顺序**：asl-cli 安装前 providers-core 必须先 `npm run build`，否则 node_modules 里没有 dist
 2. **pwsh 管道测 JSON 会误报**：本 shell 环境用 OEM 代码页解码 node 的 UTF-8 stdout，`\\` 被搅成乱码导致 `ConvertFrom-Json` 报「Bad JSON escape sequence」——JSON 本身合法，验证要走文件（`> temp.json` 再 node 解析），真实终端无碍
 3. **chalk 在 vitest 里 level=0**：非 tty 自动降级，着色断言前要手动 `chalk.level = 3`
-4. **opencode-plugin 迁移（另开任务）**：opencode 从磁盘加载 TS 源码，能否 import 包外 `file:` 依赖未知，需先实测其加载器；不行退化为 sync 脚本
+4. **opencode-plugin 迁移（已搁置）**：2026-10-16 用户决定**暂不**把 opencode-plugin 迁到 providers-core，两边暂时各自持有一份取数拷贝；后续若要迁移，先实测 opencode 加载器能否 import 包外 `file:` 依赖，不行再退化为 sync 脚本。改取数逻辑时注意两边同步改。
 
 ## 影响范围
 
