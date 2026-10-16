@@ -12,6 +12,8 @@ The repository also contains these sibling projects:
 - `landing/` — marketing landing page, deployed to GitHub Pages.
 - `opencode-plugin/` — 用量侧边栏插件，供 **opencode** 在自己的侧边栏里显示各家用量。独立 npm 包，桌面端的 `config.json` **只读不写**（固定读正式版，不读 dev 版）；唯一例外是 Codex 凭证读 `~/.codex/auth.json` 且过期时刷新写回（与 Codex CLI / 桌面端共用同一文件与原子写约定）。
 - `opencode-usage-plugin-helper-cli/` — 上述插件的配置助手 CLI（`init` / `set` / `doctor` / `install`），让没装桌面程序的 opencode 用户能自助配置。独立 npm 包，原子写且只动自己管的键。
+- `providers-core/` — 共享用量取数核心（6 家 provider + 桌面端 config.json 只读解析，自 opencode-plugin 复制迁移）。独立 npm 包（private），编译为 **CommonJS dist**（迁移来的源码是 extensionless 相对导入）；改取数逻辑在这里改，再重新 build 供下游消费。
+- `asl-cli/` — AI状态监控 命令行版（`asl` 命令，分支 `cli-dev`）：输出 6 家用量配额，支持 `--json` 结构化输出、终端表格（阈值着色 + 进度条）、`--watch` 常驻刷新。ESM 包，`file:` 依赖 providers-core，只做壳（commander 参数解析 + chalk 渲染 + watch 循环）；凭据同样只读桌面端 config.json。
 
 ## Commands
 
@@ -28,6 +30,7 @@ The repository also contains these sibling projects:
 | 正式发布 | `npm run release` | `commit-and-tag-version`: 自动 bump、生成 CHANGELOG、打 tag |
 | Landing dev/build | `npm run landing:dev` / `landing:build` | Runs the corresponding script in `landing/` |
 | opencode 插件 / CLI 测试 | `cd opencode-plugin && npm test`、`cd opencode-usage-plugin-helper-cli && npm test` | 两个都是独立 npm 包，需各自 `npm install`；根目录 `npm test` 不覆盖 |
+| asl-cli / providers-core 测试 | `cd providers-core && npm install && npm test && npm run build`、`cd asl-cli && npm install && npm test` | 独立 npm 包；asl-cli 依赖 providers-core 的 `file:` 装（先 build 再装）；根目录 `npm test` 不覆盖 |
 | Android build | `cd android-app && ./gradlew assembleDebug` | Gradle wrapper (`gradlew.bat` on Windows)。产物 `app/build/outputs/apk/debug/app-debug.apk`（debug 签名可直装；release 未配签名，无法安装） |
 | Android 版本号 | 改 `android-app/app/build.gradle.kts` 的 `versionName` | `versionCode` 自动取 `git rev-list --count HEAD`，每次提交打包都会递增；**发版打包前手动 bump `versionName`** |
 

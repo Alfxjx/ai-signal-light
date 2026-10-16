@@ -7,10 +7,10 @@
 - 关联：相关模块/文件
 -->
 
-## [asl-cli](plans/asl-cli.md)
+## [asl-cli](plans/asl-cli.md) | [history](history/asl-cli.md)
 - 时间：2026-10-16
 - 范围：新增 CLI 程序 asl-cli（分支 cli-dev）：输出 6 家用量配额，支持 JSON / 终端表格 / --watch；抽取共享包 providers-core（opencode-plugin 本任务不动，迁移另开任务）
-- 关联：`asl-cli/**`、`providers-core/**`（新建）；`opencode-plugin/src/**`（迁移来源）
+- 关联：`asl-cli/**`、`providers-core/**`（新建）；`opencode-plugin/src/**`（迁移来源）；`AGENTS.md`
 
 ## [local-tools-status-monitor](plans/local-tools-status-monitor.md) | [history](history/local-tools-status-monitor.md)
 - 时间：2026-10-13
