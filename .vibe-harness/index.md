@@ -7,6 +7,11 @@
 - 关联：相关模块/文件
 -->
 
+## [asl-cli](plans/asl-cli.md)
+- 时间：2026-10-16
+- 范围：新增 CLI 程序 asl-cli（分支 cli-dev）：输出 6 家用量配额，支持 JSON / 终端表格 / --watch；抽取共享包 providers-core（opencode-plugin 本任务不动，迁移另开任务）
+- 关联：`asl-cli/**`、`providers-core/**`（新建）；`opencode-plugin/src/**`（迁移来源）
+
 ## [local-tools-status-monitor](plans/local-tools-status-monitor.md) | [history](history/local-tools-status-monitor.md)
 - 时间：2026-10-13
 - 范围：桌面端主面板新增「本地 Agent」卡片，实时监控 Codex CLI / ChatGPT 桌面客户端、MiniMax Code (mcode)、opencode 三家的运行状态（进程存活 + 最近活跃 + 目录/版本/端口），数据源全部本机只读，每 10s 轮询，经 WS `localToolsStatus` 推送
